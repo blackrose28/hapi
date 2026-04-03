@@ -16,6 +16,7 @@ import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import type { ConversationStatus } from '@/realtime/types'
 import { useActiveWord } from '@/hooks/useActiveWord'
+
 import { useActiveSuggestions } from '@/hooks/useActiveSuggestions'
 import { applySuggestion } from '@/utils/applySuggestion'
 import { usePlatform } from '@/hooks/usePlatform'
@@ -65,6 +66,7 @@ export function HappyComposer(props: {
     voiceMicMuted?: boolean
     onVoiceToggle?: () => void
     onVoiceMicToggle?: () => void
+    onSendIntent?: () => void
 }) {
     const { t } = useTranslation()
     const {
@@ -92,7 +94,8 @@ export function HappyComposer(props: {
         voiceStatus = 'disconnected',
         voiceMicMuted = false,
         onVoiceToggle,
-        onVoiceMicToggle
+        onVoiceMicToggle,
+        onSendIntent
     } = props
 
     // Use ?? so missing values fall back to default (destructuring defaults only handle undefined)
@@ -290,6 +293,8 @@ export function HappyComposer(props: {
         if (key === 'Enter' && e.shiftKey) {
             e.preventDefault()
             if (!canSend) return
+            console.log('[HappyComposer] sendIntent', { source: 'shift-enter' })
+            onSendIntent?.()
             api.composer().send()
             setShowContinueHint(false)
             return
@@ -406,8 +411,10 @@ export function HappyComposer(props: {
             event.preventDefault()
             return
         }
+        console.log('[HappyComposer] sendIntent', { source: 'submit' })
+        onSendIntent?.()
         setShowContinueHint(false)
-    }, [attachmentsReady])
+    }, [attachmentsReady, onSendIntent])
 
     const handlePermissionChange = useCallback((mode: PermissionMode) => {
         if (!onPermissionModeChange || controlsDisabled) return
@@ -446,8 +453,10 @@ export function HappyComposer(props: {
     const voiceEnabled = Boolean(onVoiceToggle)
 
     const handleSend = useCallback(() => {
+        console.log('[HappyComposer] sendIntent', { source: 'button' })
+        onSendIntent?.()
         api.composer().send()
-    }, [api])
+    }, [api, onSendIntent])
 
     const overlays = useMemo(() => {
         if (showSettings && (showCollaborationSettings || showPermissionSettings || showModelSettings || showEffortSettings)) {

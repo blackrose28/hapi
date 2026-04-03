@@ -302,8 +302,12 @@ export function SessionChat(props: {
         }
 
         props.onSend(text, attachments)
-        setForceScrollToken((token) => token + 1)
     }, [agentFlavor, props.availableSlashCommands, props.onSend, props.session.id, addToast, haptic, t])
+
+    const handleSendIntent = useCallback(() => {
+        console.log('[SessionChat] handleSendIntent', { sessionId: props.session.id })
+        setForceScrollToken((token) => token + 1)
+    }, [props.session.id])
 
     const attachmentAdapter = useMemo(() => {
         if (!props.session.active) {
@@ -397,6 +401,7 @@ export function SessionChat(props: {
                         voiceMicMuted={voice?.micMuted}
                         onVoiceToggle={voice ? handleVoiceToggle : undefined}
                         onVoiceMicToggle={voice ? handleVoiceMicToggle : undefined}
+                        onSendIntent={handleSendIntent}
                     />
                 </div>
             </AssistantRuntimeProvider>
