@@ -46,17 +46,22 @@ export async function geminiLoop(opts: GeminiLoopOptions): Promise<void> {
         session.onSessionFound(opts.resumeSessionId);
     }
 
+    const getCurrentModel = (): string | undefined => {
+        const sessionModel = session.getModel();
+        return sessionModel != null ? sessionModel : opts.model;
+    };
+
     await runLocalRemoteSession({
         session,
         startingMode: opts.startingMode,
         logTag: 'gemini-loop',
         runLocal: (instance) => geminiLocalLauncher(instance, {
-            model: opts.model,
+            model: getCurrentModel(),
             allowedTools: opts.allowedTools,
             hookSettingsPath: opts.hookSettingsPath
         }),
         runRemote: (instance) => geminiRemoteLauncher(instance, {
-            model: opts.model,
+            model: getCurrentModel(),
             hookSettingsPath: opts.hookSettingsPath
         }),
         onSessionReady: opts.onSessionReady

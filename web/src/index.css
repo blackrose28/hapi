@@ -97,7 +97,8 @@ html,
 body {
     height: 100vh;
     height: 100dvh;
-    height: var(--tg-viewport-stable-height, 100dvh);
+    height: var(--app-viewport-height, 100dvh);
+    height: var(--tg-viewport-stable-height, var(--app-viewport-height, 100dvh));
     touch-action: pan-x pan-y;
     overscroll-behavior: none;
     -webkit-text-size-adjust: 100%;

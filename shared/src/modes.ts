@@ -35,9 +35,6 @@ export const PERMISSION_MODES = [
 ] as const
 export type PermissionMode = typeof PERMISSION_MODES[number]
 
-export const CLAUDE_MODEL_PRESETS = ['sonnet', 'sonnet[1m]', 'opus', 'opus[1m]'] as const
-export type ClaudeModelPreset = typeof CLAUDE_MODEL_PRESETS[number]
-
 export type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor'
 
 export const PERMISSION_MODE_LABELS: Record<PermissionMode, string> = {
@@ -75,29 +72,9 @@ export type CodexCollaborationModeOption = {
     label: string
 }
 
-export const CLAUDE_MODEL_LABELS: Record<ClaudeModelPreset, string> = {
-    sonnet: 'Sonnet',
-    'sonnet[1m]': 'Sonnet 1M',
-    opus: 'Opus',
-    'opus[1m]': 'Opus 1M'
-}
-
 export const CODEX_COLLABORATION_MODE_LABELS: Record<CodexCollaborationMode, string> = {
     default: 'Default',
     plan: 'Plan'
-}
-
-export function isClaudeModelPreset(model: string | null | undefined): model is ClaudeModelPreset {
-    return typeof model === 'string' && CLAUDE_MODEL_PRESETS.includes(model as ClaudeModelPreset)
-}
-
-export function getClaudeModelLabel(model: string): string | null {
-    const trimmedModel = model.trim()
-    if (!trimmedModel) {
-        return null
-    }
-
-    return CLAUDE_MODEL_LABELS[trimmedModel as ClaudeModelPreset] ?? null
 }
 
 export function getPermissionModeLabel(mode: PermissionMode): string {

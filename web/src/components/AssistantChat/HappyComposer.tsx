@@ -21,7 +21,7 @@ import { useActiveSuggestions } from '@/hooks/useActiveSuggestions'
 import { applySuggestion } from '@/utils/applySuggestion'
 import { usePlatform } from '@/hooks/usePlatform'
 import { usePWAInstall } from '@/hooks/usePWAInstall'
-import { isClaudeFlavor } from '@/lib/agentFlavorUtils'
+import { supportsEffort, supportsModelChange } from '@hapi/protocol'
 import { markSkillUsed } from '@/lib/recent-skills'
 import { FloatingOverlay } from '@/components/ChatInput/FloatingOverlay'
 import { Autocomplete } from '@/components/ChatInput/Autocomplete'
@@ -29,7 +29,7 @@ import { StatusBar } from '@/components/AssistantChat/StatusBar'
 import { ComposerButtons } from '@/components/AssistantChat/ComposerButtons'
 import { AttachmentItem } from '@/components/AssistantChat/AttachmentItem'
 import { useTranslation } from '@/lib/use-translation'
-import { getClaudeComposerModelOptions, getNextClaudeComposerModel } from './claudeModelOptions'
+import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
 import { getClaudeComposerEffortOptions } from './claudeEffortOptions'
 
 export interface TextInputState {
@@ -269,8 +269,8 @@ export function HappyComposer(props: {
         [agentFlavor]
     )
     const claudeModelOptions = useMemo(
-        () => getClaudeComposerModelOptions(model),
-        [model]
+        () => getModelOptionsForFlavor(agentFlavor, model),
+        [agentFlavor, model]
     )
     const claudeEffortOptions = useMemo(
         () => getClaudeComposerEffortOptions(effort),
@@ -357,9 +357,9 @@ export function HappyComposer(props: {
 
     useEffect(() => {
         const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
-            if (e.key === 'm' && (e.metaKey || e.ctrlKey) && onModelChange && isClaudeFlavor(agentFlavor)) {
+            if (e.key === 'm' && (e.metaKey || e.ctrlKey) && onModelChange && supportsModelChange(agentFlavor)) {
                 e.preventDefault()
-                onModelChange(getNextClaudeComposerModel(model))
+                onModelChange(getNextModelForFlavor(agentFlavor, model))
                 haptic('light')
             }
         }
@@ -446,8 +446,8 @@ export function HappyComposer(props: {
 
     const showCollaborationSettings = Boolean(onCollaborationModeChange && collaborationModeOptions.length > 0)
     const showPermissionSettings = Boolean(onPermissionModeChange && permissionModeOptions.length > 0)
-    const showModelSettings = Boolean(onModelChange && isClaudeFlavor(agentFlavor))
-    const showEffortSettings = Boolean(onEffortChange && isClaudeFlavor(agentFlavor))
+    const showModelSettings = Boolean(onModelChange && supportsModelChange(agentFlavor))
+    const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor))
     const showSettingsButton = Boolean(showCollaborationSettings || showPermissionSettings || showModelSettings || showEffortSettings)
     const showAbortButton = true
     const voiceEnabled = Boolean(onVoiceToggle)

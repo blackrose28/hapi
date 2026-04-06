@@ -316,8 +316,8 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
         }
 
         const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
-        if (flavor !== 'claude') {
-            return c.json({ error: 'Model selection is only supported for Claude sessions' }, 400)
+        if (flavor !== 'claude' && flavor !== 'gemini') {
+            return c.json({ error: 'Model selection is only supported for Claude and Gemini sessions' }, 400)
         }
 
         try {
