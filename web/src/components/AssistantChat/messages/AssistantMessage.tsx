@@ -53,21 +53,23 @@ export function HappyAssistantMessage() {
 
     return (
         <MessagePrimitive.Root className={`${rootClass} ${copyText ? 'group/msg' : ''}`}>
-            <div className={`relative min-w-0 ${copyText ? 'pr-8' : ''}`}>
-                {copyText && (
+            <div className="min-w-0">
+                <MessagePrimitive.Content components={MESSAGE_PART_COMPONENTS} />
+            </div>
+            {copyText && (
+                <div className="flex justify-end mt-1 opacity-60 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity">
                     <button
                         type="button"
                         title="Copy"
-                        className="absolute right-0 top-0 opacity-60 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-[opacity,background-color] p-0.5 rounded hover:bg-[var(--app-subtle-bg)]"
+                        className="p-0.5 rounded hover:bg-[var(--app-subtle-bg)] transition-colors"
                         onClick={() => copy(copyText)}
                     >
                         {copied
                             ? <CheckIcon className="h-3.5 w-3.5 text-green-500" />
                             : <CopyIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" />}
                     </button>
-                )}
-                <MessagePrimitive.Content components={MESSAGE_PART_COMPONENTS} />
-            </div>
+                </div>
+            )}
         </MessagePrimitive.Root>
     )
 }

@@ -1,6 +1,5 @@
 import { logger } from '@/ui/logger';
-import { restoreTerminalState } from '@/ui/terminalState';
-import { spawnWithAbort } from '@/utils/spawnWithAbort';
+import { spawnWithTerminalGuard } from '@/utils/spawnWithTerminalGuard';
 import { buildMcpServerConfigArgs, buildDeveloperInstructionsArg } from './utils/codexMcpConfig';
 import { codexSystemPrompt } from './utils/systemPrompt';
 
@@ -68,23 +67,17 @@ export async function codexLocal(opts: {
         return;
     }
 
-    process.stdin.pause();
-    try {
-        await spawnWithAbort({
-            command: 'codex',
-            args,
-            cwd: opts.path,
-            env: process.env,
-            signal: opts.abort,
-            logLabel: 'CodexLocal',
-            spawnName: 'codex',
-            installHint: 'Codex CLI',
-            includeCause: true,
-            logExit: true,
-            shell: process.platform === 'win32'
-        });
-    } finally {
-        process.stdin.resume();
-        restoreTerminalState();
-    }
+    await spawnWithTerminalGuard({
+        command: 'codex',
+        args,
+        cwd: opts.path,
+        env: process.env,
+        signal: opts.abort,
+        logLabel: 'CodexLocal',
+        spawnName: 'codex',
+        installHint: 'Codex CLI',
+        includeCause: true,
+        logExit: true,
+        shell: process.platform === 'win32'
+    });
 }

@@ -49,6 +49,7 @@ export function HappyComposer(props: {
     allowSendWhenInactive?: boolean
     thinking?: boolean
     agentState?: AgentState | null
+    backgroundTaskCount?: number
     contextSize?: number
     controlledByUser?: boolean
     agentFlavor?: string | null
@@ -79,6 +80,7 @@ export function HappyComposer(props: {
         allowSendWhenInactive = false,
         thinking = false,
         agentState,
+        backgroundTaskCount,
         contextSize,
         controlledByUser = false,
         agentFlavor,
@@ -124,7 +126,7 @@ export function HappyComposer(props: {
         const path = (attachment as { path?: string }).path
         return typeof path === 'string' && path.length > 0
     })
-    const canSend = (hasText || hasAttachments) && attachmentsReady && !controlsDisabled && !threadIsRunning
+    const canSend = (hasText || hasAttachments) && attachmentsReady && !controlsDisabled
 
     const [inputState, setInputState] = useState<TextInputState>({
         text: '',
@@ -289,8 +291,13 @@ export function HappyComposer(props: {
             return
         }
 
-        // Shift+Enter sends the message (works on all platforms including iPadOS with keyboard)
+        // Shift+Enter inserts a newline (standard behavior)
         if (key === 'Enter' && e.shiftKey) {
+            return // let default textarea behavior handle newline
+        }
+
+        // Enter without shift: send or no-op (never insert newline)
+        if (key === 'Enter' && !e.shiftKey && suggestions.length === 0) {
             e.preventDefault()
             if (!canSend) return
             console.log('[HappyComposer] sendIntent', { source: 'shift-enter' })
@@ -473,20 +480,18 @@ export function HappyComposer(props: {
                                         key={option.mode}
                                         type="button"
                                         disabled={controlsDisabled}
-                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                            controlsDisabled
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleCollaborationChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
-                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                collaborationMode === option.mode
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${collaborationMode === option.mode
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {collaborationMode === option.mode && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -514,20 +519,18 @@ export function HappyComposer(props: {
                                         key={option.mode}
                                         type="button"
                                         disabled={controlsDisabled}
-                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                            controlsDisabled
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handlePermissionChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
-                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                permissionMode === option.mode
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${permissionMode === option.mode
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {permissionMode === option.mode && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -555,20 +558,18 @@ export function HappyComposer(props: {
                                         key={option.value ?? 'auto'}
                                         type="button"
                                         disabled={controlsDisabled}
-                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                            controlsDisabled
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleModelChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
-                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                model === option.value
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${model === option.value
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {model === option.value && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -596,20 +597,18 @@ export function HappyComposer(props: {
                                         key={option.value ?? 'auto'}
                                         type="button"
                                         disabled={controlsDisabled}
-                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                            controlsDisabled
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleEffortChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
-                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                effort === option.value
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${effort === option.value
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {effort === option.value && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -677,6 +676,7 @@ export function HappyComposer(props: {
                         active={active}
                         thinking={thinking}
                         agentState={agentState}
+                        backgroundTaskCount={backgroundTaskCount}
                         contextSize={contextSize}
                         model={model}
                         permissionMode={permissionMode}
@@ -717,7 +717,7 @@ export function HappyComposer(props: {
                             showTerminalButton={showTerminalButton}
                             terminalDisabled={terminalDisabled}
                             terminalLabel={terminalLabel}
-                            onTerminal={onTerminal ?? (() => {})}
+                            onTerminal={onTerminal ?? (() => { })}
                             showAbortButton={showAbortButton}
                             abortDisabled={abortDisabled}
                             isAborting={isAborting}
@@ -729,7 +729,7 @@ export function HappyComposer(props: {
                             voiceEnabled={voiceEnabled}
                             voiceStatus={voiceStatus}
                             voiceMicMuted={voiceMicMuted}
-                            onVoiceToggle={onVoiceToggle ?? (() => {})}
+                            onVoiceToggle={onVoiceToggle ?? (() => { })}
                             onVoiceMicToggle={onVoiceMicToggle}
                             onSend={handleSend}
                         />

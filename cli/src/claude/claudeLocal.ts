@@ -1,12 +1,11 @@
 import { mkdirSync } from "node:fs";
 import { logger } from "@/ui/logger";
-import { restoreTerminalState } from "@/ui/terminalState";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { getProjectPath } from "./utils/path";
 import { appendMcpConfigArg } from "./utils/mcpConfig";
 import { systemPrompt } from "./utils/systemPrompt";
 import { withBunRuntimeEnv } from "@/utils/bunRuntime";
-import { spawnWithAbort } from "@/utils/spawnWithAbort";
+import { spawnWithTerminalGuard } from "@/utils/spawnWithTerminalGuard";
 import { getHapiBlobsDir } from "@/constants/uploadPaths";
 import { stripNewlinesForWindowsShellArg } from "@/utils/shellEscape";
 import { getDefaultClaudeCodePath } from "./sdk/utils";
@@ -91,8 +90,7 @@ export async function claudeLocal(opts: {
 
     // Spawn the process
     try {
-        process.stdin.pause();
-        await spawnWithAbort({
+        await spawnWithTerminalGuard({
             command: claudeCommand,
             args,
             cwd: opts.path,
@@ -107,8 +105,6 @@ export async function claudeLocal(opts: {
         });
     } finally {
         cleanupMcpConfig?.();
-        process.stdin.resume();
-        restoreTerminalState();
     }
 
     return startFrom ?? null;
