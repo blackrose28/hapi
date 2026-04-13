@@ -40,7 +40,7 @@ For implementation tasks, always follow this order:
 2. Show the plan to the user unless they explicitly asked for silent execution.
 3. After plan approval, use the Codex MCP tool to implement the plan.
 4. After Codex completes, use the `reviewer` subagent.
-5. If review fails, do at most one additional Codex fix round unless the user asks for more.
+5. If review fails, do at most three additional Codex fix round unless the user asks for more.
 
 ## Planning requirements
 
@@ -108,6 +108,7 @@ When calling the Codex MCP tool, always use:
 
 - cwd: "."
 - approval-policy: "never"
+- model: "glm-cn/glm-5-turbo"
 - sandbox: "danger-full-access"
 - include-plan-tool: false
 

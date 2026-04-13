@@ -5,7 +5,10 @@ import {
     getSessionInputSchema, type GetSessionInput,
     listSessionsInputSchema, type ListSessionsInput,
     sessionIdSchema, type SessionIdInput,
-    changeTitleJsonSchema, getSessionJsonSchema, listSessionsJsonSchema
+    changeTitleJsonSchema, getSessionJsonSchema, listSessionsJsonSchema,
+    sendMessageInputSchema, type SendMessageInput,
+    getMessagesAfterInputSchema, type GetMessagesAfterInput,
+    sendMessageJsonSchema, getMessagesAfterJsonSchema
 } from './schemas'
 import { resolveToolContext, requireSessionForTool } from './contextGuards'
 import type { Context } from 'hono'
@@ -43,7 +46,7 @@ export const SERVICE_UNAVAILABLE = -32003
 
 // ---- Helpers ----
 
-function text(text: string, isError = false): McpToolResult {
+function textResult(text: string, isError = false): McpToolResult {
     return { content: [{ type: 'text' as const, text }], isError }
 }
 
@@ -90,9 +93,9 @@ export const changeTitleTool: McpToolDefinition = {
         }
         try {
             await ctx.engine.renameSession(sessionResult.sessionId, title)
-            return text(`Successfully changed session title to "${title}"`)
+            return textResult(`Successfully changed session title to "${title}"`)
         } catch (error) {
-            return text(`Failed to change title: ${error instanceof Error ? error.message : String(error)}`, true)
+            return textResult(`Failed to change title: ${error instanceof Error ? error.message : String(error)}`, true)
         }
     }
 }
@@ -114,7 +117,7 @@ export const listSessionsTool: McpToolDefinition = {
                 return b.updatedAt - a.updatedAt
             })
             .map(toSessionSummary)
-        return text(JSON.stringify(sessions, null, 2))
+        return textResult(JSON.stringify(sessions, null, 2))
     }
 }
 
@@ -138,7 +141,65 @@ export const getSessionTool: McpToolDefinition = {
         if (sessionResult instanceof Response) {
             return sessionResponseToError(sessionResult)
         }
-        return text(JSON.stringify(toSessionSummary(sessionResult.session), null, 2))
+        return textResult(JSON.stringify(toSessionSummary(sessionResult.session), null, 2))
+    }
+}
+
+export const sendMessageTool: McpToolDefinition = {
+    name: 'send_message',
+    title: 'Send Message',
+    description: 'Send a user message into a session and wait for the agent response. Requires an explicit sessionId and the session must be active.',
+    inputSchema: sendMessageInputSchema,
+    jsonSchema: sendMessageJsonSchema,
+    handler: (c, getSyncEngine) => async (args) => {
+        const ctx = resolveToolContext(c, getSyncEngine)
+        if (ctx instanceof Response) {
+            return mcpError(SERVICE_UNAVAILABLE, 'Service unavailable')
+        }
+        const parsed = sendMessageInputSchema.safeParse(args)
+        if (!parsed.success) {
+            return mcpError(INVALID_PARAMS, `Invalid params: ${parsed.error.message}`)
+        }
+        const { sessionId, text, localId, attachments } = parsed.data as SendMessageInput
+        const sessionResult = requireSessionForTool(c, ctx.engine, sessionId, ctx.namespace, { requireActive: true })
+        if (sessionResult instanceof Response) {
+            return sessionResponseToError(sessionResult)
+        }
+        try {
+            await ctx.engine.sendMessage(sessionResult.sessionId, { text, localId, attachments })
+            return textResult(`Message sent successfully to session ${sessionResult.sessionId}`)
+        } catch (error) {
+            return textResult(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`, true)
+        }
+    }
+}
+
+export const getMessagesAfterTool: McpToolDefinition = {
+    name: 'get_messages_after',
+    title: 'Get Messages After',
+    description: 'Poll for messages after a given sequence number. Returns messages with seq > afterSeq in deterministic order. Requires an explicit sessionId.',
+    inputSchema: getMessagesAfterInputSchema,
+    jsonSchema: getMessagesAfterJsonSchema,
+    handler: (c, getSyncEngine) => async (args) => {
+        const ctx = resolveToolContext(c, getSyncEngine)
+        if (ctx instanceof Response) {
+            return mcpError(SERVICE_UNAVAILABLE, 'Service unavailable')
+        }
+        const parsed = getMessagesAfterInputSchema.safeParse(args)
+        if (!parsed.success) {
+            return mcpError(INVALID_PARAMS, `Invalid params: ${parsed.error.message}`)
+        }
+        const { sessionId, afterSeq, limit = 200 } = parsed.data as GetMessagesAfterInput
+        const sessionResult = requireSessionForTool(c, ctx.engine, sessionId, ctx.namespace)
+        if (sessionResult instanceof Response) {
+            return sessionResponseToError(sessionResult)
+        }
+        try {
+            const messages = ctx.engine.getMessagesAfter(sessionResult.sessionId, { afterSeq, limit })
+            return textResult(JSON.stringify(messages, null, 2))
+        } catch (error) {
+            return textResult(`Failed to get messages: ${error instanceof Error ? error.message : String(error)}`, true)
+        }
     }
 }
 
@@ -147,6 +208,8 @@ export const hubMcpTools: McpToolDefinition[] = [
     changeTitleTool,
     listSessionsTool,
     getSessionTool,
+    sendMessageTool,
+    getMessagesAfterTool,
 ]
 
 // ---- Internal helpers ----
@@ -164,5 +227,6 @@ async function sessionResponseToError(response: Response): Promise<McpToolError>
     // Map HTTP status to JSON-RPC error code
     if (status === 403) return mcpError(ACCESS_DENIED, reason)
     if (status === 404) return mcpError(SESSION_NOT_FOUND, reason)
+    if (status === 409) return mcpError(INVALID_PARAMS, reason)
     return mcpError(SERVICE_UNAVAILABLE, reason)
 }
