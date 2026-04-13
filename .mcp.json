@@ -6,6 +6,14 @@
                 "mcp-server"
             ],
             "env": {}
+        },
+        "playwright": {
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "@playwright/mcp@latest"
+            ]
         }
     }
 }
