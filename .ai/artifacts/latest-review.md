@@ -2,21 +2,21 @@
 PASS
 
 ## Criteria Check
-- [Met] MCP hub authentication is implemented by exchanging `MCP_ACCESS_TOKEN` at `/api/auth`, with auth URL derived from `MCP_BASE_URL` origin and bearer token attached to MCP tool calls.
-- [Met] JWT caching and proactive refresh are implemented using `exp` with `JWT_REFRESH_WINDOW_SECONDS`, and malformed/non-JWT `token` values now fail fast instead of being accepted.
-- [Met] Failure handling is explicit for missing access token, 401 auth rejection, and invalid auth responses.
+- [Met] `.env` loading was added in `/home/chuonglv/Work/hapi/orchestrator/main.py` and occurs before existing `os.environ`/`os.getenv` config reads.
+- [Met] Missing `.env` keeps behavior effectively unchanged because `load_dotenv(...)` is non-failing when the file does not exist.
+- [Met] `python-dotenv` was added to `/home/chuonglv/Work/hapi/orchestrator/requirements.txt`, and the patch is minimal to the target files.
 
 ## Unexpected Changes
-- `/home/chuonglv/Work/hapi/.ai/artifacts/latest-plan.md` was modified in the working tree (artifact update outside the target implementation file).
-- `/home/chuonglv/Work/hapi/orchestrator/main.py` includes a call-site rename (`conversation_id` -> `session_id`) that is cosmetic and does not alter behavior.
+- `/home/chuonglv/Work/hapi/.ai/artifacts/latest-plan.md` is modified (artifact file, outside the implementation scope).
+- Untracked paths exist in the working tree (`/home/chuonglv/Work/hapi/.claude/worktrees/agent-a33d8a18/`, `/home/chuonglv/Work/hapi/.claude/worktrees/agent-a97bc002/`, `/home/chuonglv/Work/hapi/orchestrator/__pycache__/`).
 
 ## Test Coverage Gaps
-- No end-to-end test against a live hub `/api/auth` + `/api/mcp` flow was run in this environment.
-- No committed regression test file was added for JWT parsing/refresh edge cases.
+- No command output shows runtime verification that env values are loaded from `.env`.
+- No regression/behavior test was added for precedence behavior (existing environment variables vs `.env` values).
 
 ## Risk Notes
-- Auth URL derivation still assumes `MCP_BASE_URL` is on the same origin and mounted under `/api/mcp`.
-- Refresh timing depends on local clock and `JWT_REFRESH_WINDOW_SECONDS`, though the current buffer-based logic is reasonable.
+- Current code loads only `/home/chuonglv/Work/hapi/orchestrator/.env` (script directory), not an arbitrary current working directory `.env` if execution happens elsewhere.
+- Importing `dotenv` at module load time will fail fast if dependencies are not installed in the runtime environment.
 
 ## Fix Prompt
 None
