@@ -5,7 +5,9 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 import asyncio
 import base64
 import json
+import logging
 import os
+import sys
 import time
 import uuid
 from urllib.parse import urlparse
@@ -14,6 +16,39 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from openai import AsyncOpenAI
+
+
+# -----------------------------
+# Logging setup
+# -----------------------------
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+class _Formatter(logging.Formatter):
+    """Compact colored formatter for console output."""
+    COLORS = {
+        logging.DEBUG: "\033[90m",     # grey
+        logging.INFO: "\033[36m",      # cyan
+        logging.WARNING: "\033[33m",   # yellow
+        logging.ERROR: "\033[31m",     # red
+        logging.CRITICAL: "\033[1;31m", # bold red
+    }
+    RESET = "\033[0m"
+
+    def format(self, record: logging.LogRecord) -> str:
+        color = self.COLORS.get(record.levelno, self.RESET)
+        ts = self.formatTime(record, "%H:%M:%S")
+        msg = f"{color}{ts} [{record.levelname[0]}] {record.getMessage()}{self.RESET}"
+        if record.exc_info and record.exc_info[1] is not None:
+            msg += f"\n{self.formatException(record.exc_info)}"
+        return msg
+
+_handler = logging.StreamHandler(sys.stderr)
+_handler.setFormatter(_Formatter())
+
+log = logging.getLogger("orchestrator")
+log.addHandler(_handler)
+log.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 
 # -----------------------------
@@ -36,6 +71,9 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "30"))
 # SESSION_ID validation (after all imports loaded)
 if not SESSION_ID:
     raise SystemExit("SESSION_ID env var is required and must not be empty")
+
+log.info("📋 Config loaded: model=%s session=%s poll=%.1fs", MODEL, SESSION_ID, POLL_INTERVAL_SECONDS)
+log.debug("   MCP_BASE_URL=%s  OPENAI_BASE_URL=%s", MCP_BASE_URL, OPENAI_BASE_URL or "(default)")
 
 # -----------------------------
 # Persona / policy
@@ -149,6 +187,7 @@ class MCPClient:
             raise RuntimeError(
                 "MCP_ACCESS_TOKEN env var is required for hub authentication"
             )
+        log.info("🔑 Authenticating with hub at %s", self._auth_url)
         resp = await self.http.post(
             self._auth_url,
             json={"accessToken": MCP_ACCESS_TOKEN},
@@ -169,9 +208,12 @@ class MCPClient:
         except ValueError as e:
             raise RuntimeError(f"Hub auth returned invalid JWT: {e}") from e
         self._jwt = token
+        ttl = int(self._jwt_exp - time.time())
+        log.info("🔑 Authenticated — JWT expires in %ds", ttl)
 
     async def _ensure_token(self) -> None:
         if not self._is_jwt_valid():
+            log.debug("🔑 JWT expired or missing, re-authenticating...")
             await self._authenticate()
 
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -186,12 +228,15 @@ class MCPClient:
                 "arguments": arguments,
             },
         }
+        log.debug("📡 MCP call: %s(%s)", tool_name, json.dumps(arguments, ensure_ascii=False)[:200])
         headers = {"Authorization": f"Bearer {self._jwt}"}
         resp = await self.http.post(self.base_url, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
         if "error" in data:
+            log.error("❌ MCP error on %s: %s", tool_name, data['error'])
             raise RuntimeError(f"MCP error calling {tool_name}: {data['error']}")
+        log.debug("📡 MCP %s -> ok", tool_name)
         return data.get("result", {})
 
     async def send_message(
@@ -282,33 +327,83 @@ Rules:
         conversation_history: List[Message],
         new_message: Message,
     ) -> bool:
-        # Simple heuristic first.
-        # You can replace this with another model call if needed.
-        content = new_message.content.lower()
-
-        ignore_patterns = [
-            "ack",
-            "received",
-            "done",
-            "completed",
-        ]
-        if any(p == content.strip() for p in ignore_patterns):
+        # Only respond when the agent signals it finished its turn.
+        # The hub sends: { role: "agent", content: { type: "event", data: { type: "ready" } } }
+        if new_message.role not in ("assistant", "agent"):
             return False
 
-        # Usually reply to coding_agent messages.
-        return new_message.role == "coding_agent"
+        raw_event = new_message.raw.get("content", {})
+        if not isinstance(raw_event, dict):
+            return False
+
+        # Direct check for ready event
+        if raw_event.get("type") == "event":
+            data = raw_event.get("data", {})
+            if isinstance(data, dict) and data.get("type") == "ready":
+                return True
+
+        return False
 
 
 # -----------------------------
 # Parsing helpers
 # -----------------------------
 #
-# Adapt these to your real message schema.
+# Hub StoredMessage shape:
+#   { id, sessionId, content: <agent_event>, createdAt, seq, localId }
+#
+# The `content` field is the raw agent event, which may be:
+#   - Role-wrapped record:  { role: "assistant", content: [...] }
+#   - Envelope:             { message: { role, content } }
+#   - Double envelope:      { data: { message: { role, content } } }
+#
+
+def _unwrap_role_content(event: Any) -> tuple[str, str]:
+    """Extract (role, text_content) from a hub agent event."""
+    if not isinstance(event, dict):
+        return ("unknown", str(event) if event else "")
+
+    # Direct: { role, content }
+    if "role" in event and "content" in event:
+        role = event["role"]
+        content = event["content"]
+    # Envelope: { message: { role, content } }
+    elif isinstance(event.get("message"), dict) and "role" in event["message"]:
+        role = event["message"]["role"]
+        content = event["message"].get("content", "")
+    # Double envelope: { data: { message: { role, content } } }
+    elif (isinstance(event.get("data"), dict)
+          and isinstance(event["data"].get("message"), dict)
+          and "role" in event["data"]["message"]):
+        role = event["data"]["message"]["role"]
+        content = event["data"]["message"].get("content", "")
+    else:
+        # Fallback: treat whole event as content
+        role = event.get("type", "unknown")
+        content = event
+
+    # Flatten content to string
+    if isinstance(content, list):
+        # Claude format: content is array of { type: "text", text: "..." }
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                parts.append(block)
+        text = "\n".join(parts) if parts else json.dumps(content, ensure_ascii=False)
+    elif isinstance(content, str):
+        text = content
+    else:
+        text = json.dumps(content, ensure_ascii=False) if content else ""
+
+    return (str(role), text)
+
 
 def parse_messages(result: Dict[str, Any]) -> List[Message]:
     # MCP result: {"content": [{"type": "text", "text": "<json_string>"}], "isError": bool}
     if result.get("isError"):
-        print(f"[MCP ERROR] {result}")
+        log.error("❌ MCP returned error: %s", result)
         return []
 
     content_list = result.get("content", [])
@@ -318,7 +413,7 @@ def parse_messages(result: Dict[str, Any]) -> List[Message]:
     try:
         payload = json.loads(content_list[0].get("text", ""))
     except (json.JSONDecodeError, AttributeError, TypeError):
-        print(f"[MCP PARSE ERROR] Could not decode content text")
+        log.error("❌ MCP parse error: could not decode content text")
         return []
 
     if isinstance(payload, list):
@@ -333,15 +428,21 @@ def parse_messages(result: Dict[str, Any]) -> List[Message]:
 
     parsed: List[Message] = []
     for item in raw_messages:
+        # item is a StoredMessage: { id, sessionId, content, createdAt, seq, localId }
+        event = item.get("content", {})
+        role, text = _unwrap_role_content(event)
+
         parsed.append(
             Message(
-                message_id=str(item.get("message_id") or item.get("id") or ""),
-                role=item.get("role") or item.get("sender") or "unknown",
-                content=item.get("content") or item.get("message") or "",
-                created_at=item.get("created_at"),
+                message_id=str(item.get("id") or ""),
+                role=role,
+                content=text,
+                created_at=str(item.get("createdAt", "")),
                 raw=item,
             )
         )
+        log.debug("   parsed msg seq=%s role=%s content_len=%d",
+                  item.get("seq"), role, len(text))
 
     return parsed
 
@@ -378,8 +479,11 @@ class MimicProxyAgent:
         session_goal: str = DEFAULT_SESSION_GOAL,
     ) -> ConversationState:
         state = ConversationState(conversation_id=session_id)
+        poll_count = 0
 
         # Initial instruction to coding agent
+        log.info("🚀 Starting conversation session=%s", session_id)
+        log.info("📤 Sending initial message (%d chars)", len(initial_message))
         await self.mcp.send_message(
             session_id=session_id,
             text=initial_message,
@@ -393,8 +497,15 @@ class MimicProxyAgent:
             )
         )
 
+        log.info("⏳ Entering poll loop (interval=%.1fs, limit=%d)",
+                 self.poll_interval_seconds, self.poll_limit)
+
         # Run loop
         while not state.done:
+            poll_count += 1
+            log.debug("🔄 Poll #%d (after_seq=%d, history=%d msgs)",
+                      poll_count, state.after_seq, len(state.history))
+
             result = await self.mcp.get_messages_after(
                 session_id=session_id,
                 after_seq=state.after_seq,
@@ -404,8 +515,13 @@ class MimicProxyAgent:
             messages = parse_messages(result)
 
             if not messages:
+                if poll_count % 15 == 0:  # log every ~30s at 2s interval
+                    log.info("⏳ Still waiting... (poll #%d, seq=%d)",
+                             poll_count, state.after_seq)
                 await asyncio.sleep(self.poll_interval_seconds)
                 continue
+
+            log.info("📨 Received %d new message(s)", len(messages))
 
             for msg in messages:
                 msg_seq = msg.raw.get("seq")
@@ -413,16 +529,26 @@ class MimicProxyAgent:
                     state.after_seq = max(state.after_seq, msg_seq)
                 state.history.append(msg)
 
+                preview = msg.content[:120].replace("\n", " ")
+                log.info("   [%s] seq=%s: %s%s",
+                         msg.role, msg_seq, preview,
+                         "..." if len(msg.content) > 120 else "")
+
                 if msg.role == "proxy":
                     # Skip our own messages coming back from server if mirrored.
+                    log.debug("   ↩ Skipping mirrored proxy message")
                     continue
 
                 if infer_done([msg]):
-                    print(f"[DONE SIGNAL] {msg.content}")
+                    log.info("✅ Done signal detected: %s", preview)
                     state.done = True
                     break
 
-                if await self.brain.should_respond(state.history, msg):
+                should = await self.brain.should_respond(state.history, msg)
+                log.debug("   🤔 should_respond=%s", should)
+
+                if should:
+                    log.info("🧠 Generating reply via LLM (%s)...", self.brain.model)
                     reply = await self.brain.generate_reply(
                         session_goal=session_goal,
                         conversation_history=state.history,
@@ -430,8 +556,10 @@ class MimicProxyAgent:
                     )
 
                     if reply:
-                        print(f"[CODING AGENT] {msg.content}")
-                        print(f"[PROXY REPLY ] {reply}\n")
+                        reply_preview = reply[:200].replace("\n", " ")
+                        log.info("📤 Proxy reply (%d chars): %s%s",
+                                 len(reply), reply_preview,
+                                 "..." if len(reply) > 200 else "")
 
                         await self.mcp.send_message(
                             session_id=session_id,
@@ -445,9 +573,12 @@ class MimicProxyAgent:
                                 content=reply,
                             )
                         )
+                    else:
+                        log.warning("⚠️ LLM returned empty reply, skipping")
 
             await asyncio.sleep(self.poll_interval_seconds)
 
+        log.info("🏁 Conversation ended. Total messages: %d", len(state.history))
         return state
 
 
@@ -459,11 +590,8 @@ async def main() -> None:
     conversation_id = SESSION_ID
 
     initial_message = """
-Please solve the current problem with the smallest safe change first.
-Do not break unrelated features.
-Avoid broad refactors unless they are clearly necessary.
-Before risky edits, call out regression risks and impacted components.
-Prefer local fixes and validation steps or tests around changed behavior.
+Verify our lastest changes on Codex token refresh mechanism.
+Fix it if there are any issues.
 """.strip()
 
     mcp = MCPClient(MCP_BASE_URL, timeout_seconds=HTTP_TIMEOUT_SECONDS)
@@ -481,9 +609,15 @@ Prefer local fixes and validation steps or tests around changed behavior.
             initial_message=initial_message,
             session_goal=DEFAULT_SESSION_GOAL,
         )
-        print(f"Conversation finished. Total messages: {len(final_state.history)}")
+        log.info("🏁 Conversation finished. Total messages: %d", len(final_state.history))
+    except KeyboardInterrupt:
+        log.info("⛔ Interrupted by user (Ctrl+C)")
+    except Exception:
+        log.exception("💥 Unhandled error")
     finally:
+        log.info("🧹 Closing MCP client...")
         await mcp.close()
+        log.info("👋 Bye.")
 
 
 if __name__ == "__main__":
