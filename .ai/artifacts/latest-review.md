@@ -2,21 +2,21 @@
 PASS
 
 ## Criteria Check
-- [Met] Optional `OPENAI_BASE_URL` support was added in `/home/chuonglv/Work/hapi/orchestrator/main.py` via `OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")`.
-- [Met] `ProxyBrain` passes `base_url` to `AsyncOpenAI` only when `OPENAI_BASE_URL` is set (`**({"base_url": OPENAI_BASE_URL} if OPENAI_BASE_URL else {})`).
-- [Met] Default behavior remains unchanged when unset, and an inline note was added about OpenAI-compatible providers / Responses API compatibility.
+- [Met] MCP hub authentication is implemented by exchanging `MCP_ACCESS_TOKEN` at `/api/auth`, with auth URL derived from `MCP_BASE_URL` origin and bearer token attached to MCP tool calls.
+- [Met] JWT caching and proactive refresh are implemented using `exp` with `JWT_REFRESH_WINDOW_SECONDS`, and malformed/non-JWT `token` values now fail fast instead of being accepted.
+- [Met] Failure handling is explicit for missing access token, 401 auth rejection, and invalid auth responses.
 
 ## Unexpected Changes
-- `/home/chuonglv/Work/hapi/.ai/artifacts/latest-plan.md` was modified (non-implementation artifact change).
-- Untracked generated/environment artifacts are present: `/home/chuonglv/Work/hapi/orchestrator/__pycache__/` and `/home/chuonglv/Work/hapi/.claude/worktrees/agent-a873abc4/`.
+- `/home/chuonglv/Work/hapi/.ai/artifacts/latest-plan.md` was modified in the working tree (artifact update outside the target implementation file).
+- `/home/chuonglv/Work/hapi/orchestrator/main.py` includes a call-site rename (`conversation_id` -> `session_id`) that is cosmetic and does not alter behavior.
 
 ## Test Coverage Gaps
-- No command output was provided here proving the planned validation commands were run (`py_compile` and import checks with/without `OPENAI_BASE_URL`).
-- No regression test was added for `OPENAI_BASE_URL` handling (e.g., unset vs set behavior of `ProxyBrain` client initialization).
+- No end-to-end test against a live hub `/api/auth` + `/api/mcp` flow was run in this environment.
+- No committed regression test file was added for JWT parsing/refresh edge cases.
 
 ## Risk Notes
-- `OPENAI_BASE_URL` values containing only whitespace still evaluate as set and will be passed through; this may cause misconfiguration-related runtime failures.
-- Runtime compatibility still depends on provider support for the Responses API, as noted in the comment.
+- Auth URL derivation still assumes `MCP_BASE_URL` is on the same origin and mounted under `/api/mcp`.
+- Refresh timing depends on local clock and `JWT_REFRESH_WINDOW_SECONDS`, though the current buffer-based logic is reasonable.
 
 ## Fix Prompt
 None

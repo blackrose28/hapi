@@ -1,8 +1,10 @@
 import asyncio
+import base64
 import json
 import os
 import time
 import uuid
+from urllib.parse import urlparse
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +22,8 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")  # Optional: target LiteLLM or ot
 
 SESSION_ID = os.environ["SESSION_ID"]
 MCP_BASE_URL = os.environ["MCP_BASE_URL"]  # e.g. https://your-mcp-server.example.com/mcp
+MCP_ACCESS_TOKEN = os.environ.get("MCP_ACCESS_TOKEN")
+JWT_REFRESH_WINDOW_SECONDS = float(os.getenv("JWT_REFRESH_WINDOW_SECONDS", "60"))
 POLL_INTERVAL_SECONDS = float(os.getenv("POLL_INTERVAL_SECONDS", "2.0"))
 POLL_LIMIT = int(os.getenv("POLL_LIMIT", "20"))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "30"))
@@ -103,15 +107,71 @@ class ConversationState:
 # }
 #
 
+def _parse_jwt_exp(token: str) -> float:
+    """Decode JWT payload and return numeric exp claim. Raises on any issue."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise ValueError(f"JWT must have 3 dot-separated segments, got {len(parts)}")
+    try:
+        padded = parts[1] + "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded))
+    except Exception as e:
+        raise ValueError(f"Cannot decode JWT payload: {e}") from e
+    exp = payload.get("exp")
+    if not isinstance(exp, (int, float)):
+        raise ValueError(f"JWT payload missing or non-numeric 'exp' claim, got {type(exp).__name__}: {exp!r}")
+    return float(exp)
+
+
 class MCPClient:
     def __init__(self, base_url: str, timeout_seconds: float = 30):
         self.base_url = base_url
         self.http = httpx.AsyncClient(timeout=timeout_seconds)
+        self._jwt: Optional[str] = None
+        self._jwt_exp: Optional[float] = None
+        parsed = urlparse(base_url)
+        self._auth_url = f"{parsed.scheme}://{parsed.netloc}/api/auth"
 
     async def close(self) -> None:
         await self.http.aclose()
 
+    def _is_jwt_valid(self) -> bool:
+        if not self._jwt or self._jwt_exp is None:
+            return False
+        return time.time() < (self._jwt_exp - JWT_REFRESH_WINDOW_SECONDS)
+
+    async def _authenticate(self) -> None:
+        if not MCP_ACCESS_TOKEN:
+            raise RuntimeError(
+                "MCP_ACCESS_TOKEN env var is required for hub authentication"
+            )
+        resp = await self.http.post(
+            self._auth_url,
+            json={"accessToken": MCP_ACCESS_TOKEN},
+        )
+        if resp.status_code == 401:
+            raise RuntimeError(
+                f"Hub auth rejected: invalid MCP_ACCESS_TOKEN (HTTP {resp.status_code})"
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        token = data.get("token")
+        if not token or not isinstance(token, str):
+            raise RuntimeError(
+                f"Hub auth response missing 'token' field: {list(data.keys())}"
+            )
+        try:
+            self._jwt_exp = _parse_jwt_exp(token)
+        except ValueError as e:
+            raise RuntimeError(f"Hub auth returned invalid JWT: {e}") from e
+        self._jwt = token
+
+    async def _ensure_token(self) -> None:
+        if not self._is_jwt_valid():
+            await self._authenticate()
+
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        await self._ensure_token()
         request_id = str(uuid.uuid4())
         payload = {
             "jsonrpc": "2.0",
@@ -122,14 +182,12 @@ class MCPClient:
                 "arguments": arguments,
             },
         }
-
-        resp = await self.http.post(self.base_url, json=payload)
+        headers = {"Authorization": f"Bearer {self._jwt}"}
+        resp = await self.http.post(self.base_url, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
-
         if "error" in data:
             raise RuntimeError(f"MCP error calling {tool_name}: {data['error']}")
-
         return data.get("result", {})
 
     async def send_message(
@@ -415,7 +473,7 @@ Prefer local fixes and validation steps or tests around changed behavior.
 
     try:
         final_state = await agent.start_conversation(
-            conversation_id=conversation_id,
+            session_id=conversation_id,
             initial_message=initial_message,
             session_goal=DEFAULT_SESSION_GOAL,
         )
