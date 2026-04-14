@@ -17,11 +17,16 @@ from openai import AsyncOpenAI
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 MODEL = os.getenv("MODEL", "gpt-5.4")
 
+SESSION_ID = os.environ["SESSION_ID"]
 MCP_BASE_URL = os.environ["MCP_BASE_URL"]  # e.g. https://your-mcp-server.example.com/mcp
 POLL_INTERVAL_SECONDS = float(os.getenv("POLL_INTERVAL_SECONDS", "2.0"))
 POLL_LIMIT = int(os.getenv("POLL_LIMIT", "20"))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "30"))
 
+
+# SESSION_ID validation (after all imports loaded)
+if not SESSION_ID:
+    raise SystemExit("SESSION_ID env var is required and must not be empty")
 
 # -----------------------------
 # Persona / policy
@@ -71,7 +76,7 @@ class Message:
 @dataclass
 class ConversationState:
     conversation_id: str
-    offset: int = 0
+    after_seq: int = 0
     done: bool = False
     history: List[Message] = field(default_factory=list)
 
@@ -128,30 +133,28 @@ class MCPClient:
 
     async def send_message(
         self,
-        conversation_id: str,
-        message: str,
-        sender: str = "proxy",
+        session_id: str,
+        text: str,
     ) -> Dict[str, Any]:
         return await self.call_tool(
             "send_message",
             {
-                "id": conversation_id,
-                "message": message,
-                "sender": sender,
+                "sessionId": session_id,
+                "text": text,
             },
         )
 
-    async def get_messages(
+    async def get_messages_after(
         self,
-        conversation_id: str,
-        offset: int,
+        session_id: str,
+        after_seq: int,
         limit: int,
     ) -> Dict[str, Any]:
         return await self.call_tool(
-            "get_messages",
+            "get_messages_after",
             {
-                "id": conversation_id,
-                "offset": offset,
+                "sessionId": session_id,
+                "afterSeq": after_seq,
                 "limit": limit,
             },
         )
@@ -237,9 +240,32 @@ Rules:
 # Adapt these to your real message schema.
 
 def parse_messages(result: Dict[str, Any]) -> List[Message]:
-    raw_messages = result.get("messages", [])
-    parsed: List[Message] = []
+    # MCP result: {"content": [{"type": "text", "text": "<json_string>"}], "isError": bool}
+    if result.get("isError"):
+        print(f"[MCP ERROR] {result}")
+        return []
 
+    content_list = result.get("content", [])
+    if not content_list or not isinstance(content_list, list):
+        return []
+
+    try:
+        payload = json.loads(content_list[0].get("text", ""))
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        print(f"[MCP PARSE ERROR] Could not decode content text")
+        return []
+
+    if isinstance(payload, list):
+        raw_messages = payload
+    elif isinstance(payload, dict):
+        raw_messages = payload.get("messages", [])
+    else:
+        return []
+
+    if not isinstance(raw_messages, list):
+        return []
+
+    parsed: List[Message] = []
     for item in raw_messages:
         parsed.append(
             Message(
@@ -281,17 +307,16 @@ class MimicProxyAgent:
 
     async def start_conversation(
         self,
-        conversation_id: str,
+        session_id: str,
         initial_message: str,
         session_goal: str = DEFAULT_SESSION_GOAL,
     ) -> ConversationState:
-        state = ConversationState(conversation_id=conversation_id)
+        state = ConversationState(conversation_id=session_id)
 
         # Initial instruction to coding agent
         await self.mcp.send_message(
-            conversation_id=conversation_id,
-            message=initial_message,
-            sender="proxy",
+            session_id=session_id,
+            text=initial_message,
         )
 
         state.history.append(
@@ -304,9 +329,9 @@ class MimicProxyAgent:
 
         # Run loop
         while not state.done:
-            result = await self.mcp.get_messages(
-                conversation_id=conversation_id,
-                offset=state.offset,
+            result = await self.mcp.get_messages_after(
+                session_id=session_id,
+                after_seq=state.after_seq,
                 limit=self.poll_limit,
             )
 
@@ -317,7 +342,9 @@ class MimicProxyAgent:
                 continue
 
             for msg in messages:
-                state.offset += 1
+                msg_seq = msg.raw.get("seq")
+                if isinstance(msg_seq, int):
+                    state.after_seq = max(state.after_seq, msg_seq)
                 state.history.append(msg)
 
                 if msg.role == "proxy":
@@ -341,9 +368,8 @@ class MimicProxyAgent:
                         print(f"[PROXY REPLY ] {reply}\n")
 
                         await self.mcp.send_message(
-                            conversation_id=conversation_id,
-                            message=reply,
-                            sender="proxy",
+                            session_id=session_id,
+                            text=reply,
                         )
 
                         state.history.append(
@@ -364,7 +390,7 @@ class MimicProxyAgent:
 # -----------------------------
 
 async def main() -> None:
-    conversation_id = f"conv-{uuid.uuid4()}"
+    conversation_id = SESSION_ID
 
     initial_message = """
 Please solve the current problem with the smallest safe change first.

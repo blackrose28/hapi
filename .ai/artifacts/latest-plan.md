@@ -1,74 +1,95 @@
 ## Goal
-Add hub-wide MCP Streamable HTTP transport so the hub can serve MCP requests across multiple sessions in a single authenticated namespace, with no implicit “current session” behavior. The new endpoint should use explicit identifiers (such as `sessionId` and/or `machineId`) in tool inputs, enforce namespace-scoped authorization, and provide parity with existing streamable HTTP behavior already used in the CLI.
+Harden MCP result parsing in `/home/chuonglv/Work/hapi/orchestrator/main.py` so `parse_messages` accepts both JSON payload shapes returned inside `result.content[0].text`: an object with `messages` and a bare array of messages, while preserving existing safe-failure behavior for `isError`, missing content, and malformed JSON.
 
 ## Acceptance Criteria
-- Hub exposes a new authenticated MCP Streamable HTTP endpoint under the existing namespace-authenticated web routing stack, and it supports concurrent requests for multiple sessions.
-- MCP tool handlers reachable through this endpoint require explicit scope identifiers (at minimum `sessionId`; `machineId` where tool semantics require machine scope), and requests missing required IDs fail with a protocol-appropriate invalid-params error.
-- Authorization and namespace isolation are enforced: caller token/identity must be authorized for the namespace and for the referenced explicit IDs; cross-namespace or unauthorized ID access is denied.
-- Existing hub REST/SSE/socket behavior remains unchanged, and no session-scoped implicit context is introduced into MCP tool execution.
-- Automated tests cover: successful multi-session usage, missing-ID validation failures, unauthorized namespace/ID access rejection, and at least one regression case proving no implicit current-session fallback.
+- `parse_messages` correctly parses message lists from both payload shapes:
+  - `{"messages": [...]}`
+  - `[...]`
+- Existing defensive behavior remains intact: returns `[]` (without crashing) for `result.isError`, missing/invalid `content`, non-JSON text, or unsupported decoded JSON types.
+- No changes are made to MCP server behavior or tool call contracts (`send_message`, `get_messages_after` arguments and usage remain unchanged).
 
 ## Constraints
-- Keep the patch minimal and reversible; prefer route/middleware additions over broad refactors.
-- Reuse existing MCP Streamable HTTP implementation patterns from `/D:/Work/hapi/.claude/worktrees/agent-a38db289/cli/src/claude/utils/startHappyServer.ts` and bridge behavior from `/D:/Work/hapi/.claude/worktrees/agent-a38db289/cli/src/codex/happyMcpStdioBridge.ts` without changing CLI behavior.
-- Do not add new dependencies or change public APIs outside the new hub MCP endpoint and explicit MCP tool input contracts required for hub-wide scope.
+- Keep the patch minimal and localized, ideally only `/home/chuonglv/Work/hapi/orchestrator/main.py`.
+- Do not change server-side code or hub MCP API contract assumptions outside parsing tolerance.
+- Preserve current message field mapping/fallback behavior (`message_id/id`, `role/sender`, `content/message`) unless strictly needed for the parsing fix.
 
 ## Target Files
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/mcpHttp.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/index.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/authNamespaceRouter.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/server/createHubMcpHttpServer.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/tools/index.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/tools/schemas.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/tools/contextGuards.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/__tests__/mcpHttp.test.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/__tests__/mcpHttp.auth.test.ts
+- /home/chuonglv/Work/hapi/orchestrator/main.py
 
 ## Test Plan
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub test -- mcpHttp.test.ts`
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub test -- mcpHttp.auth.test.ts`
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub test`
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub typecheck`
+- `python3 -m py_compile /home/chuonglv/Work/hapi/orchestrator/main.py`
+- `OPENAI_API_KEY=dummy SESSION_ID=dummy MCP_BASE_URL=http://localhost python3 - <<'PY'
+import os, json, importlib.util
+path = "/home/chuonglv/Work/hapi/orchestrator/main.py"
+spec = importlib.util.spec_from_file_location("orch_main", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def wrap(payload):
+    return {"content":[{"type":"text","text":json.dumps(payload)}], "isError": False}
+
+msgs_obj = mod.parse_messages(wrap({"messages":[{"id":"1","role":"coding_agent","content":"hi"}]}))
+assert len(msgs_obj) == 1 and msgs_obj[0].message_id == "1"
+
+msgs_arr = mod.parse_messages(wrap([{"id":"2","sender":"coding_agent","message":"hello"}]))
+assert len(msgs_arr) == 1 and msgs_arr[0].message_id == "2"
+
+assert mod.parse_messages({"isError": True, "content":[{"text":"[]"}]}) == []
+assert mod.parse_messages({"content":[]}) == []
+assert mod.parse_messages({"content":[{"type":"text","text":"not-json"}]}) == []
+assert mod.parse_messages(wrap({"unexpected":"shape"})) == []
+print("parse_messages payload-shape hardening checks passed")
+PY`
 
 ## Risks
-- If existing MCP tool implementations assume implicit session state, enforcing explicit IDs may surface hidden coupling and require small compatibility shims.
-- Namespace authorization checks may exist in multiple layers; incorrect middleware ordering could accidentally allow or block traffic.
-- Streamable HTTP lifecycle handling (long-lived streams, cancellation, cleanup) may introduce subtle regressions if route integration differs from existing SSE/socket route conventions.
+- If other undocumented payload shapes are returned (e.g., nested wrappers), this minimal fix may still ignore them by returning `[]`.
+- Small parsing changes could inadvertently alter behavior for edge-case payloads if type checks are too permissive or too strict.
 
 ## Execution Prompt for Codex
 Implement the approved plan below.
 
 Goal:
-Add hub-wide MCP Streamable HTTP transport so the hub can serve MCP requests across multiple sessions in a single authenticated namespace, with no implicit “current session” behavior. The new endpoint should use explicit identifiers (such as `sessionId` and/or `machineId`) in tool inputs, enforce namespace-scoped authorization, and provide parity with existing streamable HTTP behavior already used in the CLI.
+Harden MCP result parsing in `/home/chuonglv/Work/hapi/orchestrator/main.py` so `parse_messages` accepts both JSON payload shapes returned inside `result.content[0].text`: an object with `messages` and a bare array of messages, while preserving existing safe-failure behavior for `isError`, missing content, and malformed JSON.
 
 Acceptance criteria:
-- Hub exposes a new authenticated MCP Streamable HTTP endpoint under the existing namespace-authenticated web routing stack, and it supports concurrent requests for multiple sessions.
-- MCP tool handlers reachable through this endpoint require explicit scope identifiers (at minimum `sessionId`; `machineId` where tool semantics require machine scope), and requests missing required IDs fail with a protocol-appropriate invalid-params error.
-- Authorization and namespace isolation are enforced: caller token/identity must be authorized for the namespace and for the referenced explicit IDs; cross-namespace or unauthorized ID access is denied.
-- Existing hub REST/SSE/socket behavior remains unchanged, and no session-scoped implicit context is introduced into MCP tool execution.
-- Automated tests cover: successful multi-session usage, missing-ID validation failures, unauthorized namespace/ID access rejection, and at least one regression case proving no implicit current-session fallback.
+- `parse_messages` correctly parses message lists from both payload shapes:
+  - `{"messages": [...]}`
+  - `[...]`
+- Existing defensive behavior remains intact: returns `[]` (without crashing) for `result.isError`, missing/invalid `content`, non-JSON text, or unsupported decoded JSON types.
+- No changes are made to MCP server behavior or tool call contracts (`send_message`, `get_messages_after` arguments and usage remain unchanged).
 
 Constraints:
-- Keep the patch minimal and reversible; prefer route/middleware additions over broad refactors.
-- Reuse existing MCP Streamable HTTP implementation patterns from `/D:/Work/hapi/.claude/worktrees/agent-a38db289/cli/src/claude/utils/startHappyServer.ts` and bridge behavior from `/D:/Work/hapi/.claude/worktrees/agent-a38db289/cli/src/codex/happyMcpStdioBridge.ts` without changing CLI behavior.
-- Do not add new dependencies or change public APIs outside the new hub MCP endpoint and explicit MCP tool input contracts required for hub-wide scope.
+- Keep the patch minimal and localized, ideally only `/home/chuonglv/Work/hapi/orchestrator/main.py`.
+- Do not change server-side code or hub MCP API contract assumptions outside parsing tolerance.
+- Preserve current message field mapping/fallback behavior (`message_id/id`, `role/sender`, `content/message`) unless strictly needed for the parsing fix.
 
 Target files:
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/mcpHttp.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/index.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/authNamespaceRouter.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/server/createHubMcpHttpServer.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/tools/index.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/tools/schemas.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/mcp/tools/contextGuards.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/__tests__/mcpHttp.test.ts
-- /D:/Work/hapi/.claude/worktrees/agent-a38db289/hub/src/web/routes/__tests__/mcpHttp.auth.test.ts
+- /home/chuonglv/Work/hapi/orchestrator/main.py
 
 Required test commands:
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub test -- mcpHttp.test.ts`
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub test -- mcpHttp.auth.test.ts`
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub test`
-- `cd /D:/Work/hapi/.claude/worktrees/agent-a38db289 && pnpm --filter hub typecheck`
+- `python3 -m py_compile /home/chuonglv/Work/hapi/orchestrator/main.py`
+- `OPENAI_API_KEY=dummy SESSION_ID=dummy MCP_BASE_URL=http://localhost python3 - <<'PY'
+import os, json, importlib.util
+path = "/home/chuonglv/Work/hapi/orchestrator/main.py"
+spec = importlib.util.spec_from_file_location("orch_main", path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def wrap(payload):
+    return {"content":[{"type":"text","text":json.dumps(payload)}], "isError": False}
+
+msgs_obj = mod.parse_messages(wrap({"messages":[{"id":"1","role":"coding_agent","content":"hi"}]}))
+assert len(msgs_obj) == 1 and msgs_obj[0].message_id == "1"
+
+msgs_arr = mod.parse_messages(wrap([{"id":"2","sender":"coding_agent","message":"hello"}]))
+assert len(msgs_arr) == 1 and msgs_arr[0].message_id == "2"
+
+assert mod.parse_messages({"isError": True, "content":[{"text":"[]"}]}) == []
+assert mod.parse_messages({"content":[]}) == []
+assert mod.parse_messages({"content":[{"type":"text","text":"not-json"}]}) == []
+assert mod.parse_messages(wrap({"unexpected":"shape"})) == []
+print("parse_messages payload-shape hardening checks passed")
+PY`
 
 Rules:
 - Make the smallest patch that satisfies the plan.
@@ -81,3 +102,8 @@ Rules:
   3. commands run
   4. test results
   5. unresolved concerns
+
+Notes:
+- Agent threads always have their cwd reset between bash calls, as a result please only use absolute file paths.
+- In your final response, share file paths (always absolute, never relative) that are relevant to the task. Include code snippets only when the exact text is load-bearing (e.g., a bug you found, a function signature the caller asked for) — do not recap code you merely read.
+- For clear communication with the user the assistant MUST avoid using emojis.
