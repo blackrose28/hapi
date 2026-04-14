@@ -16,6 +16,7 @@ from openai import AsyncOpenAI
 
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 MODEL = os.getenv("MODEL", "gpt-5.4")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")  # Optional: target LiteLLM or other OpenAI-compatible providers (Responses API compat varies)
 
 SESSION_ID = os.environ["SESSION_ID"]
 MCP_BASE_URL = os.environ["MCP_BASE_URL"]  # e.g. https://your-mcp-server.example.com/mcp
@@ -166,7 +167,10 @@ class MCPClient:
 
 class ProxyBrain:
     def __init__(self, model: str):
-        self.client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        self.client = AsyncOpenAI(
+            api_key=OPENAI_API_KEY,
+            **({"base_url": OPENAI_BASE_URL} if OPENAI_BASE_URL else {}),
+        )
         self.model = model
 
     async def generate_reply(
