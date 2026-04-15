@@ -23,6 +23,7 @@ import { usePlatform } from '@/hooks/usePlatform'
 import { usePWAInstall } from '@/hooks/usePWAInstall'
 import { supportsEffort, supportsModelChange } from '@hapi/protocol'
 import { markSkillUsed } from '@/lib/recent-skills'
+import { useComposerDraft } from '@/hooks/useComposerDraft'
 import { FloatingOverlay } from '@/components/ChatInput/FloatingOverlay'
 import { Autocomplete } from '@/components/ChatInput/Autocomplete'
 import { StatusBar } from '@/components/AssistantChat/StatusBar'
@@ -31,6 +32,7 @@ import { AttachmentItem } from '@/components/AssistantChat/AttachmentItem'
 import { useTranslation } from '@/lib/use-translation'
 import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
 import { getClaudeComposerEffortOptions } from './claudeEffortOptions'
+import { getCodexComposerReasoningEffortOptions } from './codexReasoningEffortOptions'
 
 export interface TextInputState {
     text: string
@@ -40,10 +42,12 @@ export interface TextInputState {
 const defaultSuggestionHandler = async (): Promise<Suggestion[]> => []
 
 export function HappyComposer(props: {
+    sessionId?: string
     disabled?: boolean
     permissionMode?: PermissionMode
     collaborationMode?: CodexCollaborationMode
     model?: string | null
+    modelReasoningEffort?: string | null
     effort?: string | null
     active?: boolean
     allowSendWhenInactive?: boolean
@@ -56,6 +60,7 @@ export function HappyComposer(props: {
     onCollaborationModeChange?: (mode: CodexCollaborationMode) => void
     onPermissionModeChange?: (mode: PermissionMode) => void
     onModelChange?: (model: string | null) => void
+    onModelReasoningEffortChange?: (modelReasoningEffort: string | null) => void
     onEffortChange?: (effort: string | null) => void
     onSwitchToRemote?: () => void
     onTerminal?: () => void
@@ -71,10 +76,12 @@ export function HappyComposer(props: {
 }) {
     const { t } = useTranslation()
     const {
+        sessionId,
         disabled = false,
         permissionMode: rawPermissionMode,
         collaborationMode: rawCollaborationMode,
         model: rawModel,
+        modelReasoningEffort: rawModelReasoningEffort,
         effort: rawEffort,
         active = true,
         allowSendWhenInactive = false,
@@ -87,6 +94,7 @@ export function HappyComposer(props: {
         onCollaborationModeChange,
         onPermissionModeChange,
         onModelChange,
+        onModelReasoningEffortChange,
         onEffortChange,
         onSwitchToRemote,
         onTerminal,
@@ -104,6 +112,7 @@ export function HappyComposer(props: {
     const permissionMode = rawPermissionMode ?? 'default'
     const collaborationMode = rawCollaborationMode ?? 'default'
     const model = rawModel ?? null
+    const modelReasoningEffort = rawModelReasoningEffort ?? null
     const effort = rawEffort ?? null
 
     const api = useAssistantApi()
@@ -139,6 +148,8 @@ export function HappyComposer(props: {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const prevControlledByUser = useRef(controlledByUser)
+
+    useComposerDraft(sessionId, composerText, (text) => api.composer().setText(text))
 
     useEffect(() => {
         setInputState((prev) => {
@@ -274,6 +285,10 @@ export function HappyComposer(props: {
         () => getModelOptionsForFlavor(agentFlavor, model),
         [agentFlavor, model]
     )
+    const codexReasoningEffortOptions = useMemo(
+        () => agentFlavor === 'codex' ? getCodexComposerReasoningEffortOptions(modelReasoningEffort) : [],
+        [agentFlavor, modelReasoningEffort]
+    )
     const claudeEffortOptions = useMemo(
         () => getClaudeComposerEffortOptions(effort),
         [effort]
@@ -296,10 +311,19 @@ export function HappyComposer(props: {
             return // let default textarea behavior handle newline
         }
 
-        // Enter without shift: send or no-op (never insert newline)
-        if (key === 'Enter' && !e.shiftKey && suggestions.length === 0) {
+        // Enter with suggestions visible: select the suggestion
+        if (key === 'Enter' && suggestions.length > 0) {
+            e.preventDefault()
+            const indexToSelect = selectedIndex >= 0 ? selectedIndex : 0
+            handleSuggestionSelect(indexToSelect)
+            return
+        }
+
+        // Only plain Enter (no modifiers) sends; other modifier combos are ignored
+        if (key === 'Enter') {
             e.preventDefault()
             if (!canSend) return
+            if (e.ctrlKey || e.altKey || e.metaKey) return
             console.log('[HappyComposer] sendIntent', { source: 'shift-enter' })
             onSendIntent?.()
             api.composer().send()
@@ -318,7 +342,7 @@ export function HappyComposer(props: {
                 moveDown()
                 return
             }
-            if ((key === 'Enter' || key === 'Tab') && !e.shiftKey) {
+            if ((key === 'Tab') && !e.shiftKey) {
                 e.preventDefault()
                 const indexToSelect = selectedIndex >= 0 ? selectedIndex : 0
                 handleSuggestionSelect(indexToSelect)
@@ -444,6 +468,13 @@ export function HappyComposer(props: {
         haptic('light')
     }, [onModelChange, controlsDisabled, haptic])
 
+    const handleModelReasoningEffortChange = useCallback((nextModelReasoningEffort: string | null) => {
+        if (!onModelReasoningEffortChange || controlsDisabled) return
+        onModelReasoningEffortChange(nextModelReasoningEffort)
+        setShowSettings(false)
+        haptic('light')
+    }, [onModelReasoningEffortChange, controlsDisabled, haptic])
+
     const handleEffortChange = useCallback((nextEffort: string | null) => {
         if (!onEffortChange || controlsDisabled) return
         onEffortChange(nextEffort)
@@ -454,8 +485,15 @@ export function HappyComposer(props: {
     const showCollaborationSettings = Boolean(onCollaborationModeChange && collaborationModeOptions.length > 0)
     const showPermissionSettings = Boolean(onPermissionModeChange && permissionModeOptions.length > 0)
     const showModelSettings = Boolean(onModelChange && supportsModelChange(agentFlavor))
+    const showModelReasoningEffortSettings = Boolean(onModelReasoningEffortChange && codexReasoningEffortOptions.length > 0)
     const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor))
-    const showSettingsButton = Boolean(showCollaborationSettings || showPermissionSettings || showModelSettings || showEffortSettings)
+    const showSettingsButton = Boolean(
+        showCollaborationSettings
+        || showPermissionSettings
+        || showModelSettings
+        || showModelReasoningEffortSettings
+        || showEffortSettings
+    )
     const showAbortButton = true
     const voiceEnabled = Boolean(onVoiceToggle)
 
@@ -466,7 +504,7 @@ export function HappyComposer(props: {
     }, [api, onSendIntent])
 
     const overlays = useMemo(() => {
-        if (showSettings && (showCollaborationSettings || showPermissionSettings || showModelSettings || showEffortSettings)) {
+        if (showSettings && (showCollaborationSettings || showPermissionSettings || showModelSettings || showModelReasoningEffortSettings || showEffortSettings)) {
             return (
                 <div className="absolute bottom-[100%] mb-2 w-full">
                     <FloatingOverlay maxHeight={320}>
@@ -481,16 +519,16 @@ export function HappyComposer(props: {
                                         type="button"
                                         disabled={controlsDisabled}
                                         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
-                                                ? 'cursor-not-allowed opacity-50'
-                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                            ? 'cursor-not-allowed opacity-50'
+                                            : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
                                             }`}
                                         onClick={() => handleCollaborationChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
                                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${collaborationMode === option.mode
-                                                    ? 'border-[var(--app-link)]'
-                                                    : 'border-[var(--app-hint)]'
+                                                ? 'border-[var(--app-link)]'
+                                                : 'border-[var(--app-hint)]'
                                                 }`}
                                         >
                                             {collaborationMode === option.mode && (
@@ -505,7 +543,7 @@ export function HappyComposer(props: {
                             </div>
                         ) : null}
 
-                        {showCollaborationSettings && (showPermissionSettings || showModelSettings || showEffortSettings) ? (
+                        {showCollaborationSettings && (showPermissionSettings || showModelSettings || showModelReasoningEffortSettings || showEffortSettings) ? (
                             <div className="mx-3 h-px bg-[var(--app-divider)]" />
                         ) : null}
 
@@ -520,16 +558,16 @@ export function HappyComposer(props: {
                                         type="button"
                                         disabled={controlsDisabled}
                                         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
-                                                ? 'cursor-not-allowed opacity-50'
-                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                            ? 'cursor-not-allowed opacity-50'
+                                            : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
                                             }`}
                                         onClick={() => handlePermissionChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
                                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${permissionMode === option.mode
-                                                    ? 'border-[var(--app-link)]'
-                                                    : 'border-[var(--app-hint)]'
+                                                ? 'border-[var(--app-link)]'
+                                                : 'border-[var(--app-hint)]'
                                                 }`}
                                         >
                                             {permissionMode === option.mode && (
@@ -544,7 +582,7 @@ export function HappyComposer(props: {
                             </div>
                         ) : null}
 
-                        {(showCollaborationSettings || showPermissionSettings) && (showModelSettings || showEffortSettings) ? (
+                        {(showCollaborationSettings || showPermissionSettings) && (showModelSettings || showModelReasoningEffortSettings || showEffortSettings) ? (
                             <div className="mx-3 h-px bg-[var(--app-divider)]" />
                         ) : null}
 
@@ -559,16 +597,16 @@ export function HappyComposer(props: {
                                         type="button"
                                         disabled={controlsDisabled}
                                         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
-                                                ? 'cursor-not-allowed opacity-50'
-                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                            ? 'cursor-not-allowed opacity-50'
+                                            : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
                                             }`}
                                         onClick={() => handleModelChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
                                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${model === option.value
-                                                    ? 'border-[var(--app-link)]'
-                                                    : 'border-[var(--app-hint)]'
+                                                ? 'border-[var(--app-link)]'
+                                                : 'border-[var(--app-hint)]'
                                                 }`}
                                         >
                                             {model === option.value && (
@@ -583,7 +621,46 @@ export function HappyComposer(props: {
                             </div>
                         ) : null}
 
-                        {showModelSettings && showEffortSettings ? (
+                        {(showModelSettings || showModelReasoningEffortSettings) && showEffortSettings ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showModelReasoningEffortSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.reasoningEffort')}
+                                </div>
+                                {codexReasoningEffortOptions.map((option) => (
+                                    <button
+                                        key={option.value ?? 'default'}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                            }`}
+                                        onClick={() => handleModelReasoningEffortChange(option.value)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${modelReasoningEffort === option.value
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                                }`}
+                                        >
+                                            {modelReasoningEffort === option.value && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={modelReasoningEffort === option.value ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {showModelReasoningEffortSettings && showEffortSettings ? (
                             <div className="mx-3 h-px bg-[var(--app-divider)]" />
                         ) : null}
 
@@ -598,16 +675,16 @@ export function HappyComposer(props: {
                                         type="button"
                                         disabled={controlsDisabled}
                                         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${controlsDisabled
-                                                ? 'cursor-not-allowed opacity-50'
-                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                            ? 'cursor-not-allowed opacity-50'
+                                            : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
                                             }`}
                                         onClick={() => handleEffortChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
                                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${effort === option.value
-                                                    ? 'border-[var(--app-link)]'
-                                                    : 'border-[var(--app-hint)]'
+                                                ? 'border-[var(--app-link)]'
+                                                : 'border-[var(--app-hint)]'
                                                 }`}
                                         >
                                             {effort === option.value && (
@@ -646,8 +723,10 @@ export function HappyComposer(props: {
         showCollaborationSettings,
         showPermissionSettings,
         showModelSettings,
+        showModelReasoningEffortSettings,
         showEffortSettings,
         claudeModelOptions,
+        codexReasoningEffortOptions,
         claudeEffortOptions,
         suggestions,
         selectedIndex,
@@ -655,12 +734,14 @@ export function HappyComposer(props: {
         collaborationMode,
         permissionMode,
         model,
+        modelReasoningEffort,
         effort,
         collaborationModeOptions,
         permissionModeOptions,
         handleCollaborationChange,
         handlePermissionChange,
         handleModelChange,
+        handleModelReasoningEffortChange,
         handleEffortChange,
         handleSuggestionSelect,
         t
@@ -699,7 +780,7 @@ export function HappyComposer(props: {
                                 placeholder={showContinueHint ? t('misc.typeMessage') : t('misc.typeAMessage')}
                                 disabled={controlsDisabled}
                                 maxRows={5}
-                                submitOnEnter={!isTouch}
+                                submitOnEnter={false}
                                 cancelOnEscape={false}
                                 onChange={handleChange}
                                 onSelect={handleSelect}

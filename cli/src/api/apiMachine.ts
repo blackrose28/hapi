@@ -15,6 +15,7 @@ import { RpcHandlerManager } from './rpc/RpcHandlerManager'
 import { registerCommonHandlers } from '../modules/common/registerCommonHandlers'
 import type { SpawnSessionOptions, SpawnSessionResult } from '../modules/common/rpcTypes'
 import { applyVersionedAck } from './versionedUpdate'
+import { buildSocketIoExtraHeaderOptions } from './hubExtraHeaders'
 
 interface ServerToRunnerEvents {
     update: (data: Update) => void
@@ -102,7 +103,7 @@ export class ApiMachineClient {
 
     setRPCHandlers({ spawnSession, stopSession, requestShutdown }: MachineRpcHandlers): void {
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
-            const { directory, sessionId, resumeSessionId, machineId, approvedNewDirectoryCreation, agent, model, effort, modelReasoningEffort, yolo, token, sessionType, worktreeName } = params || {}
+            const { directory, sessionId, resumeSessionId, machineId, approvedNewDirectoryCreation, agent, model, effort, modelReasoningEffort, yolo, permissionMode, token, sessionType, worktreeName } = params || {}
 
             if (!directory) {
                 throw new Error('Directory is required')
@@ -119,6 +120,7 @@ export class ApiMachineClient {
                 effort,
                 modelReasoningEffort,
                 yolo,
+                permissionMode,
                 token,
                 sessionType,
                 worktreeName
@@ -231,7 +233,8 @@ export class ApiMachineClient {
             path: '/socket.io/',
             reconnection: true,
             reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000
+            reconnectionDelayMax: 5000,
+            ...buildSocketIoExtraHeaderOptions()
         })
 
         this.socket.on('connect', () => {

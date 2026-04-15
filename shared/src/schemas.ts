@@ -175,8 +175,9 @@ export const SessionSchema = z.object({
     backgroundTaskCount: z.number().optional(),
     todos: TodosSchema.optional(),
     teamState: TeamStateSchema.optional(),
-    model: z.string().nullable(),
-    effort: z.string().nullable(),
+    model: z.string().nullable().optional().default(null),
+    modelReasoningEffort: z.string().nullable().optional().default(null),
+    effort: z.string().nullable().optional().default(null),
     permissionMode: PermissionModeSchema.optional(),
     collaborationMode: CodexCollaborationModeSchema.optional()
 })

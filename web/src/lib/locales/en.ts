@@ -278,6 +278,7 @@ export default {
   'misc.collaborationMode': 'Collaboration Mode',
   'misc.permissionMode': 'Permission Mode',
   'misc.model': 'Model',
+  'misc.reasoningEffort': 'Reasoning Effort',
   'misc.effort': 'Effort',
   'misc.loading': 'Loading…',
   'misc.loadOlder': 'Load older',
