@@ -328,21 +328,70 @@ Rules:
         new_message: Message,
     ) -> bool:
         # Only respond when the agent signals it finished its turn.
-        # The hub sends: { role: "agent", content: { type: "event", data: { type: "ready" } } }
+        # StoredMessage.content shape: { role: "agent", content: { type: "event", data: { type: "ready" } } }
         if new_message.role not in ("assistant", "agent"):
             return False
 
-        raw_event = new_message.raw.get("content", {})
-        if not isinstance(raw_event, dict):
+        raw_content = new_message.raw.get("content", {})
+        if not isinstance(raw_content, dict):
             return False
 
-        # Direct check for ready event
-        if raw_event.get("type") == "event":
-            data = raw_event.get("data", {})
+        # The event payload may be at top level or nested under "content"
+        inner = raw_content.get("content", raw_content)
+        if not isinstance(inner, dict):
+            return False
+
+        if inner.get("type") == "event":
+            data = inner.get("data", {})
             if isinstance(data, dict) and data.get("type") == "ready":
                 return True
 
         return False
+
+    async def is_task_done(
+        self,
+        session_goal: str,
+        conversation_history: List[Message],
+    ) -> bool:
+        """Ask the LLM whether the session goal has been achieved."""
+        history_text = "\n".join(
+            f"[{m.role}] {m.content}" for m in conversation_history[-30:]
+        )
+
+        prompt = f"""
+You are evaluating whether a coding task is complete.
+
+Session goal:
+{session_goal}
+
+Recent conversation:
+{history_text}
+
+Based on the conversation, has the coding agent fully completed the task described in the session goal?
+
+Consider:
+- Did the agent make all requested changes?
+- Did the agent confirm the changes work (tests pass, build succeeds, etc.)?
+- Are there remaining action items, open questions, or unresolved issues?
+- Did the agent explicitly signal completion?
+
+Respond with exactly one word: YES or NO
+"""
+
+        try:
+            response = await self.client.responses.create(
+                model=self.model,
+                input=[
+                    {"role": "system", "content": "You evaluate task completion. Respond with exactly YES or NO."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            answer = response.output_text.strip().upper()
+            log.debug("   🏁 is_task_done LLM answer: %s", answer)
+            return answer.startswith("YES")
+        except Exception:
+            log.exception("⚠️ is_task_done LLM call failed, assuming not done")
+            return False
 
 
 # -----------------------------
@@ -447,12 +496,37 @@ def parse_messages(result: Dict[str, Any]) -> List[Message]:
     return parsed
 
 
-def infer_done(messages: List[Message]) -> bool:
-    for m in messages:
-        text = m.content.lower()
-        if "task completed" in text or "fix applied" in text or "done" == text.strip():
-            return True
-    return False
+# infer_done removed — done detection is now LLM-based via ProxyBrain.is_task_done
+
+
+# -----------------------------
+# JSONL message logger
+# -----------------------------
+
+class MessageLogger:
+    """Appends every raw message to a JSONL file for offline debugging."""
+
+    def __init__(self, session_id: str, log_dir: str = "logs"):
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.path = self.log_dir / f"{session_id}.jsonl"
+        self._file = open(self.path, "a", encoding="utf-8")
+        log.info("📝 Message log: %s", self.path)
+
+    def log(self, msg: Message) -> None:
+        record = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "message_id": msg.message_id,
+            "role": msg.role,
+            "content": msg.content,
+            "created_at": msg.created_at,
+            "raw": msg.raw,
+        }
+        self._file.write(json.dumps(record, ensure_ascii=False) + "\n")
+        self._file.flush()
+
+    def close(self) -> None:
+        self._file.close()
 
 
 # -----------------------------
@@ -479,6 +553,7 @@ class MimicProxyAgent:
         session_goal: str = DEFAULT_SESSION_GOAL,
     ) -> ConversationState:
         state = ConversationState(conversation_id=session_id)
+        self._msg_log = MessageLogger(session_id)
         poll_count = 0
 
         # Initial instruction to coding agent
@@ -523,11 +598,16 @@ class MimicProxyAgent:
 
             log.info("📨 Received %d new message(s)", len(messages))
 
+            # --- Process entire batch first, then decide ---
+            ready_seen = False
+            last_content_msg: Optional[Message] = None
+
             for msg in messages:
                 msg_seq = msg.raw.get("seq")
                 if isinstance(msg_seq, int):
                     state.after_seq = max(state.after_seq, msg_seq)
                 state.history.append(msg)
+                self._msg_log.log(msg)
 
                 preview = msg.content[:120].replace("\n", " ")
                 log.info("   [%s] seq=%s: %s%s",
@@ -535,24 +615,37 @@ class MimicProxyAgent:
                          "..." if len(msg.content) > 120 else "")
 
                 if msg.role == "proxy":
-                    # Skip our own messages coming back from server if mirrored.
                     log.debug("   ↩ Skipping mirrored proxy message")
                     continue
 
-                if infer_done([msg]):
-                    log.info("✅ Done signal detected: %s", preview)
+                # Track ready signal
+                is_ready = await self.brain.should_respond(state.history, msg)
+                if is_ready:
+                    ready_seen = True
+                    log.debug("   🔔 Ready signal at seq=%s", msg_seq)
+
+                # Track latest substantive content message from agent
+                if msg.role in ("assistant", "agent") and msg.content.strip():
+                    last_content_msg = msg
+
+            # --- After full batch: act on ready signal ---
+            if ready_seen:
+                # Check if the task is done (LLM-based)
+                done = await self.brain.is_task_done(
+                    session_goal=session_goal,
+                    conversation_history=state.history,
+                )
+                if done:
+                    log.info("✅ Task done (LLM confirmed)")
                     state.done = True
-                    break
-
-                should = await self.brain.should_respond(state.history, msg)
-                log.debug("   🤔 should_respond=%s", should)
-
-                if should:
+                else:
+                    # Generate reply using the latest content message
+                    reply_target = last_content_msg or messages[-1]
                     log.info("🧠 Generating reply via LLM (%s)...", self.brain.model)
                     reply = await self.brain.generate_reply(
                         session_goal=session_goal,
                         conversation_history=state.history,
-                        new_message=msg,
+                        new_message=reply_target,
                     )
 
                     if reply:
@@ -578,6 +671,7 @@ class MimicProxyAgent:
 
             await asyncio.sleep(self.poll_interval_seconds)
 
+        self._msg_log.close()
         log.info("🏁 Conversation ended. Total messages: %d", len(state.history))
         return state
 
@@ -590,8 +684,7 @@ async def main() -> None:
     conversation_id = SESSION_ID
 
     initial_message = """
-Verify our lastest changes on Codex token refresh mechanism.
-Fix it if there are any issues.
+Review the current changes, and fix the issues if any.
 """.strip()
 
     mcp = MCPClient(MCP_BASE_URL, timeout_seconds=HTTP_TIMEOUT_SECONDS)
@@ -610,7 +703,7 @@ Fix it if there are any issues.
             session_goal=DEFAULT_SESSION_GOAL,
         )
         log.info("🏁 Conversation finished. Total messages: %d", len(final_state.history))
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
         log.info("⛔ Interrupted by user (Ctrl+C)")
     except Exception:
         log.exception("💥 Unhandled error")
@@ -621,4 +714,7 @@ Fix it if there are any issues.
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass  # already handled inside main()
