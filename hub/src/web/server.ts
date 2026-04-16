@@ -20,6 +20,8 @@ import { createCliRoutes } from './routes/cli'
 import { createPushRoutes } from './routes/push'
 import { createVoiceRoutes } from './routes/voice'
 import { createMcpHttpRoutes } from './routes/mcpHttp'
+import { createOrchestratorsRoutes } from './routes/orchestrators'
+import type { OrchestratorManager } from '../sync/orchestratorManager'
 import type { SSEManager } from '../sse/sseManager'
 import type { VisibilityTracker } from '../visibility/visibilityTracker'
 import type { Server as BunServer } from 'bun'
@@ -59,6 +61,7 @@ function createWebApp(options: {
     getSyncEngine: () => SyncEngine | null
     getSseManager: () => SSEManager | null
     getVisibilityTracker: () => VisibilityTracker | null
+    getOrchestratorManager: () => OrchestratorManager | null
     jwtSecret: Uint8Array
     store: Store
     vapidPublicKey: string
@@ -99,6 +102,10 @@ function createWebApp(options: {
     app.route('/api', createPushRoutes(options.store, options.vapidPublicKey))
     app.route('/api', createVoiceRoutes())
     app.route('/api', createMcpHttpRoutes(options.getSyncEngine))
+    app.route(
+        '/api',
+        createOrchestratorsRoutes(options.getSyncEngine, options.getOrchestratorManager)
+    )
 
     // Skip static serving in relay mode, show helpful message on root
     if (options.relayMode) {
@@ -207,6 +214,7 @@ export async function startWebServer(options: {
     getSyncEngine: () => SyncEngine | null
     getSseManager: () => SSEManager | null
     getVisibilityTracker: () => VisibilityTracker | null
+    getOrchestratorManager: () => OrchestratorManager | null
     jwtSecret: Uint8Array
     store: Store
     vapidPublicKey: string
@@ -221,6 +229,7 @@ export async function startWebServer(options: {
         getSyncEngine: options.getSyncEngine,
         getSseManager: options.getSseManager,
         getVisibilityTracker: options.getVisibilityTracker,
+        getOrchestratorManager: options.getOrchestratorManager,
         jwtSecret: options.jwtSecret,
         store: options.store,
         vapidPublicKey: options.vapidPublicKey,

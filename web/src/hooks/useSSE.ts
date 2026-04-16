@@ -538,6 +538,13 @@ export function useSSE(options: {
                 }
             }
 
+            if (event.type === 'orchestrator-updated') {
+                const orch = event.data
+                queryClient.setQueryData(queryKeys.orchestrator(orch.id), { orchestrator: orch })
+                void queryClient.invalidateQueries({ queryKey: queryKeys.orchestrators })
+                void queryClient.invalidateQueries({ queryKey: queryKeys.orchestratorTranscript(orch.id) })
+            }
+
             onEventRef.current(event)
         }
 

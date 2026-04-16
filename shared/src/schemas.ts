@@ -195,6 +195,34 @@ const MachineChangedSchema = SessionEventBaseSchema.extend({
     machineId: z.string()
 })
 
+// --- Orchestrator (hub proxy loop + web UI) ---
+
+export const OrchestratorStatusSchema = z.enum(['idle', 'running', 'paused', 'done', 'error'])
+
+export type OrchestratorStatus = z.infer<typeof OrchestratorStatusSchema>
+
+export const OrchestratorPublicSchema = z.object({
+    id: z.string(),
+    sessionId: z.string(),
+    model: z.string(),
+    status: OrchestratorStatusSchema,
+    error: z.string().nullable(),
+    messageCount: z.number(),
+    createdAt: z.number(),
+    updatedAt: z.number()
+})
+
+export type OrchestratorPublic = z.infer<typeof OrchestratorPublicSchema>
+
+export const OrchestratorTranscriptEntrySchema = z.object({
+    id: z.string(),
+    role: z.string(),
+    content: z.string(),
+    createdAt: z.number().optional()
+})
+
+export type OrchestratorTranscriptEntry = z.infer<typeof OrchestratorTranscriptEntrySchema>
+
 export const SyncEventSchema = z.discriminatedUnion('type', [
     SessionChangedSchema.extend({
         type: z.literal('session-added'),
@@ -237,6 +265,11 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
             status: z.string(),
             subscriptionId: z.string().optional()
         }).optional()
+    }),
+    SessionChangedSchema.extend({
+        type: z.literal('orchestrator-updated'),
+        orchestratorId: z.string(),
+        data: OrchestratorPublicSchema
     })
 ])
 

@@ -11,6 +11,9 @@ import {
     useNavigate,
     useParams,
 } from '@tanstack/react-router'
+import OrchestratorListPage from '@/routes/orchestrators/index'
+import OrchestratorNewPage from '@/routes/orchestrators/new'
+import OrchestratorDetailPage from '@/routes/orchestrators/$id'
 import { App } from '@/App'
 import { SessionChat } from '@/components/SessionChat'
 import { SessionList } from '@/components/SessionList'
@@ -71,6 +74,33 @@ function PlusIcon(props: { className?: string }) {
         >
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+    )
+}
+
+function OrchestratorIcon(props: { className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={props.className}
+        >
+            <path d="M12 2v4" />
+            <path d="M12 18v4" />
+            <path d="m4.93 4.93 2.83 2.83" />
+            <path d="m16.24 16.24 2.83 2.83" />
+            <path d="M2 12h4" />
+            <path d="M18 12h4" />
+            <path d="m4.93 19.07 2.83-2.83" />
+            <path d="m16.24 7.76 2.83-2.83" />
+            <circle cx="12" cy="12" r="3" />
         </svg>
     )
 }
@@ -139,6 +169,14 @@ function SessionsPage() {
                             {t('sessions.count', { n: sessions.length, m: projectCount })}
                         </div>
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => navigate({ to: '/orchestrators' })}
+                                className="p-1.5 rounded-full text-[var(--app-hint)] hover:text-[var(--app-fg)] hover:bg-[var(--app-subtle-bg)] transition-colors"
+                                title={t('orchestrator.title')}
+                            >
+                                <OrchestratorIcon className="h-5 w-5" />
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => navigate({ to: '/settings' })}
@@ -506,6 +544,34 @@ const settingsRoute = createRoute({
     component: SettingsPage,
 })
 
+function OrchestratorsLayout() {
+    return <Outlet />
+}
+
+const orchestratorsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: 'orchestrators',
+    component: OrchestratorsLayout,
+})
+
+const orchestratorsIndexRoute = createRoute({
+    getParentRoute: () => orchestratorsRoute,
+    path: '/',
+    component: OrchestratorListPage,
+})
+
+const orchestratorsNewRoute = createRoute({
+    getParentRoute: () => orchestratorsRoute,
+    path: 'new',
+    component: OrchestratorNewPage,
+})
+
+const orchestratorsDetailRoute = createRoute({
+    getParentRoute: () => orchestratorsRoute,
+    path: '$id',
+    component: OrchestratorDetailPage,
+})
+
 export const routeTree = rootRoute.addChildren([
     indexRoute,
     sessionsRoute.addChildren([
@@ -516,6 +582,11 @@ export const routeTree = rootRoute.addChildren([
             sessionFilesRoute,
             sessionFileRoute,
         ]),
+    ]),
+    orchestratorsRoute.addChildren([
+        orchestratorsIndexRoute,
+        orchestratorsNewRoute,
+        orchestratorsDetailRoute,
     ]),
     settingsRoute,
 ])

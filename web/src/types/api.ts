@@ -1,5 +1,7 @@
 import type {
     DecryptedMessage as ProtocolDecryptedMessage,
+    OrchestratorPublic,
+    OrchestratorTranscriptEntry,
     Session,
     SessionSummary,
     SyncEvent as ProtocolSyncEvent,
@@ -218,3 +220,21 @@ export type VisibilityPayload = {
 }
 
 export type SyncEvent = ProtocolSyncEvent
+
+export type { OrchestratorPublic, OrchestratorTranscriptEntry }
+
+export type OrchestratorsListResponse = { orchestrators: OrchestratorPublic[] }
+export type OrchestratorResponse = { orchestrator: OrchestratorPublic }
+export type OrchestratorTranscriptResponse = { transcript: OrchestratorTranscriptEntry[] }
+
+export type CreateOrchestratorPayload = {
+    sessionId: string
+    initialMessage: string
+    openaiApiKey: string
+    model: string
+    openaiBaseUrl?: string | null
+    systemPrompt?: string
+    sessionGoal?: string
+    pollIntervalMs?: number
+    pollLimit?: number
+}

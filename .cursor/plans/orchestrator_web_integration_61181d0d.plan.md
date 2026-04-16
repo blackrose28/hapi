@@ -1,106 +1,123 @@
 ---
 name: Orchestrator web integration
-overview: "First-draft plan to expose the Python orchestrator’s behavior as a hub-managed, web-controlled feature: TypeScript poll loop inside the hub, REST control plane, SSE updates, and new web routes—while keeping upstream merge surface small and leaving `orchestrator/main.py` as the standalone path."
+overview: "Primary deliverable is an Orchestrator area inside the existing HAPI web PWA (reuse ui/, NewSession patterns, ApiClient). Control plane is Option A only: hub REST under /api/orchestrators, in-process OrchestratorManager using SyncEngine + OpenAI via fetch, and a new orchestrator SyncEvent on the existing SSE channel—same JWT as the rest of the app; no Python sidecar."
 todos:
-  - id: shared-sync-event
-    content: Add orchestrator Zod schemas + `SyncEvent` variant with namespace/sessionId in shared/src/schemas.ts; export types
-    status: pending
-  - id: hub-manager
-    content: Implement OrchestratorManager (poll loop, OpenAI fetch, pause/resume/stop, guards) using SyncEngine getMessagesAfter/sendMessage
-    status: pending
+  - id: shared-contracts
+    content: Add orchestrator Zod schemas + SyncEvent variant (namespace + sessionId) in shared/src/schemas.ts; types re-exported
+    status: completed
+  - id: hub-orchestrator-core
+    content: hub/src/sync/orchestratorManager.ts — poll loop, OpenAI fetch, pause/resume/stop, guards; wire SSE broadcast via SSEManager + namespace
+    status: completed
   - id: hub-routes-wire
-    content: Add orchestrators Hono routes; register in server.ts; instantiate + SSE broadcast from hub/index.ts
-    status: pending
-  - id: web-ui-sse
-    content: Add orchestrator routes, components, TanStack Query/mutations, handle new SSE in useSSE or app shell
-    status: pending
+    content: hub/src/web/routes/orchestrators.ts + register in server.ts; instantiate manager in hub/src/index.ts
+    status: completed
+  - id: web-shell-routes
+    content: Add /orchestrators routes in router.tsx, nav entry; OrchestratorList/New/Detail pages
+    status: completed
+  - id: web-components
+    content: Orchestrator UI from ui/*, NewSession-style forms, LoadingState, useToast; transcript + controls
+    status: completed
+  - id: web-data-layer
+    content: TanStack Query + mutations calling /api/orchestrators; extend useSSE (or app shell) to handle orchestrator-updated and refresh cache
+    status: completed
   - id: verify-tests
-    content: Run typecheck + tests; manual SSE and secret-leak checks
-    status: pending
+    content: bun typecheck, bun run test; manual UI + no API key leak on GET
+    status: completed
 isProject: false
 ---
 
-# Orchestrator on the web (first draft)
+# Orchestrator in the HAPI web app (web-first)
 
-## Context
+## Decision: Option A (hub-native)
 
-Today [`orchestrator/main.py`](d:\Work\hapi\orchestrator\main.py) runs as a standalone process: hub JWT/MCP for `send_message` and `get_messages_after`, OpenAI Responses API for replies and completion checks, and a poll loop keyed off the agent **ready** event. The web PWA ([`web/`](d:\Work\hapi\web)) already uses TanStack Router/Query and SSE ([`web/src/hooks/useSSE.ts`](d:\Work\hapi\web\src\hooks\useSSE.ts)). Hub exposes authenticated REST under `/api/*` via [`hub/src/web/server.ts`](d:\Work\hapi\hub\src\web\server.ts). `SyncEngine` already has [`getMessagesAfter`](d:\Work\hapi\hub\src\sync\syncEngine.ts) and [`sendMessage`](d:\Work\hapi\hub\src\sync\syncEngine.ts) suitable for an in-process port of the loop.
+The control plane **runs inside the hub**: REST on **`/api/orchestrators`**, orchestration loop uses **`SyncEngine.getMessagesAfter` / `sendMessage`** in-process, OpenAI via **`fetch`** (no new hub dependency). Realtime updates use the **existing SSE connection** with a **new `SyncEvent` variant** (see [`shared/src/schemas.ts`](d:\Work\hapi\shared\src\schemas.ts), [`hub/src/sse/sseManager.ts`](d:\Work\hapi\hub\src\sse\sseManager.ts) `shouldSend` rules—include `namespace` and `sessionId` on events). **No Python HTTP sidecar** for this feature.
 
-## Recommended architecture
+## Goal
+
+Ship a **first-class Orchestrator experience inside the existing PWA** ([`web/`](d:\Work\hapi\web)): same layout and components users already know. [`orchestrator/main.py`](d:\Work\hapi\orchestrator\main.py) stays the **reference behavior** and **CLI/offline** path; it is **not** modified for this work.
+
+## What already exists (no web UI yet)
+
+- Orchestrator config and **`initial_message`**: env / `.env` + hardcoded string in [`orchestrator/main.py`](d:\Work\hapi\orchestrator\main.py).
+- Web stack: [`web/src/router.tsx`](d:\Work\hapi\web\src\router.tsx), ApiClient, TanStack Query, [`useSSE.ts`](d:\Work\hapi\web\src\hooks\useSSE.ts), components under [`web/src/components/`](d:\Work\hapi\web\src\components).
+
+## UI: reuse existing building blocks
+
+| Area | Reuse |
+|------|--------|
+| Structure / chrome | Route patterns like sessions/settings; [`useAppGoBack`](d:\Work\hapi\web\src\hooks\useAppGoBack.ts) where appropriate |
+| Forms | [`NewSession`](d:\Work\hapi\web\src\components\NewSession) patterns (sections, selectors, primary actions) |
+| Actions | [`ActionButtons`](d:\Work\hapi\web\src\components\NewSession\ActionButtons.tsx), [`ui/button`](d:\Work\hapi\web\src\components\ui\button.tsx) |
+| Feedback | [`LoadingState`](d:\Work\hapi\web\src\components\LoadingState.tsx), [`Spinner`](d:\Work\hapi\web\src\components\Spinner.tsx), [`useToast`](d:\Work\hapi\web\src\lib\toast-context.tsx), [`ConfirmDialog`](d:\Work\hapi\web\src\components\ui\ConfirmDialog.tsx) |
+| List / status | [`ui/badge`](d:\Work\hapi\web\src\components\ui\badge.tsx), [`ui/card`](d:\Work\hapi\web\src\components\ui\card.tsx); cues from [`SessionList`](d:\Work\hapi\web\src\components\SessionList.tsx) |
+| Session picking | Existing sessions query; link to `/sessions/$id` |
+| Transcript | Scrollable panel; [`MarkdownRenderer`](d:\Work\hapi\web\src\components\MarkdownRenderer.tsx) when content is markdown; clear role labels |
+| Secrets | Masked API key input; **never** store OpenAI key in `localStorage`; send on create only |
+
+**Screens (MVP)**
+
+1. **`/orchestrators`** — list runs, status badges, link to detail, “New” CTA.
+2. **`/orchestrators/new`** — **initial message**, **session goal**, **system prompt**, model, optional base URL, masked API key, session picker.
+3. **`/orchestrators/:id`** — status, pause / resume / stop, transcript; live updates via **hub SSE** (`orchestrator-updated` or chosen type name); optional lightweight refetch on focus as fallback.
+
+## Hub implementation (targets)
+
+| Piece | Location |
+|-------|----------|
+| Loop + OpenAI | New [`hub/src/sync/orchestratorManager.ts`](d:\Work\hapi\hub\src\sync\orchestratorManager.ts) |
+| REST | New [`hub/src/web/routes/orchestrators.ts`](d:\Work\hapi\hub\src\web\routes\orchestrators.ts); register in [`hub/src/web/server.ts`](d:\Work\hapi\hub\src\web\server.ts) |
+| Lifecycle | Construct manager in [`hub/src/index.ts`](d:\Work\hapi\hub\src\index.ts); pass `getSyncEngine` + callback to broadcast `SyncEvent` |
+
+Secrets: API key **in memory** on the hub process only; never returned from GET/list.
 
 ```mermaid
-sequenceDiagram
-    participant Web as WebPWA
-    participant HubAPI as HubREST
-    participant Orch as OrchestratorManager
-    participant SE as SyncEngine
-    participant OAI as OpenAI_API
-    participant SSE as SSEManager
-
-    Web->>HubAPI: POST /api/orchestrators
-    HubAPI->>Orch: create + start loop
-    loop Poll
-        Orch->>SE: getMessagesAfter
-        SE-->>Orch: DecryptedMessage batch
-        alt ready + not done
-            Orch->>OAI: responses API
-            OAI-->>Orch: reply text
-            Orch->>SE: sendMessage
-        end
-        Orch->>SSE: broadcast orchestrator-updated
- SSE-->>Web: SSE event
+flowchart LR
+    subgraph web [Web PWA]
+        routes[orchestrators routes]
+        ui[components + Query]
     end
+    subgraph hub [Hub]
+        rest["/api/orchestrators"]
+        mgr[OrchestratorManager]
+        se[SyncEngine]
+        sse[SSEManager]
+    end
+    routes --> ui
+    ui -->|ApiClient JWT| rest
+    rest --> mgr
+    mgr --> se
+    mgr --> sse
+    sse -->|SSE| ui
 ```
 
-**Secrets:** OpenAI API key only on create body; stored only in server memory with orchestrator state; never returned from GET/list.
-
-**State:** In-memory orchestrator registry (hub restart drops runs). Optional guardrails: max poll iterations and/or history cap (align with risks in prior plan).
-
-**SSE:** Add a new `SyncEvent` variant in [`shared/src/schemas.ts`](d:\Work\hapi\shared\src\schemas.ts) (this package is `@hapi/protocol`). Include `namespace` and `sessionId` on the event so [`SSEManager.shouldSend`](d:\Work\hapi\hub\src\sse\sseManager.ts) delivers to the same subscribers as other session-scoped events (avoid relying only on `connection.all`).
-
-**OpenAI:** Hub has no `openai` dependency in [`hub/package.json`](d:\Work\hapi\hub\package.json); use `fetch` to the Responses API (same logical calls as `ProxyBrain` in Python).
-
-## Fork / upstream merge strategy
-
-- **Bulk logic** in new files: e.g. [`hub/src/sync/orchestratorManager.ts`](d:\Work\hapi\hub\src\sync\orchestratorManager.ts), [`hub/src/web/routes/orchestrators.ts`](d:\Work\hapi\hub\src\web\routes\orchestrators.ts), new [`web/src/routes/orchestrators/`](d:\Work\hapi\web\src\routes\orchestrators) and components.
-- **Minimal edits to shared “hot” files:** one new discriminated union member in [`shared/src/schemas.ts`](d:\Work\hapi\shared\src\schemas.ts) (upstream may also touch this—conflicts possible but localized).
-- **Minimal hub wiring:** one `app.route` line in [`hub/src/web/server.ts`](d:\Work\hapi\hub\src\web\server.ts), constructor/wiring in [`hub/src/index.ts`](d:\Work\hapi\hub\src\index.ts).
-- **Web:** new routes under [`web/src/router.tsx`](d:\Work\hapi\web\src\router.tsx) plus one nav entry where other top-level links live.
-- **Do not modify** [`orchestrator/main.py`](d:\Work\hapi\orchestrator\main.py) for this feature; it remains the CLI/offline path.
-
-Alternative (if merge sensitivity dominates): keep Python orchestrator and add a tiny **sidecar HTTP** service + web UI that talks only to that service; hub diff approaches zero but you own deployment, auth, and real-time UX.
-
-## API sketch (hub)
+## API shape (`/api/orchestrators`)
 
 | Method | Path | Purpose |
 |--------|------|--------|
-| POST | `/api/orchestrators` | Body: `sessionId`, `openaiApiKey`, `model`, optional `openaiBaseUrl`, `systemPrompt`, `sessionGoal`, optional poll tuning. Validates session in namespace; starts loop. |
-| GET | `/api/orchestrators` | List public status for namespace. |
-| GET | `/api/orchestrators/:id` | Status + non-secret fields. |
-| GET | `/api/orchestrators/:id/transcript` (optional) | Bounded in-memory history for UI if not folded into GET. |
-| PATCH | `/api/orchestrators/:id` | `pause` / `resume`. |
-| DELETE | `/api/orchestrators/:id` | Stop and remove. |
+| POST | `/api/orchestrators` | `sessionId`, `initialMessage`, `openaiApiKey`, `model`, optional `openaiBaseUrl`, `systemPrompt`, `sessionGoal`, optional poll tuning |
+| GET | `/api/orchestrators` | List public status |
+| GET | `/api/orchestrators/:id` | Detail without secrets |
+| GET | `/api/orchestrators/:id/transcript` | Optional bounded history |
+| PATCH | `/api/orchestrators/:id` | `pause` / `resume` |
+| DELETE | `/api/orchestrators/:id` | Stop |
 
-Follow the same JWT + namespace patterns as [`hub/src/web/routes/sessions.ts`](d:\Work\hapi\hub\src\web\routes\sessions.ts) / [`hub/src/web/routes/messages.ts`](d:\Work\hapi\hub\src\web\routes\messages.ts).
+Auth: same JWT + namespace rules as [`hub/src/web/routes/sessions.ts`](d:\Work\hapi\hub\src\web\routes\sessions.ts).
 
-## Web UX (MVP)
+## Fork / upstream merge (Option A)
 
-- **`/orchestrators`:** list with status, link to detail.
-- **`/orchestrators/new`:** session picker (reuse sessions query), masked API key, model, goal + system prompt, submit.
-- **`/orchestrators/:id`:** status, pause/resume/stop, transcript; subscribe to new SSE type and update TanStack Query cache (mirror patterns in [`useSSE.ts`](d:\Work\hapi\web\src\hooks\useSSE.ts) for session events).
+- **Web:** mostly new files under `web/src/routes/orchestrators/`, `web/src/components/Orchestrator/`, hooks.
+- **Shared + hub:** `SyncEvent` extension + route registration + manager—expect occasional **merge conflicts** on upstream pulls; keep orchestration logic in **dedicated files** to limit edits to `server.ts` / `index.ts` to a few lines.
 
-## Port fidelity notes
+## Behavioral fidelity
 
-- Reuse Python helpers conceptually: `_unwrap_role_content`, `should_respond` (ready detection), `generate_reply`, `is_task_done`, batch processing then act—see [`orchestrator/main.py`](d:\Work\hapi\orchestrator\main.py) `MimicProxyAgent` and `ProxyBrain`.
-- **Validate** ready-event shape against live `DecryptedMessage.content` from the hub (same risk as standalone script).
+Mirror [`orchestrator/main.py`](d:\Work\hapi\orchestrator\main.py): parsing, **ready** detection, reply generation, task-done check, batch-then-act. Validate **ready** against live `DecryptedMessage.content`.
 
 ## Test plan
 
-- `bun typecheck` (root).
-- `bun run test` (root).
-- Manual: create orchestrator, confirm SSE delivery with correct namespace/session subscription, confirm API key never appears on GET, DELETE stops polling.
+- `bun typecheck`, `bun run test`.
+- Manual: create from UI; SSE updates detail; GET never exposes API key.
 
-## Out of scope for this draft
+## Out of scope
 
-- Persisting orchestrators across hub restarts (SQLite).
-- Running OpenAI or the loop in the browser.
+- SQLite persistence for orchestrators (hub restart drops runs).
+- Running the loop or OpenAI in the browser.

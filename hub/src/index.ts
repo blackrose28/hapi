@@ -15,6 +15,7 @@ import { NotificationHub } from './notifications/notificationHub'
 import type { NotificationChannel } from './notifications/notificationTypes'
 import { HappyBot } from './telegram/bot'
 import { startWebServer } from './web/server'
+import { OrchestratorManager } from './sync/orchestratorManager'
 import { getOrCreateJwtSecret } from './config/jwtSecret'
 import { createSocketServer } from './socket/server'
 import { SSEManager } from './sse/sseManager'
@@ -98,6 +99,7 @@ function mergeCorsOrigins(base: string[], extra: string[]): string[] {
 }
 
 let syncEngine: SyncEngine | null = null
+let orchestratorManager: OrchestratorManager | null = null
 let happyBot: HappyBot | null = null
 let webServer: BunServer<WebSocketData> | null = null
 let sseManager: SSEManager | null = null
@@ -185,6 +187,13 @@ async function main() {
 
     syncEngine = new SyncEngine(store, socketServer.io, socketServer.rpcRegistry, sseManager)
 
+    orchestratorManager = new OrchestratorManager({
+        getSyncEngine: () => syncEngine,
+        broadcast: (event) => {
+            sseManager?.broadcast(event)
+        }
+    })
+
     const notificationChannels: NotificationChannel[] = [
         new PushNotificationChannel(pushService, sseManager, visibilityTracker, config.publicUrl)
     ]
@@ -210,6 +219,7 @@ async function main() {
         getSyncEngine: () => syncEngine,
         getSseManager: () => sseManager,
         getVisibilityTracker: () => visibilityTracker,
+        getOrchestratorManager: () => orchestratorManager,
         jwtSecret,
         store,
         vapidPublicKey: vapidKeys.publicKey,

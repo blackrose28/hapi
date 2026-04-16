@@ -20,7 +20,11 @@ import type {
     UploadFileResponse,
     VisibilityPayload,
     SessionResponse,
-    SessionsResponse
+    SessionsResponse,
+    OrchestratorsListResponse,
+    OrchestratorResponse,
+    OrchestratorTranscriptResponse,
+    CreateOrchestratorPayload
 } from '@/types/api'
 
 type ApiClientOptions = {
@@ -421,6 +425,41 @@ export class ApiClient {
 
     async deleteSession(sessionId: string): Promise<void> {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+            method: 'DELETE'
+        })
+    }
+
+    async getOrchestrators(): Promise<OrchestratorsListResponse> {
+        return await this.request<OrchestratorsListResponse>('/api/orchestrators')
+    }
+
+    async getOrchestrator(id: string): Promise<OrchestratorResponse> {
+        return await this.request<OrchestratorResponse>(`/api/orchestrators/${encodeURIComponent(id)}`)
+    }
+
+    async getOrchestratorTranscript(id: string, limit?: number): Promise<OrchestratorTranscriptResponse> {
+        const q = limit !== undefined ? `?limit=${limit}` : ''
+        return await this.request<OrchestratorTranscriptResponse>(
+            `/api/orchestrators/${encodeURIComponent(id)}/transcript${q}`
+        )
+    }
+
+    async createOrchestrator(payload: CreateOrchestratorPayload): Promise<OrchestratorResponse> {
+        return await this.request<OrchestratorResponse>('/api/orchestrators', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+    }
+
+    async patchOrchestrator(id: string, action: 'pause' | 'resume'): Promise<OrchestratorResponse> {
+        return await this.request<OrchestratorResponse>(`/api/orchestrators/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ action })
+        })
+    }
+
+    async deleteOrchestrator(id: string): Promise<void> {
+        await this.request<{ ok: boolean }>(`/api/orchestrators/${encodeURIComponent(id)}`, {
             method: 'DELETE'
         })
     }
