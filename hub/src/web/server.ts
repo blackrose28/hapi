@@ -146,13 +146,14 @@ from GitHub Pages instead of through the relay tunnel.
         return app
     }
 
-    const shouldRedirectToWebDev = !options.embeddedAssetMap
+    const shouldProxyToWebDev = !options.embeddedAssetMap
         && !isBunCompiled()
         && parseBooleanEnv(process.env.HAPI_WEB_DEV_REDIRECT, true)
     const webDevUrlRaw = process.env.HAPI_WEB_DEV_URL || 'http://127.0.0.1:5173'
     const webDevUrl = webDevUrlRaw.endsWith('/') ? webDevUrlRaw.slice(0, -1) : webDevUrlRaw
+    const webDevOrigin = new URL(webDevUrl)
 
-    if (shouldRedirectToWebDev) {
+    if (shouldProxyToWebDev) {
         app.use('*', async (c, next) => {
             if (c.req.path.startsWith('/api') || c.req.path.startsWith('/socket.io/')) {
                 await next()
@@ -163,9 +164,23 @@ from GitHub Pages instead of through the relay tunnel.
                 return
             }
             const target = new URL(c.req.url)
-            target.host = new URL(webDevUrl).host
-            target.protocol = new URL(webDevUrl).protocol
-            return c.redirect(target.toString(), 307)
+            target.host = webDevOrigin.host
+            target.protocol = webDevOrigin.protocol
+
+            try {
+                const upstream = await fetch(target.toString(), {
+                    method: c.req.method,
+                    headers: c.req.raw.headers,
+                    redirect: 'manual'
+                })
+                return new Response(upstream.body, {
+                    status: upstream.status,
+                    headers: upstream.headers
+                })
+            } catch {
+                await next()
+                return
+            }
         })
     }
 
