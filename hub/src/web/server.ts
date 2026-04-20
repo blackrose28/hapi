@@ -148,7 +148,7 @@ from GitHub Pages instead of through the relay tunnel.
 
     const shouldProxyToWebDev = !options.embeddedAssetMap
         && !isBunCompiled()
-        && parseBooleanEnv(process.env.HAPI_WEB_DEV_REDIRECT, true)
+        && parseBooleanEnv(process.env.HAPI_WEB_DEV_REDIRECT, false)
     const webDevUrlRaw = process.env.HAPI_WEB_DEV_URL || 'http://127.0.0.1:5173'
     const webDevUrl = webDevUrlRaw.endsWith('/') ? webDevUrlRaw.slice(0, -1) : webDevUrlRaw
     const webDevOrigin = new URL(webDevUrl)
