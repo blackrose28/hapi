@@ -57,6 +57,20 @@ function serveEmbeddedAsset(asset: EmbeddedWebAsset): Response {
     })
 }
 
+function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+    if (value === undefined) {
+        return fallback
+    }
+    const normalized = value.trim().toLowerCase()
+    if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') {
+        return true
+    }
+    if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') {
+        return false
+    }
+    return fallback
+}
+
 function createWebApp(options: {
     getSyncEngine: () => SyncEngine | null
     getSseManager: () => SSEManager | null
@@ -130,6 +144,29 @@ from GitHub Pages instead of through the relay tunnel.
 </html>`)
         })
         return app
+    }
+
+    const shouldRedirectToWebDev = !options.embeddedAssetMap
+        && !isBunCompiled()
+        && parseBooleanEnv(process.env.HAPI_WEB_DEV_REDIRECT, true)
+    const webDevUrlRaw = process.env.HAPI_WEB_DEV_URL || 'http://127.0.0.1:5173'
+    const webDevUrl = webDevUrlRaw.endsWith('/') ? webDevUrlRaw.slice(0, -1) : webDevUrlRaw
+
+    if (shouldRedirectToWebDev) {
+        app.use('*', async (c, next) => {
+            if (c.req.path.startsWith('/api') || c.req.path.startsWith('/socket.io/')) {
+                await next()
+                return
+            }
+            if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+                await next()
+                return
+            }
+            const target = new URL(c.req.url)
+            target.host = new URL(webDevUrl).host
+            target.protocol = new URL(webDevUrl).protocol
+            return c.redirect(target.toString(), 307)
+        })
     }
 
     if (options.embeddedAssetMap) {
