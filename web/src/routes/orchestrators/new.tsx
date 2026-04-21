@@ -9,6 +9,56 @@ import { useToast } from '@/lib/toast-context'
 import { LoadingState } from '@/components/LoadingState'
 import { ActionButtons } from '@/components/NewSession/ActionButtons'
 
+const ORCHESTRATOR_DEFAULTS_STORAGE_KEY = 'hapi:orchestrator:new:defaults'
+const DEFAULT_MODEL = 'gpt-5.4'
+
+type OrchestratorDefaults = {
+    sessionGoal: string
+    systemPrompt: string
+    model: string
+    openaiBaseUrl: string
+    openaiApiKey: string
+}
+
+function loadOrchestratorDefaults(): OrchestratorDefaults {
+    try {
+        const raw = localStorage.getItem(ORCHESTRATOR_DEFAULTS_STORAGE_KEY)
+        if (!raw) {
+            return {
+                sessionGoal: '',
+                systemPrompt: '',
+                model: DEFAULT_MODEL,
+                openaiBaseUrl: '',
+                openaiApiKey: '',
+            }
+        }
+        const parsed = JSON.parse(raw) as Partial<OrchestratorDefaults>
+        return {
+            sessionGoal: typeof parsed.sessionGoal === 'string' ? parsed.sessionGoal : '',
+            systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
+            model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model : DEFAULT_MODEL,
+            openaiBaseUrl: typeof parsed.openaiBaseUrl === 'string' ? parsed.openaiBaseUrl : '',
+            openaiApiKey: typeof parsed.openaiApiKey === 'string' ? parsed.openaiApiKey : '',
+        }
+    } catch {
+        return {
+            sessionGoal: '',
+            systemPrompt: '',
+            model: DEFAULT_MODEL,
+            openaiBaseUrl: '',
+            openaiApiKey: '',
+        }
+    }
+}
+
+function saveOrchestratorDefaults(defaults: OrchestratorDefaults): void {
+    try {
+        localStorage.setItem(ORCHESTRATOR_DEFAULTS_STORAGE_KEY, JSON.stringify(defaults))
+    } catch {
+        // Ignore storage write errors.
+    }
+}
+
 function BackIcon(props: { className?: string }) {
     return (
         <svg
@@ -37,13 +87,15 @@ export default function OrchestratorNewPage() {
     const { sessions, isLoading: sessionsLoading } = useSessions(api)
     const createMutation = useCreateOrchestrator(api)
 
+    const defaults = useMemo(loadOrchestratorDefaults, [])
+
     const [sessionId, setSessionId] = useState('')
     const [initialMessage, setInitialMessage] = useState('')
-    const [sessionGoal, setSessionGoal] = useState('')
-    const [systemPrompt, setSystemPrompt] = useState('')
-    const [model, setModel] = useState('gpt-4.1')
-    const [openaiBaseUrl, setOpenaiBaseUrl] = useState('')
-    const [openaiApiKey, setOpenaiApiKey] = useState('')
+    const [sessionGoal, setSessionGoal] = useState(defaults.sessionGoal)
+    const [systemPrompt, setSystemPrompt] = useState(defaults.systemPrompt)
+    const [model, setModel] = useState(defaults.model)
+    const [openaiBaseUrl, setOpenaiBaseUrl] = useState(defaults.openaiBaseUrl)
+    const [openaiApiKey, setOpenaiApiKey] = useState(defaults.openaiApiKey)
 
     const canCreate = useMemo(() => {
         return Boolean(
@@ -66,6 +118,13 @@ export default function OrchestratorNewPage() {
                 systemPrompt: systemPrompt.trim() || undefined,
                 model: model.trim(),
                 openaiBaseUrl: openaiBaseUrl.trim() || undefined,
+                openaiApiKey: openaiApiKey.trim(),
+            })
+            saveOrchestratorDefaults({
+                sessionGoal: sessionGoal.trim(),
+                systemPrompt: systemPrompt.trim(),
+                model: model.trim(),
+                openaiBaseUrl: openaiBaseUrl.trim(),
                 openaiApiKey: openaiApiKey.trim(),
             })
             navigate({
