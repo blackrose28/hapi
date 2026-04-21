@@ -498,13 +498,6 @@ export class OrchestratorManager {
                             text: reply,
                             sentFrom: 'webapp'
                         })
-                        this.appendTranscript(current, {
-                            id: `local-${randomUUID()}`,
-                            role: 'proxy',
-                            content: reply,
-                            createdAt: Date.now()
-                        })
-                        this.emit(orchestratorId, current)
                     }
                 } catch (e) {
                     current.status = 'error'

@@ -60,15 +60,20 @@ export default function OrchestratorDetailPage() {
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center gap-2 border-b border-[var(--app-border)] bg-[var(--app-bg)] p-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
-                <button
-                    type="button"
-                    onClick={goBack}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
-                >
-                    <BackIcon />
-                </button>
-                <div className="flex-1 min-w-0 truncate font-semibold text-sm">{id}</div>
+            <div className="bg-[var(--app-bg)] pt-[env(safe-area-inset-top)]">
+                <div className="mx-auto w-full max-w-content flex items-center gap-2 p-3 border-b border-[var(--app-border)]">
+                    <button
+                        type="button"
+                        onClick={goBack}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
+                    >
+                        <BackIcon />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold">Orchestrator</div>
+                        <div className="truncate text-xs text-[var(--app-hint)]">{id}</div>
+                    </div>
+                </div>
             </div>
 
             <div
@@ -88,28 +93,33 @@ export default function OrchestratorDetailPage() {
                     </div>
                 ) : (
                     <div className="mx-auto w-full max-w-content flex flex-col gap-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={statusVariant(orch.status)}>{orch.status}</Badge>
-                            <span className="text-xs text-[var(--app-hint)]">{orch.model}</span>
-                            <Button type="button" variant="outline" size="sm" asChild>
-                                <Link
-                                    to="/sessions/$sessionId"
-                                    params={{ sessionId: orch.sessionId }}
+                        <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-secondary-bg)] p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant={statusVariant(orch.status)}>{orch.status}</Badge>
+                                <span className="text-xs text-[var(--app-hint)]">{orch.model}</span>
+                                <span className="text-xs text-[var(--app-hint)]">{orch.messageCount} msgs</span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <Button type="button" variant="outline" size="sm" asChild>
+                                    <Link
+                                        to="/sessions/$sessionId"
+                                        params={{ sessionId: orch.sessionId }}
+                                    >
+                                        {t('orchestrator.openSession')}
+                                    </Link>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        void refetch()
+                                        void refetchTranscript()
+                                    }}
                                 >
-                                    {t('orchestrator.openSession')}
-                                </Link>
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    void refetch()
-                                    void refetchTranscript()
-                                }}
-                            >
-                                {t('orchestrator.refresh')}
-                            </Button>
+                                    {t('orchestrator.refresh')}
+                                </Button>
+                            </div>
                         </div>
 
                         {orch.error ? (
@@ -158,14 +168,14 @@ export default function OrchestratorDetailPage() {
                             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--app-hint)]">
                                 {t('orchestrator.transcript')}
                             </h2>
-                            <ul className="flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-secondary-bg)] p-2">
+                            <ul className="flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] p-2">
                                 {transcript.length === 0 ? (
                                     <li className="text-sm text-[var(--app-hint)]">…</li>
                                 ) : (
                                     transcript.map((line) => (
-                                        <li key={line.id} className="text-sm">
-                                            <span className="font-medium text-[var(--app-link)]">[{line.role}]</span>
-                                            <pre className="mt-0.5 whitespace-pre-wrap break-words font-sans text-[var(--app-fg)]">
+                                        <li key={line.id} className="rounded-md bg-[var(--app-secondary-bg)] px-3 py-2 text-sm">
+                                            <span className="font-medium uppercase tracking-wide text-[var(--app-hint)]">{line.role}</span>
+                                            <pre className="mt-1 whitespace-pre-wrap break-words font-sans text-[var(--app-fg)]">
                                                 {line.content}
                                             </pre>
                                         </li>
