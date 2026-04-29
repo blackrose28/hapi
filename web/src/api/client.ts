@@ -24,6 +24,7 @@ import type {
     OrchestratorsListResponse,
     OrchestratorResponse,
     OrchestratorTranscriptResponse,
+    OrchestratorAuditLogResponse,
     CreateOrchestratorPayload
 } from '@/types/api'
 
@@ -441,6 +442,13 @@ export class ApiClient {
         const q = limit !== undefined ? `?limit=${limit}` : ''
         return await this.request<OrchestratorTranscriptResponse>(
             `/api/orchestrators/${encodeURIComponent(id)}/transcript${q}`
+        )
+    }
+
+    async getOrchestratorAuditLog(id: string, limit?: number): Promise<OrchestratorAuditLogResponse> {
+        const q = limit !== undefined ? `?limit=${limit}` : ''
+        return await this.request<OrchestratorAuditLogResponse>(
+            `/api/orchestrators/${encodeURIComponent(id)}/audit-log${q}`
         )
     }
 

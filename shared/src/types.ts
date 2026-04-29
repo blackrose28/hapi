@@ -5,6 +5,7 @@ export type {
     AttachmentMetadata,
     DecryptedMessage,
     Metadata,
+    OrchestratorAuditEntry,
     OrchestratorPublic,
     OrchestratorStatus,
     OrchestratorTranscriptEntry,

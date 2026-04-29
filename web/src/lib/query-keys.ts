@@ -2,6 +2,7 @@ export const queryKeys = {
     orchestrators: ['orchestrators'] as const,
     orchestrator: (id: string) => ['orchestrator', id] as const,
     orchestratorTranscript: (id: string) => ['orchestrator-transcript', id] as const,
+    orchestratorAuditLog: (id: string) => ['orchestrator-audit-log', id] as const,
     sessions: ['sessions'] as const,
     session: (sessionId: string) => ['session', sessionId] as const,
     messages: (sessionId: string) => ['messages', sessionId] as const,

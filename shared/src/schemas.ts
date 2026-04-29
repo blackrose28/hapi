@@ -223,6 +223,31 @@ export const OrchestratorTranscriptEntrySchema = z.object({
 
 export type OrchestratorTranscriptEntry = z.infer<typeof OrchestratorTranscriptEntrySchema>
 
+export const OrchestratorAuditEntrySchema = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('done-check'),
+        ts: z.number(),
+        llmAnswer: z.enum(['YES', 'NO']),
+        rawAnswer: z.string(),
+        triggeredByMessageId: z.string().nullable(),
+        triggeredBySeq: z.number().nullable(),
+        historySize: z.number()
+    }),
+    z.object({
+        type: z.literal('reply-generated'),
+        ts: z.number(),
+        triggeredByMessageId: z.string().nullable(),
+        triggeredBySeq: z.number().nullable()
+    }),
+    z.object({
+        type: z.literal('system-event'),
+        ts: z.number(),
+        reason: z.string()
+    })
+])
+
+export type OrchestratorAuditEntry = z.infer<typeof OrchestratorAuditEntrySchema>
+
 export const SyncEventSchema = z.discriminatedUnion('type', [
     SessionChangedSchema.extend({
         type: z.literal('session-added'),

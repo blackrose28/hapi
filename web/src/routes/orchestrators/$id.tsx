@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useAppContext } from '@/lib/app-context'
 import { useAppGoBack } from '@/hooks/useAppGoBack'
-import { useOrchestrator, useOrchestratorTranscript } from '@/hooks/queries/useOrchestrators'
+import { useOrchestrator, useOrchestratorAuditLog, useOrchestratorTranscript } from '@/hooks/queries/useOrchestrators'
 import { useOrchestratorControl } from '@/hooks/mutations/useOrchestratorMutations'
 import { useTranslation } from '@/lib/use-translation'
 import { LoadingState } from '@/components/LoadingState'
@@ -53,10 +53,12 @@ export default function OrchestratorDetailPage() {
     const { t } = useTranslation()
     const { data: orch, isLoading, isError, error, refetch } = useOrchestrator(api, id)
     const { data: transcriptData, refetch: refetchTranscript } = useOrchestratorTranscript(api, id)
+    const { data: auditData, refetch: refetchAuditLog } = useOrchestratorAuditLog(api, id)
     const { pause, resume, stop } = useOrchestratorControl(api, id)
     const [stopOpen, setStopOpen] = useState(false)
 
     const transcript = transcriptData?.transcript ?? []
+    const auditLog = auditData?.auditLog ?? []
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -115,6 +117,7 @@ export default function OrchestratorDetailPage() {
                                     onClick={() => {
                                         void refetch()
                                         void refetchTranscript()
+                                        void refetchAuditLog()
                                     }}
                                 >
                                     {t('orchestrator.refresh')}
@@ -178,6 +181,44 @@ export default function OrchestratorDetailPage() {
                                             <pre className="mt-1 whitespace-pre-wrap break-words font-sans text-[var(--app-fg)]">
                                                 {line.content}
                                             </pre>
+                                        </li>
+                                    ))
+                                )}
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--app-hint)]">
+                                Audit Log
+                            </h2>
+                            <ul className="flex flex-col gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] p-2">
+                                {auditLog.length === 0 ? (
+                                    <li className="text-sm text-[var(--app-hint)]">…</li>
+                                ) : (
+                                    auditLog.map((entry, index) => (
+                                        <li key={`${entry.ts}-${entry.type}-${index}`} className="rounded-md bg-[var(--app-secondary-bg)] px-3 py-2 text-sm">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-medium uppercase tracking-wide text-[var(--app-hint)]">{entry.type}</span>
+                                                <span className="text-xs text-[var(--app-hint)]">{new Date(entry.ts).toLocaleString()}</span>
+                                                {entry.type === 'done-check' ? (
+                                                    <Badge variant={entry.llmAnswer === 'YES' ? 'success' : 'default'}>
+                                                        {entry.llmAnswer}
+                                                    </Badge>
+                                                ) : null}
+                                            </div>
+                                            {entry.type === 'done-check' ? (
+                                                <div className="mt-1 text-xs text-[var(--app-hint)]">
+                                                    trigger={entry.triggeredByMessageId ?? 'n/a'} seq={entry.triggeredBySeq ?? 'n/a'} history={entry.historySize}
+                                                </div>
+                                            ) : null}
+                                            {entry.type === 'reply-generated' ? (
+                                                <div className="mt-1 text-xs text-[var(--app-hint)]">
+                                                    trigger={entry.triggeredByMessageId ?? 'n/a'} seq={entry.triggeredBySeq ?? 'n/a'}
+                                                </div>
+                                            ) : null}
+                                            {entry.type === 'system-event' ? (
+                                                <div className="mt-1 text-xs text-[var(--app-hint)]">{entry.reason}</div>
+                                            ) : null}
                                         </li>
                                     ))
                                 )}

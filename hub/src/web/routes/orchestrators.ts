@@ -110,6 +110,22 @@ export function createOrchestratorsRoutes(
         return c.json({ transcript })
     })
 
+    app.get('/orchestrators/:id/audit-log', (c) => {
+        const mgr = getOrchestratorManager()
+        if (!mgr) {
+            return c.json({ error: 'Orchestrator unavailable' }, 503)
+        }
+        const id = c.req.param('id')
+        const namespace = c.get('namespace')
+        const limitRaw = c.req.query('limit')
+        const limit = limitRaw ? Math.min(1000, Math.max(1, Number.parseInt(limitRaw, 10) || 300)) : 300
+        const auditLog = mgr.getAuditLog(id, namespace, limit)
+        if (auditLog === null) {
+            return c.json({ error: 'Not found' }, 404)
+        }
+        return c.json({ auditLog })
+    })
+
     app.patch('/orchestrators/:id', async (c) => {
         const mgr = getOrchestratorManager()
         if (!mgr) {

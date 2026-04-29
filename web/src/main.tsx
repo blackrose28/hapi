@@ -50,26 +50,36 @@ async function bootstrap() {
         restoreSpaRedirect()
     }
 
-    const updateSW = registerSW({
-        onNeedRefresh() {
-            if (confirm('New version available! Reload to update?')) {
-                updateSW(true)
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    if (import.meta.env.DEV || isLocalhost) {
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations()
+            for (const registration of registrations) {
+                await registration.unregister()
             }
-        },
-        onOfflineReady() {
-            console.log('App ready for offline use')
-        },
-        onRegistered(registration) {
-            if (registration) {
-                setInterval(() => {
-                    registration.update()
-                }, 60 * 60 * 1000)
-            }
-        },
-        onRegisterError(error) {
-            console.error('SW registration error:', error)
         }
-    })
+    } else {
+        const updateSW = registerSW({
+            onNeedRefresh() {
+                if (confirm('New version available! Reload to update?')) {
+                    updateSW(true)
+                }
+            },
+            onOfflineReady() {
+                console.log('App ready for offline use')
+            },
+            onRegistered(registration) {
+                if (registration) {
+                    setInterval(() => {
+                        registration.update()
+                    }, 60 * 60 * 1000)
+                }
+            },
+            onRegisterError(error) {
+                console.error('SW registration error:', error)
+            }
+        })
+    }
 
     const history = isTelegram
         ? createMemoryHistory({ initialEntries: [getInitialPath()] })

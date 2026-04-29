@@ -1,5 +1,6 @@
 import type {
     DecryptedMessage,
+    OrchestratorAuditEntry,
     OrchestratorPublic,
     OrchestratorStatus,
     OrchestratorTranscriptEntry,
@@ -37,6 +38,7 @@ Behavior:
 
 const MAX_POLL_ITERATIONS = 10_000
 const MAX_TRANSCRIPT_ENTRIES = 500
+const MAX_AUDIT_ENTRIES = 1_000
 
 export type CreateOrchestratorInput = {
     namespace: string
@@ -67,6 +69,7 @@ type InternalRun = {
     error: string | null
     afterSeq: number
     transcript: TranscriptEntry[]
+    auditLog: OrchestratorAuditEntry[]
     orchestratorTexts: Set<string>
     createdAt: number
     updatedAt: number
@@ -267,6 +270,7 @@ export class OrchestratorManager {
             error: null,
             afterSeq: 0,
             transcript: [],
+            auditLog: [],
             orchestratorTexts: new Set(),
             createdAt: now,
             updatedAt: now,
@@ -317,6 +321,14 @@ export class OrchestratorManager {
         }))
     }
 
+    getAuditLog(id: string, namespace: string, limit: number): OrchestratorAuditEntry[] | null {
+        const run = this.runs.get(id)
+        if (!run || run.namespace !== namespace) {
+            return null
+        }
+        return run.auditLog.slice(-Math.min(limit, MAX_AUDIT_ENTRIES))
+    }
+
     pause(id: string, namespace: string): OrchestratorPublic | null {
         const run = this.runs.get(id)
         if (!run || run.namespace !== namespace) {
@@ -346,6 +358,11 @@ export class OrchestratorManager {
         if (!run || run.namespace !== namespace) {
             return false
         }
+        this.appendAudit(run, {
+            type: 'system-event',
+            ts: Date.now(),
+            reason: 'user-stop'
+        })
         run.status = 'done'
         this.emit(id, run)
         this.runs.delete(id)
@@ -365,6 +382,13 @@ export class OrchestratorManager {
         }
     }
 
+    private appendAudit(run: InternalRun, entry: OrchestratorAuditEntry): void {
+        run.auditLog.push(entry)
+        if (run.auditLog.length > MAX_AUDIT_ENTRIES) {
+            run.auditLog.splice(0, run.auditLog.length - MAX_AUDIT_ENTRIES)
+        }
+    }
+
     private decodableRoleForUserText(run: InternalRun, text: string, hubRole: string): string {
         if (hubRole === 'user' && run.orchestratorTexts.has(text.trim())) {
             return 'proxy'
@@ -375,6 +399,11 @@ export class OrchestratorManager {
     private async runLoop(orchestratorId: string, run: InternalRun, initialMessage: string): Promise<void> {
         const engine = this.getSyncEngine()
         if (!engine) {
+            this.appendAudit(run, {
+                type: 'system-event',
+                ts: Date.now(),
+                reason: 'engine-unavailable'
+            })
             run.status = 'error'
             run.error = 'Sync engine unavailable'
             this.emit(orchestratorId, run)
@@ -415,6 +444,11 @@ export class OrchestratorManager {
 
             current.pollIterations += 1
             if (current.pollIterations > MAX_POLL_ITERATIONS) {
+                this.appendAudit(current, {
+                    type: 'system-event',
+                    ts: Date.now(),
+                    reason: 'max-iterations'
+                })
                 current.status = 'error'
                 current.error = 'Max poll iterations reached'
                 this.emit(orchestratorId, current)
@@ -423,6 +457,11 @@ export class OrchestratorManager {
             }
 
             if (current.transcript.length >= MAX_TRANSCRIPT_ENTRIES) {
+                this.appendAudit(current, {
+                    type: 'system-event',
+                    ts: Date.now(),
+                    reason: 'transcript-limit'
+                })
                 current.status = 'done'
                 current.error = 'Transcript limit reached'
                 this.emit(orchestratorId, current)
@@ -432,6 +471,11 @@ export class OrchestratorManager {
 
             const eng = this.getSyncEngine()
             if (!eng) {
+                this.appendAudit(current, {
+                    type: 'system-event',
+                    ts: Date.now(),
+                    reason: 'engine-unavailable'
+                })
                 current.status = 'error'
                 current.error = 'Sync engine unavailable'
                 this.emit(orchestratorId, current)
@@ -481,7 +525,8 @@ export class OrchestratorManager {
 
             if (readySeen) {
                 try {
-                    const done = await this.isTaskDone(current)
+                    const target = lastAgent ?? batch[batch.length - 1]
+                    const done = await this.isTaskDone(current, target)
                     if (done) {
                         current.status = 'done'
                         this.emit(orchestratorId, current)
@@ -489,7 +534,6 @@ export class OrchestratorManager {
                         return
                     }
 
-                    const target = lastAgent ?? batch[batch.length - 1]
                     const reply = await this.generateReply(current, target)
 
                     if (reply.trim()) {
@@ -512,6 +556,12 @@ export class OrchestratorManager {
     }
 
     private async generateReply(run: InternalRun, latest: DecryptedMessage): Promise<string> {
+        this.appendAudit(run, {
+            type: 'reply-generated',
+            ts: Date.now(),
+            triggeredByMessageId: latest.id,
+            triggeredBySeq: latest.seq ?? null
+        })
         const { role, text } = unwrapRoleContent(latest.content)
         const historyText = transcriptToBrainLines(run.transcript.slice(0, -1))
         const userPrompt = `
@@ -544,7 +594,7 @@ Rules:
         })
     }
 
-    private async isTaskDone(run: InternalRun): Promise<boolean> {
+    private async isTaskDone(run: InternalRun, latest: DecryptedMessage): Promise<boolean> {
         const historyText = transcriptToBrainLines(run.transcript)
         const prompt = `
 You are evaluating whether a coding task is complete.
@@ -574,8 +624,27 @@ Respond with exactly one word: YES or NO
                 system: 'You evaluate task completion. Respond with exactly YES or NO.',
                 user: prompt
             })
-            return answer.trim().toUpperCase().startsWith('YES')
+            const normalized = answer.trim().toUpperCase().startsWith('YES') ? 'YES' : 'NO'
+            this.appendAudit(run, {
+                type: 'done-check',
+                ts: Date.now(),
+                llmAnswer: normalized,
+                rawAnswer: answer,
+                triggeredByMessageId: latest.id,
+                triggeredBySeq: latest.seq ?? null,
+                historySize: run.transcript.length
+            })
+            return normalized === 'YES'
         } catch {
+            this.appendAudit(run, {
+                type: 'done-check',
+                ts: Date.now(),
+                llmAnswer: 'NO',
+                rawAnswer: '',
+                triggeredByMessageId: latest.id,
+                triggeredBySeq: latest.seq ?? null,
+                historySize: run.transcript.length
+            })
             return false
         }
     }

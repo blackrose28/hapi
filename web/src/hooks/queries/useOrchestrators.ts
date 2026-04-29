@@ -27,3 +27,11 @@ export function useOrchestratorTranscript(api: ApiClient | null, id: string | un
         enabled: Boolean(api && id)
     })
 }
+
+export function useOrchestratorAuditLog(api: ApiClient | null, id: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.orchestratorAuditLog(id ?? ''),
+        queryFn: () => api!.getOrchestratorAuditLog(id!, 500),
+        enabled: Boolean(api && id)
+    })
+}

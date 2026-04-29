@@ -1,5 +1,6 @@
 import type {
     DecryptedMessage as ProtocolDecryptedMessage,
+    OrchestratorAuditEntry,
     OrchestratorPublic,
     OrchestratorTranscriptEntry,
     Session,
@@ -221,11 +222,12 @@ export type VisibilityPayload = {
 
 export type SyncEvent = ProtocolSyncEvent
 
-export type { OrchestratorPublic, OrchestratorTranscriptEntry }
+export type { OrchestratorAuditEntry, OrchestratorPublic, OrchestratorTranscriptEntry }
 
 export type OrchestratorsListResponse = { orchestrators: OrchestratorPublic[] }
 export type OrchestratorResponse = { orchestrator: OrchestratorPublic }
 export type OrchestratorTranscriptResponse = { transcript: OrchestratorTranscriptEntry[] }
+export type OrchestratorAuditLogResponse = { auditLog: OrchestratorAuditEntry[] }
 
 export type CreateOrchestratorPayload = {
     sessionId: string

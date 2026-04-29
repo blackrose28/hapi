@@ -9,8 +9,35 @@ import { useToast } from '@/lib/toast-context'
 import { LoadingState } from '@/components/LoadingState'
 import { ActionButtons } from '@/components/NewSession/ActionButtons'
 
-const ORCHESTRATOR_DEFAULTS_STORAGE_KEY = 'hapi:orchestrator:new:defaults'
-const DEFAULT_MODEL = 'gpt-5.4'
+const ORCHESTRATOR_DEFAULTS_STORAGE_KEY = 'hapi:orchestrator:new:defaults:v2'
+const DEFAULT_MODEL = 'cx/gpt-5.4'
+const DEFAULT_OPENAI_BASE_URL = 'https://9router.sohatv.vn/v1'
+const DEFAULT_OPENAI_API_KEY = 'sk-a1094cf695e5e680-lsui04-f46ef94a'
+const DEFAULT_SYSTEM_PROMPT = `
+You are Chuong's proxy when talking to an AI Coding Agent.
+
+Behavior:
+- Prioritize finishing the requested task.
+- Prefer the smallest safe change first.
+- Strongly avoid breaking existing features.
+- Avoid broad refactors unless clearly necessary.
+- Prefer local, rollback-friendly changes.
+- Ask the coding agent to call out regression risk when proposing risky edits.
+- Prefer tests or validation steps around changed behavior.
+- Be concise, practical, direct, and decisive.
+- Do not ask unnecessary questions.
+- If multiple approaches exist, prefer the one with lower regression risk.
+`
+const DEFAULT_SESSION_GOAL = `
+Current goal:
+Work with the AI Coding Agent to solve the current coding problem.
+
+Constraints:
+- Do not break unrelated features.
+- Preserve existing behavior where possible.
+- Prefer minimal edits over broad rewrites.
+- Ask for impacted components and regression risks if the change is non-trivial.
+`
 
 type OrchestratorDefaults = {
     sessionGoal: string
@@ -25,28 +52,28 @@ function loadOrchestratorDefaults(): OrchestratorDefaults {
         const raw = localStorage.getItem(ORCHESTRATOR_DEFAULTS_STORAGE_KEY)
         if (!raw) {
             return {
-                sessionGoal: '',
-                systemPrompt: '',
+                sessionGoal: DEFAULT_SESSION_GOAL,
+                systemPrompt: DEFAULT_SYSTEM_PROMPT,
                 model: DEFAULT_MODEL,
-                openaiBaseUrl: '',
-                openaiApiKey: '',
+                openaiBaseUrl: DEFAULT_OPENAI_BASE_URL,
+                openaiApiKey: DEFAULT_OPENAI_API_KEY,
             }
         }
         const parsed = JSON.parse(raw) as Partial<OrchestratorDefaults>
         return {
-            sessionGoal: typeof parsed.sessionGoal === 'string' ? parsed.sessionGoal : '',
-            systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
+            sessionGoal: typeof parsed.sessionGoal === 'string' && parsed.sessionGoal.trim() ? parsed.sessionGoal : DEFAULT_SESSION_GOAL,
+            systemPrompt: typeof parsed.systemPrompt === 'string' && parsed.systemPrompt.trim() ? parsed.systemPrompt : DEFAULT_SYSTEM_PROMPT,
             model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model : DEFAULT_MODEL,
-            openaiBaseUrl: typeof parsed.openaiBaseUrl === 'string' ? parsed.openaiBaseUrl : '',
-            openaiApiKey: typeof parsed.openaiApiKey === 'string' ? parsed.openaiApiKey : '',
+            openaiBaseUrl: typeof parsed.openaiBaseUrl === 'string' && parsed.openaiBaseUrl.trim() ? parsed.openaiBaseUrl : DEFAULT_OPENAI_BASE_URL,
+            openaiApiKey: typeof parsed.openaiApiKey === 'string' && parsed.openaiApiKey.trim() ? parsed.openaiApiKey : DEFAULT_OPENAI_API_KEY,
         }
     } catch {
         return {
-            sessionGoal: '',
-            systemPrompt: '',
+            sessionGoal: DEFAULT_SESSION_GOAL,
+            systemPrompt: DEFAULT_SYSTEM_PROMPT,
             model: DEFAULT_MODEL,
-            openaiBaseUrl: '',
-            openaiApiKey: '',
+            openaiBaseUrl: DEFAULT_OPENAI_BASE_URL,
+            openaiApiKey: DEFAULT_OPENAI_API_KEY,
         }
     }
 }
