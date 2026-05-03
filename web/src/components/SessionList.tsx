@@ -512,7 +512,6 @@ export function getVisibleSessionPreview(
     sessions: SessionSummary[],
     options: {
         expanded?: boolean
-        selectedSessionId?: string | null
         limit?: number
     } = {}
 ): SessionSummary[] {
@@ -545,6 +544,63 @@ function CalendarIcon(props: { className?: string }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
             <rect x="3" y="5" width="18" height="16" rx="2" />
             <path d="M16 3v4M8 3v4M3 10h18" />
+        </svg>
+    )
+}
+
+const FLAVOR_BADGES: Record<string, { label: string; colors: string }> = {
+    claude: {
+        label: 'Cl',
+        colors: 'bg-[#d97706] text-white',
+    },
+    codex: {
+        label: 'Cx',
+        colors: 'bg-[#111827] text-white',
+    },
+    cursor: {
+        label: 'Cu',
+        colors: 'bg-[#0f766e] text-white',
+    },
+    gemini: {
+        label: 'Gm',
+        colors: 'bg-[#2563eb] text-white',
+    },
+    opencode: {
+        label: 'Op',
+        colors: 'bg-[#15803d] text-white',
+    },
+}
+
+function FlavorIcon({ flavor, className }: { flavor?: string | null; className?: string }) {
+    const badge = FLAVOR_BADGES[(flavor ?? 'claude').trim().toLowerCase()] ?? FLAVOR_BADGES.claude
+    return (
+        <span
+            aria-hidden="true"
+            className={`inline-flex items-center justify-center rounded-sm text-[8px] font-semibold leading-none ${badge.colors} ${className ?? 'h-4 w-4'}`}
+        >
+            {badge.label}
+        </span>
+    )
+}
+
+function MachineIcon(props: { className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={props.className}
+        >
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+>>>>>>> 02bc206f (fix(web): polish session search and ordering (#551))
         </svg>
     )
 }
