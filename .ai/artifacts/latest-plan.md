@@ -1,39 +1,28 @@
 ## Goal
 
-Add a reviewable audit/action log to the web-based orchestrator so users can inspect every decision the proxy brain makes — especially `done` decisions. Each `done-check` entry must capture the machine-readable answer, the LLM raw response, the triggering message ID/seq, and a snapshot context count. The log is stored in-memory (same lifetime as the run), exposed via a new REST endpoint, and rendered in the detail page as a collapsible "Audit Log" section below the transcript.
-
-Persistence trade-off: in-memory only, no SQLite changes. Log is lost on hub restart but avoids migration complexity. If persistence is later needed, entries map cleanly to a new `orchestrator_audit_log` table.
+Improve the orchestrator audit log so users can understand each entry without external lookups. Currently, `done-check` and `reply-generated` entries render a raw UUID (`trigger=<uuid>`) and a bare integer (`seq=132`), neither of which maps visibly to any message in the UI. The fix has two parts: (1) expose `seq` from the transcript API so each transcript line is addressable by sequence number, and (2) rewrite the audit log rendering in the web UI to show the triggering message's role + content preview (resolved from the already-loaded transcript) and use readable labels for seq and history counts.
 
 ## Acceptance Criteria
 
-- Every `isTaskDone()` call appends an `OrchestratorAuditEntry` with `type: 'done-check'`, `llmAnswer` (`"YES"` | `"NO"`), `triggeredByMessageId`, `triggeredBySeq`, `historySize`, and `ts` (epoch ms).
-- Every `generateReply()` call appends an entry with `type: 'reply-generated'`, `triggeredByMessageId`, `triggeredBySeq`, `ts`.
-- System events (`max-iterations`, `transcript-limit`, `engine-unavailable`, user-initiated `stop`) each append an entry with `type: 'system-event'`, `reason` string, and `ts`.
-- When `isTaskDone()` returns `true`, the triggering `done-check` entry is the authoritative record; no additional field is required on `OrchestratorPublic`.
-- `GET /api/orchestrators/:id/audit-log` returns `{ auditLog: OrchestratorAuditEntry[] }` ordered oldest-first; requires same namespace auth as transcript.
-- Web detail page renders an "Audit Log" section below transcript; each entry shows type, ts, llmAnswer (if present), triggeredByMessageId (if present).
-- `done-check` entries where `llmAnswer === "YES"` are visually highlighted (e.g., green badge).
-- Audit log is capped at 1 000 entries (trimmed from oldest on overflow).
-- All new types exported from `shared/src/schemas.ts` and re-exported from `shared/src/types.ts`.
+- `OrchestratorTranscriptEntry` schema includes an optional `seq` field (`number | null`).
+- `GET /api/orchestrators/:id/transcript` returns `seq` on each entry.
+- Audit log entries of type `done-check` and `reply-generated` no longer show a raw UUID; instead they show `[role] content_preview…` resolved from the transcript, falling back to a truncated message ID if no match is found.
+- `seq=N` is replaced with `Msg #N` (or "seq unknown" when null).
+- `history=N` is replaced with `History: N msgs`.
+- System-event entries continue to render the `reason` string, unchanged in shape.
+- No new dependencies are added.
 
 ## Constraints
 
-- No new npm/bun dependencies.
-- No SQLite schema changes.
-- No changes to existing `OrchestratorPublic` shape (no breaking SSE event changes).
-- No changes to the transcript endpoint or `OrchestratorTranscriptEntry` type.
-- Stay within target files; do not touch unrelated hub routes.
-- TypeScript strict; no `any` unless narrowing from `unknown` already present in the file.
+- Minimal diff; do not restructure the component or change unrelated UI.
+- Stay within the three target files; do not touch other routes or hooks.
+- TypeScript strict compliance; no `any` casts.
+- The transcript lookup is a pure in-memory array scan on the already-fetched data; no additional API calls.
 
 ## Target Files
 
 - `shared/src/schemas.ts`
-- `shared/src/types.ts`
 - `hub/src/sync/orchestratorManager.ts`
-- `hub/src/web/routes/orchestrators.ts`
-- `web/src/types/api.ts`
-- `web/src/api/client.ts`
-- `web/src/hooks/queries/useOrchestrators.ts`
 - `web/src/routes/orchestrators/$id.tsx`
 
 ## Test Plan
@@ -43,44 +32,33 @@ Persistence trade-off: in-memory only, no SQLite changes. Log is lost on hub res
 
 ## Risks
 
-- The `isTaskDone()` and `generateReply()` methods have no access to a message ID when called today; the caller (`runLoop`) must pass triggering message ID/seq down. This requires refactoring both method signatures and their single call-site — low risk but touches the internal loop logic.
-- Audit log is in-memory; if a run is deleted via `stop()`, the log is lost immediately. The stop path should optionally append a final `system-event` before deleting so the last entry is visible until the page navigates away (timing race is acceptable).
+- `seq` on transcript entries is nullable at the hub (`seq?: number | null`); the UI must handle `null` gracefully, which the fallback label covers.
+- If the transcript is paginated / trimmed and the triggering message was evicted, the lookup returns no match; the UUID truncation fallback handles this but provides partial info only.
 
 ## Execution Prompt for Codex
 
 Implement the approved plan below.
 
 Goal:
-Add a reviewable in-memory audit log to the hub orchestrator that records every proxy-brain decision (done-check, reply-generated, system-event) and exposes it via a new REST endpoint and web UI section on the orchestrator detail page.
+Make the orchestrator audit log human-readable by (a) exposing `seq` on transcript entries and (b) resolving trigger UUIDs to role+content previews in the web UI.
 
 Acceptance criteria:
-- Every `isTaskDone()` call appends an `OrchestratorAuditEntry` with `type: 'done-check'`, `llmAnswer` (`"YES"` | `"NO"`), `triggeredByMessageId` (string | null), `triggeredBySeq` (number | null), `historySize` (number), and `ts` (epoch ms).
-- Every `generateReply()` call appends an entry with `type: 'reply-generated'`, `triggeredByMessageId`, `triggeredBySeq`, `ts`.
-- System termination paths (max-iterations exceeded, transcript-limit reached, engine-unavailable, user stop) each append an entry with `type: 'system-event'`, `reason: string`, `ts`.
-- `GET /api/orchestrators/:id/audit-log` returns `{ auditLog: OrchestratorAuditEntry[] }`, oldest-first, namespace-guarded (same pattern as transcript endpoint).
-- Audit log is capped at 1 000 entries; trim from front on overflow.
-- `OrchestratorAuditEntry` type is defined in `shared/src/schemas.ts` and re-exported from `shared/src/types.ts`.
-- `web/src/types/api.ts` exports `OrchestratorAuditEntry` and `OrchestratorAuditLogResponse = { auditLog: OrchestratorAuditEntry[] }`.
-- `web/src/api/client.ts` adds `getOrchestratorAuditLog(id: string): Promise<OrchestratorAuditLogResponse>`.
-- `web/src/hooks/queries/useOrchestrators.ts` adds `useOrchestratorAuditLog(api, id)` query using key `queryKeys.orchestratorAuditLog(id)`.
-- `web/src/routes/orchestrators/$id.tsx` renders an "Audit Log" section below the transcript; each row shows `type`, formatted `ts`, `llmAnswer` (badge, green if YES), and `triggeredByMessageId` (dimmed, truncated). The section is present unconditionally (empty state: `…`).
-- `bun typecheck` passes with no new errors.
+- `OrchestratorTranscriptEntrySchema` gains `seq: z.number().nullable().optional()`.
+- `getTranscript()` in `orchestratorManager.ts` maps `seq` through to the returned objects.
+- In `$id.tsx`, the audit log rows for `done-check` and `reply-generated` show:
+  - A resolved message line: find the entry in `transcript` where `entry.id === auditEntry.triggeredByMessageId`, render `[role] first-80-chars-of-content…`; if not found, fall back to `msg …${last8charsOfId}`.
+  - `Msg #N` in place of `seq=N`; `seq unknown` when null.
+  - For `done-check` only: `History: N msgs` in place of `history=N`.
 
 Constraints:
-- No new npm/bun packages.
-- No SQLite changes.
-- No changes to `OrchestratorPublic` schema or the transcript endpoint.
-- TypeScript strict; avoid `any`.
-- Minimal diff; stay within target files.
+- Minimal diff.
+- Stay within target files unless absolutely necessary.
+- No new npm/bun dependencies.
+- TypeScript strict; no `any`.
 
 Target files:
 - `shared/src/schemas.ts`
-- `shared/src/types.ts`
 - `hub/src/sync/orchestratorManager.ts`
-- `hub/src/web/routes/orchestrators.ts`
-- `web/src/types/api.ts`
-- `web/src/api/client.ts`
-- `web/src/hooks/queries/useOrchestrators.ts`
 - `web/src/routes/orchestrators/$id.tsx`
 
 Required test commands:

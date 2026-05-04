@@ -11,6 +11,28 @@ import { Badge } from '@/components/ui/badge'
 import type { OrchestratorPublic } from '@/types/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
+function formatMessageRef(
+    transcript: Array<{ id: string; role: string; content: string }>,
+    messageId: string | null
+): string {
+    if (!messageId) {
+        return 'msg n/a'
+    }
+
+    const matched = transcript.find((entry) => entry.id === messageId)
+    if (!matched) {
+        return `msg ...${messageId.slice(-8)}`
+    }
+
+    const previewBase = matched.content.replace(/\s+/g, ' ').trim()
+    const preview = previewBase.length > 80 ? `${previewBase.slice(0, 80)}...` : previewBase
+    return `[${matched.role}] ${preview || '(empty)'}`
+}
+
+function formatSeqLabel(seq: number | null | undefined): string {
+    return typeof seq === 'number' ? `Msg #${seq}` : 'seq unknown'
+}
+
 function BackIcon(props: { className?: string }) {
     return (
         <svg
@@ -208,12 +230,20 @@ export default function OrchestratorDetailPage() {
                                             </div>
                                             {entry.type === 'done-check' ? (
                                                 <div className="mt-1 text-xs text-[var(--app-hint)]">
-                                                    trigger={entry.triggeredByMessageId ?? 'n/a'} seq={entry.triggeredBySeq ?? 'n/a'} history={entry.historySize}
+                                                    {formatMessageRef(transcript, entry.triggeredByMessageId)}
+                                                    {' | '}
+                                                    {formatSeqLabel(entry.triggeredBySeq)}
+                                                    {' | '}
+                                                    History: {entry.historySize} msgs
+                                                    {' | '}
+                                                    Evaluated: {entry.evaluatedMessagePreview}
                                                 </div>
                                             ) : null}
                                             {entry.type === 'reply-generated' ? (
                                                 <div className="mt-1 text-xs text-[var(--app-hint)]">
-                                                    trigger={entry.triggeredByMessageId ?? 'n/a'} seq={entry.triggeredBySeq ?? 'n/a'}
+                                                    {formatMessageRef(transcript, entry.triggeredByMessageId)}
+                                                    {' | '}
+                                                    {formatSeqLabel(entry.triggeredBySeq)}
                                                 </div>
                                             ) : null}
                                             {entry.type === 'system-event' ? (

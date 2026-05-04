@@ -218,7 +218,8 @@ export const OrchestratorTranscriptEntrySchema = z.object({
     id: z.string(),
     role: z.string(),
     content: z.string(),
-    createdAt: z.number().optional()
+    createdAt: z.number().optional(),
+    seq: z.number().nullable().optional()
 })
 
 export type OrchestratorTranscriptEntry = z.infer<typeof OrchestratorTranscriptEntrySchema>
@@ -229,6 +230,7 @@ export const OrchestratorAuditEntrySchema = z.discriminatedUnion('type', [
         ts: z.number(),
         llmAnswer: z.enum(['YES', 'NO']),
         rawAnswer: z.string(),
+        evaluatedMessagePreview: z.string(),
         triggeredByMessageId: z.string().nullable(),
         triggeredBySeq: z.number().nullable(),
         historySize: z.number()

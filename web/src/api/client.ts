@@ -467,9 +467,19 @@ export class ApiClient {
     }
 
     async deleteOrchestrator(id: string): Promise<void> {
-        await this.request<{ ok: boolean }>(`/api/orchestrators/${encodeURIComponent(id)}`, {
-            method: 'DELETE'
-        })
+        try {
+            await this.request<{ ok: boolean }>(`/api/orchestrators/${encodeURIComponent(id)}`, {
+                method: 'DELETE'
+            })
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            // Stop is idempotent from the UI perspective: if the run is already gone,
+            // treat it as successfully stopped instead of surfacing a noisy 404.
+            if (message.includes('HTTP 404') && message.includes('"error":"Not found"')) {
+                return
+            }
+            throw error
+        }
     }
 
     async fetchVoiceToken(options?: { customAgentId?: string; customApiKey?: string }): Promise<{

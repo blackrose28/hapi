@@ -75,6 +75,8 @@ type InternalRun = {
     updatedAt: number
     pollIterations: number
     loopPromise: Promise<void> | null
+    lastReadySeq: number
+    lastCodingAgentMessage: DecryptedMessage | null
 }
 
 function sleep(ms: number): Promise<void> {
@@ -148,6 +150,30 @@ function shouldRespondFromContent(rawContent: unknown): boolean {
         return false
     }
     return (data as { type?: string }).type === 'ready'
+}
+
+function isEventEnvelope(rawContent: unknown): boolean {
+    if (rawContent === null || typeof rawContent !== 'object') {
+        return false
+    }
+    const rc = rawContent as Record<string, unknown>
+    const innerRaw = rc.content
+    const inner = typeof innerRaw === 'object' && innerRaw !== null ? (innerRaw as Record<string, unknown>) : rc
+    return inner.type === 'event'
+}
+
+function isMeaningfulAssistantText(text: string): boolean {
+    const trimmed = text.trim()
+    if (!trimmed) return false
+    if (trimmed === 'No response requested.' || trimmed === 'No response requested') return false
+    return true
+}
+
+function buildEvaluatedPreview(rawContent: unknown): string {
+    const { role, text } = unwrapRoleContent(rawContent)
+    const compact = text.replace(/\s+/g, ' ').trim()
+    const trimmed = compact.length > 140 ? `${compact.slice(0, 140)}...` : compact
+    return `[${role}] ${trimmed || '(empty)'}`
 }
 
 function transcriptToBrainLines(entries: TranscriptEntry[]): string {
@@ -275,7 +301,9 @@ export class OrchestratorManager {
             createdAt: now,
             updatedAt: now,
             pollIterations: 0,
-            loopPromise: null
+            loopPromise: null,
+            lastReadySeq: 0,
+            lastCodingAgentMessage: null
         }
         this.runs.set(id, run)
         this.emit(id, run)
@@ -313,11 +341,12 @@ export class OrchestratorManager {
             return null
         }
         const slice = run.transcript.slice(-Math.min(limit, MAX_TRANSCRIPT_ENTRIES))
-        return slice.map(({ id: eid, role, content, createdAt }) => ({
+        return slice.map(({ id: eid, role, content, createdAt, seq }) => ({
             id: eid,
             role,
             content,
-            createdAt
+            createdAt,
+            seq
         }))
     }
 
@@ -452,7 +481,6 @@ export class OrchestratorManager {
                 current.status = 'error'
                 current.error = 'Max poll iterations reached'
                 this.emit(orchestratorId, current)
-                this.runs.delete(orchestratorId)
                 return
             }
 
@@ -465,7 +493,6 @@ export class OrchestratorManager {
                 current.status = 'done'
                 current.error = 'Transcript limit reached'
                 this.emit(orchestratorId, current)
-                this.runs.delete(orchestratorId)
                 return
             }
 
@@ -479,7 +506,6 @@ export class OrchestratorManager {
                 current.status = 'error'
                 current.error = 'Sync engine unavailable'
                 this.emit(orchestratorId, current)
-                this.runs.delete(orchestratorId)
                 return
             }
 
@@ -494,8 +520,7 @@ export class OrchestratorManager {
             }
 
             let readySeen = false
-            let lastAgent: DecryptedMessage | null = null
-
+            let readySeq = 0
             for (const msg of batch) {
                 const seq = typeof msg.seq === 'number' ? msg.seq : 0
                 current.afterSeq = Math.max(current.afterSeq, seq)
@@ -512,25 +537,39 @@ export class OrchestratorManager {
                 })
                 this.emit(orchestratorId, current)
 
+                if (shouldRespondFromContent(msg.content)) {
+                    readySeen = true
+                    readySeq = Math.max(readySeq, seq)
+                }
                 if (
                     (rawRole === 'assistant' || rawRole === 'agent')
-                    && shouldRespondFromContent(msg.content)
+                    && isMeaningfulAssistantText(text)
+                    && !isEventEnvelope(msg.content)
                 ) {
-                    readySeen = true
-                }
-                if ((rawRole === 'assistant' || rawRole === 'agent') && text.trim()) {
-                    lastAgent = msg
+                    current.lastCodingAgentMessage = msg
                 }
             }
 
             if (readySeen) {
+                // Avoid re-processing the same ready event across polling cycles.
+                if (readySeq <= current.lastReadySeq) {
+                    await sleep(current.pollIntervalMs)
+                    continue
+                }
+                current.lastReadySeq = readySeq
+
+                // Never send proactive "user" messages unless we saw a real assistant turn.
+                if (!current.lastCodingAgentMessage) {
+                    await sleep(current.pollIntervalMs)
+                    continue
+                }
+
                 try {
-                    const target = lastAgent ?? batch[batch.length - 1]
+                    const target = current.lastCodingAgentMessage
                     const done = await this.isTaskDone(current, target)
                     if (done) {
                         current.status = 'done'
                         this.emit(orchestratorId, current)
-                        this.runs.delete(orchestratorId)
                         return
                     }
 
@@ -596,6 +635,7 @@ Rules:
 
     private async isTaskDone(run: InternalRun, latest: DecryptedMessage): Promise<boolean> {
         const historyText = transcriptToBrainLines(run.transcript)
+        const evaluatedMessagePreview = buildEvaluatedPreview(latest.content)
         const prompt = `
 You are evaluating whether a coding task is complete.
 
@@ -630,6 +670,7 @@ Respond with exactly one word: YES or NO
                 ts: Date.now(),
                 llmAnswer: normalized,
                 rawAnswer: answer,
+                evaluatedMessagePreview,
                 triggeredByMessageId: latest.id,
                 triggeredBySeq: latest.seq ?? null,
                 historySize: run.transcript.length
@@ -641,6 +682,7 @@ Respond with exactly one word: YES or NO
                 ts: Date.now(),
                 llmAnswer: 'NO',
                 rawAnswer: '',
+                evaluatedMessagePreview,
                 triggeredByMessageId: latest.id,
                 triggeredBySeq: latest.seq ?? null,
                 historySize: run.transcript.length
