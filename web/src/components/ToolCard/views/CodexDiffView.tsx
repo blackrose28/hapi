@@ -79,7 +79,8 @@ function patchTexts(patch: ReturnType<typeof parsePatch>[number]): { oldText: st
 function renderDiff(
     block: ToolViewProps['block'],
     showFileHeader: boolean,
-    overflowMode: 'contained' | 'parent-scroll'
+    surface?: ToolViewProps['surface'],
+    overflowMode?: 'contained' | 'parent-scroll'
 ) {
     const input = block.tool.input
     if (!isObject(input) || typeof input.unified_diff !== 'string') return null
@@ -108,6 +109,8 @@ function renderDiff(
                         filePath={showFileHeader ? path : undefined}
                         variant={showFileHeader ? 'inline' : undefined}
                         overflowMode={overflowMode}
+                        size={surface === 'dialog' ? 'comfortable' : undefined}
+                        scrollY={surface === 'dialog'}
                     />
                 )
             })}
@@ -161,6 +164,7 @@ export function CodexDiffFullView(props: ToolViewProps) {
     return renderDiff(
         props.block,
         true,
+        props.surface,
         props.surface === 'group-output' ? 'parent-scroll' : 'contained'
     )
 }

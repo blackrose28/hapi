@@ -459,27 +459,22 @@ export function getVisibleSessionPreview(
     const limit = options.limit ?? GROUP_SESSION_PREVIEW_LIMIT
     if (options.expanded || sessions.length <= limit) return sessions
 
-    const included = new Set<string>()
-    const visible: SessionSummary[] = []
-    const addSession = (session: SessionSummary) => {
-        if (included.has(session.id)) return
-        included.add(session.id)
-        visible.push(session)
+    const requiredIds = new Set<string>()
+    for (const session of sessions) {
+        if (session.active) requiredIds.add(session.id)
+    }
+    if (options.selectedSessionId && sessions.some(session => session.id === options.selectedSessionId)) {
+        requiredIds.add(options.selectedSessionId)
     }
 
-    const selectedSession = options.selectedSessionId
-        ? sessions.find(session => session.id === options.selectedSessionId)
-        : undefined
-    if (selectedSession) addSession(selectedSession)
+    const visible: SessionSummary[] = sessions.filter((session, index) => {
+        return index < limit || requiredIds.has(session.id)
+    })
 
-    for (const session of sessions) {
-        if (visible.length >= limit) break
-        if (session.active) addSession(session)
-    }
-
-    for (const session of sessions) {
-        if (visible.length >= limit) break
-        addSession(session)
+    for (let index = visible.length - 1; visible.length > limit && index >= 0; index -= 1) {
+        const session = visible[index]
+        if (!session || requiredIds.has(session.id)) continue
+        visible.splice(index, 1)
     }
 
     return visible

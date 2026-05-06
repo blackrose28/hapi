@@ -84,23 +84,25 @@ export function HappyAssistantMessage() {
             id={getConversationMessageAnchorId(messageId)}
             className={`${rootClass} ${copyText ? 'group/msg' : ''} scroll-mt-4`}
         >
-            <div className="min-w-0">
-                <MessagePrimitive.Content components={MESSAGE_PART_COMPONENTS} />
-            </div>
-            {copyText && (
-                <div className="hidden sm:flex justify-end mt-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
-                    <button
-                        type="button"
-                        title="Copy"
-                        className="p-0.5 rounded hover:bg-[var(--app-subtle-bg)] transition-colors"
-                        onClick={() => copy(copyText)}
-                    >
-                        {copied
-                            ? <CheckIcon className="h-3.5 w-3.5 text-green-500" />
-                            : <CopyIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" />}
-                    </button>
+            <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                    <MessagePrimitive.Content components={MESSAGE_PART_COMPONENTS} />
                 </div>
-            )}
+                {copyText ? (
+                    <div className="happy-message-actions-first-line hidden sm:flex shrink-0 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                        <button
+                            type="button"
+                            title="Copy"
+                            className="p-0.5 rounded hover:bg-[var(--app-subtle-bg)] transition-colors"
+                            onClick={() => copy(copyText)}
+                        >
+                            {copied
+                                ? <CheckIcon className="h-3.5 w-3.5 text-green-500" />
+                                : <CopyIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" />}
+                        </button>
+                    </div>
+                ) : null}
+            </div>
         </MessagePrimitive.Root>
     )
 }

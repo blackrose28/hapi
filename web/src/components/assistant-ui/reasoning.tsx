@@ -3,7 +3,13 @@ import { useMessage } from '@assistant-ui/react'
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
-import { defaultComponents, MARKDOWN_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from '@/components/assistant-ui/markdown-text'
+import {
+    MARKDOWN_CLASSNAME,
+    MARKDOWN_COMPONENTS_BY_LANGUAGE,
+    MARKDOWN_PLUGINS,
+    MARKDOWN_REHYPE_PLUGINS,
+    defaultComponents,
+} from '@/components/assistant-ui/markdown-text'
 
 function ChevronIcon(props: { className?: string; open?: boolean }) {
     return (
@@ -39,16 +45,14 @@ function ShimmerDot() {
     )
 }
 
-/**
- * Renders individual reasoning message part content with markdown support.
- */
 export const Reasoning: FC = () => {
     return (
         <MarkdownTextPrimitive
             remarkPlugins={MARKDOWN_PLUGINS}
             rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
             components={defaultComponents}
-            className={cn('aui-reasoning-content min-w-0 max-w-full break-words text-sm text-[var(--app-hint)]')}
+            componentsByLanguage={MARKDOWN_COMPONENTS_BY_LANGUAGE}
+            className={cn(MARKDOWN_CLASSNAME, 'aui-reasoning-content text-[13.5px] text-[var(--app-hint)]')}
         />
     )
 }
@@ -156,7 +160,6 @@ export function ReasoningDisclosure(props: ReasoningDisclosureProps) {
 export const ReasoningGroup: FC<PropsWithChildren> = ({ children }) => {
     const { t } = useTranslation()
 
-    // Check if reasoning is still streaming
     const message = useMessage()
     const isStreaming = message.status?.type === 'running'
         && message.content.length > 0

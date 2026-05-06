@@ -115,6 +115,9 @@ function renderTaskSummary(
 
 function renderToolInput(block: ToolCallBlock, surface: 'inline' | 'dialog' = 'inline'): ReactNode {
     const collapseLongContent = surface === 'inline'
+    const codeBlockSurfaceProps = surface === 'dialog'
+        ? { size: 'comfortable' as const, scrollY: true }
+        : {}
     const toolName = block.tool.name
     const input = block.tool.input
 
@@ -122,6 +125,9 @@ function renderToolInput(block: ToolCallBlock, surface: 'inline' | 'dialog' = 'i
         return <MarkdownRenderer content={input.prompt} />
     }
 
+    if (toolName === 'Task' && isObject(input) && typeof input.prompt === 'string') {
+        return <MarkdownRenderer content={input.prompt} />
+    }
 
     const commandArray = isObject(input) && Array.isArray(input.command) ? input.command : null
     if ((toolName === 'CodexBash' || toolName === 'Bash') && (typeof commandArray?.[0] === 'string' || typeof input === 'object')) {
@@ -129,11 +135,11 @@ function renderToolInput(block: ToolCallBlock, surface: 'inline' | 'dialog' = 'i
             ? commandArray.filter((part) => typeof part === 'string').join(' ')
             : getInputStringAny(input, ['command', 'cmd'])
         if (cmd) {
-            return <CodeBlock code={cmd} language="bash" collapseLongContent={collapseLongContent} />
+            return <CodeBlock code={cmd} language="bash" title="Command" collapseLongContent={collapseLongContent} {...codeBlockSurfaceProps} />
         }
     }
 
-    return <CodeBlock code={safeStringify(input)} language="json" collapseLongContent={collapseLongContent} />
+    return <CodeBlock code={safeStringify(input)} language="json" title="Input" collapseLongContent={collapseLongContent} {...codeBlockSurfaceProps} />
 }
 
 function StatusIcon(props: { state: ToolCallBlock['tool']['state'] }) {
@@ -461,8 +467,8 @@ function ToolCardInner(props: ToolCardProps) {
     }
 
     const header = (
-        <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex flex-col gap-1">
                 <div className="min-w-0 flex items-center gap-2">
                     <div
                         aria-hidden="true"
@@ -585,7 +591,7 @@ function ToolCardInner(props: ToolCardProps) {
             </CardHeader>
 
             {hasBody ? (
-                <CardContent className="px-3 pb-3 pt-0">
+                <CardContent className="px-3 pb-3 pt-1">
                     {taskSummary ? (
                         <div className="mt-2">
                             {taskSummary}
