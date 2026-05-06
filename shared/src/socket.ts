@@ -396,10 +396,25 @@ export const UpdateMachineBodySchema = z.object({
 
 export type UpdateMachineBody = z.infer<typeof UpdateMachineBodySchema>
 
+export const UpdateCancelQueuedMessageBodySchema = z.object({
+    t: z.literal('cancel-queued-message'),
+    sid: z.string(),
+    messageId: z.string(),
+    localId: z.string().optional()
+})
+
+export type UpdateCancelQueuedMessageBody = z.infer<typeof UpdateCancelQueuedMessageBodySchema>
+
+export const CancelQueuedMessageAckSchema = z.object({
+    removed: z.boolean()
+})
+
+export type CancelQueuedMessageAck = z.infer<typeof CancelQueuedMessageAckSchema>
+
 export const UpdateSchema = z.object({
     id: z.string(),
     seq: z.number(),
-    body: z.union([UpdateNewMessageBodySchema, UpdateSessionBodySchema, UpdateMachineBodySchema]),
+    body: z.union([UpdateNewMessageBodySchema, UpdateSessionBodySchema, UpdateMachineBodySchema, UpdateCancelQueuedMessageBodySchema]),
     createdAt: z.number()
 })
 
@@ -458,7 +473,7 @@ export type MachineUpdateStateAck = {
 }
 
 export interface ServerToClientEvents {
-    update: (data: Update) => void
+    update: (data: Update, ack?: (response: CancelQueuedMessageAck) => void) => void
     'rpc-request': (data: { method: string; params: string }, callback: (response: string) => void) => void
     'terminal:open': (data: TerminalOpenPayload) => void
     'terminal:write': (data: TerminalWritePayload) => void

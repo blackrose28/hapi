@@ -525,6 +525,11 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
         localIds: z.array(z.string()),
         invokedAt: z.number().optional()
     }),
+    SessionChangedSchema.extend({
+        type: z.literal('message-cancelled'),
+        messageId: z.string(),
+        localId: z.string().optional()
+    }),
     SessionEventBaseSchema.extend({
         type: z.literal('heartbeat'),
         data: z.object({
@@ -573,6 +578,7 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
 
 export type SyncEvent = z.infer<typeof SyncEventSchema>
 
+<<<<<<< HEAD
 
 export const ScratchlistAttachmentMetadataSchema = z.object({
     id: z.string(),
@@ -814,3 +820,11 @@ export type SqliteStorageUsageResponse = {
     shmBytes: number
     totalBytes: number
 }
+
+export const CancelMessageResponseSchema = z.discriminatedUnion('status', [
+    z.object({ status: z.literal('cancelled'), localId: z.string().nullable() }),
+    z.object({ status: z.literal('invoked'), message: DecryptedMessageSchema }),
+])
+
+export type CancelMessageResponse = z.infer<typeof CancelMessageResponseSchema>
+

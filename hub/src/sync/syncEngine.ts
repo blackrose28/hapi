@@ -10,7 +10,7 @@
 import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult } from '@hapi/protocol'
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import type { Server } from 'socket.io'
-import type { Store, StoredTeamMessage, StoredTeamParticipant } from '../store'
+import type { Store, StoredTeamMessage, StoredTeamParticipant, CancelQueuedMessageResult } from '../store'
 import type { RpcRegistry } from '../socket/rpcRegistry'
 import type { SSEManager } from '../sse/sseManager'
 import { EventPublisher, type SyncEventListener } from './eventPublisher'
@@ -577,6 +577,13 @@ export class SyncEngine {
         if (payload.text.trim()) {
             this.sessionCache.updateLastUserRequest(sessionId, payload.text.trim())
         }
+    }
+
+    async cancelQueuedMessage(
+        sessionId: string,
+        messageId: string
+    ): Promise<CancelQueuedMessageResult> {
+        return this.messageService.cancelQueuedMessage(sessionId, messageId)
     }
 
     async approvePermission(

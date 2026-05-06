@@ -116,7 +116,11 @@ export async function runOpencode(opts: {
         messageQueue.push(formattedText, mode, localId);
     });
 
-    
+    session.onCancelQueuedMessage((localId) => {
+        const removed = messageQueue.cancelByLocalId(localId);
+        logger.debug(`[opencode] cancelByLocalId(${localId}): ${removed ? 'removed' : 'not found (best-effort)'}`);
+        return removed;
+    });
 
     registerSessionConfigRpc({
         rpcHandlerManager: session.rpcHandlerManager,

@@ -14,7 +14,7 @@ import type {
 } from '@/types/api'
 import { deriveApiCacheScope } from '@/api/client'
 import { queryKeys } from '@/lib/query-keys'
-import { clearMessageWindow, getMessageWindowState, ingestIncomingMessages, markMessagesConsumed, updateMessageStatus } from '@/lib/message-window-store'
+import { clearMessageWindow, getMessageWindowState, ingestIncomingMessages, markMessagesConsumed, removeOptimisticMessage, updateMessageStatus } from '@/lib/message-window-store'
 
 type SSESubscription = {
     all?: boolean
@@ -445,6 +445,12 @@ export function useSSE(options: {
 
             if (event.type === 'messages-consumed') {
                 markMessagesConsumed(event.sessionId, event.localIds, event.invokedAt)
+            }
+
+            if (event.type === 'message-cancelled') {
+                // Remove the cancelled message from the store. If the local
+                // optimistic removal already cleared it, this is a no-op.
+                removeOptimisticMessage(event.sessionId, event.messageId)
             }
 
             if (event.type === 'message-received') {

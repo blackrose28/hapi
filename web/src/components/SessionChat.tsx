@@ -710,7 +710,7 @@ export function SessionChat(props: {
                     </div>
 
                     <div className="px-3">
-                        <QueuedMessagesBar sessionId={props.session.id} />
+                        <QueuedMessagesBar sessionId={props.session.id} api={props.api} />
                     </div>
 
                     <HappyComposer

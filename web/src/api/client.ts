@@ -43,7 +43,7 @@ import type {
     TeamMentionRequest,
     TeamChatMessage
 } from '@/types/api'
-import type { ReopenSessionResponse } from '@hapi/protocol/schemas'
+import type { CancelMessageResponse, ReopenSessionResponse } from '@hapi/protocol/schemas'
 import {
     TerminalSnippetResponseSchema,
     TerminalSnippetsResponseSchema,
@@ -523,6 +523,14 @@ export class ApiClient {
 
         const body = await res.json().catch(() => null) as { sessionId?: string } | null
         return { status: 'sent', sessionId: body?.sessionId ?? sessionId }
+    }
+
+    async cancelMessage(sessionId: string, messageId: string): Promise<CancelMessageResponse> {
+        const response = await this.request(
+            `/api/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}`,
+            { method: 'DELETE' }
+        )
+        return response as CancelMessageResponse
     }
 
     async abortSession(sessionId: string): Promise<void> {

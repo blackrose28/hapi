@@ -54,6 +54,23 @@ export function createMessagesRoutes(
         return c.json(engine.getMessagesPage(sessionId, { limit, beforeSeq }))
     })
 
+    app.delete('/sessions/:id/messages/:messageId', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine)
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+        const sessionId = sessionResult.sessionId
+        const messageId = c.req.param('messageId')
+
+        const result = await engine.cancelQueuedMessage(sessionId, messageId)
+        return c.json(result)
+    })
+
     app.post('/sessions/:id/messages', async (c) => {
         const engine = requireSyncEngine(c, getSyncEngine)
         if (engine instanceof Response) {

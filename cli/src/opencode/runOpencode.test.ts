@@ -15,6 +15,7 @@ const harness = vi.hoisted(() => ({
     opencodeLoopError: null as Error | null,
     session: {
         onUserMessage: vi.fn(),
+        onCancelQueuedMessage: vi.fn(),
         rpcHandlerManager: {
             registerHandler: vi.fn()
         }
