@@ -202,6 +202,199 @@ function extractPlanUpdate(params: Record<string, unknown>): ConvertedEvent[] {
     return plan.length > 0 ? [{ type: 'plan_update', plan }] : [];
 }
 
+function extractEventScope(params: Record<string, unknown>): Record<string, unknown> {
+    const thread = asRecord(params.thread);
+    const turn = asRecord(params.turn);
+    const tokenUsage = asRecord(params.tokenUsage ?? params.token_usage ?? params.info);
+    const tokenUsageThread = asRecord(tokenUsage?.thread);
+    const tokenUsageTurn = asRecord(tokenUsage?.turn);
+    const item = asRecord(params.item);
+    const itemThread = asRecord(item?.thread);
+    const itemTurn = asRecord(item?.turn);
+    const threadId = asString(
+        params.threadId
+        ?? params.thread_id
+        ?? thread?.threadId
+        ?? thread?.thread_id
+        ?? thread?.id
+        ?? tokenUsage?.threadId
+        ?? tokenUsage?.thread_id
+        ?? tokenUsageThread?.threadId
+        ?? tokenUsageThread?.thread_id
+        ?? tokenUsageThread?.id
+        ?? item?.threadId
+        ?? item?.thread_id
+        ?? itemThread?.threadId
+        ?? itemThread?.thread_id
+        ?? itemThread?.id
+    );
+    const turnId = asString(
+        params.turnId
+        ?? params.turn_id
+        ?? turn?.turnId
+        ?? turn?.turn_id
+        ?? turn?.id
+        ?? tokenUsage?.turnId
+        ?? tokenUsage?.turn_id
+        ?? tokenUsageTurn?.turnId
+        ?? tokenUsageTurn?.turn_id
+        ?? tokenUsageTurn?.id
+        ?? item?.turnId
+        ?? item?.turn_id
+        ?? itemTurn?.turnId
+        ?? itemTurn?.turn_id
+        ?? itemTurn?.id
+    );
+
+    return {
+        ...(threadId ? { thread_id: threadId } : {}),
+        ...(turnId ? { turn_id: turnId } : {})
+    };
+}
+
+function addEventScope(events: ConvertedEvent[], scope: Record<string, unknown>): ConvertedEvent[] {
+    if (Object.keys(scope).length === 0) {
+        return events;
+    }
+
+    return events.map((event) => ({
+        ...scope,
+        ...event
+    }));
+}
+
+function normalizeCollabAgentToolName(value: unknown): string | null {
+    const raw = asString(value);
+    if (!raw) return null;
+
+    const normalized = raw.trim().toLowerCase().replace(/[\s_-]/g, '');
+    if (normalized === 'spawnagent' || normalized === 'spawn') return 'spawn_agent';
+    if (normalized === 'sendinput' || normalized === 'sendmessage') return 'send_input';
+    if (normalized === 'resumeagent' || normalized === 'resume') return 'resume_agent';
+    if (normalized === 'waitagent' || normalized === 'wait') return 'wait_agent';
+    if (normalized === 'closeagent' || normalized === 'close') return 'close_agent';
+    return null;
+}
+
+function extractStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+        : [];
+}
+
+function buildCollabAgentInput(item: Record<string, unknown>, toolName: string): Record<string, unknown> {
+    const targets = extractStringArray(item.receiverThreadIds ?? item.receiver_thread_ids ?? item.targets);
+    const input: Record<string, unknown> = {};
+
+    const prompt = asString(item.prompt ?? item.message);
+    if (prompt) {
+        input.message = prompt;
+    }
+
+    const agentType = asString(item.agentType ?? item.agent_type);
+    if (agentType) {
+        input.agent_type = agentType;
+    }
+
+    const forkContext = asBoolean(item.forkContext ?? item.fork_context);
+    if (forkContext !== null) {
+        input.fork_context = forkContext;
+    }
+
+    const model = asString(item.model);
+    if (model) {
+        input.model = model;
+    }
+
+    const reasoningEffort = asString(item.reasoningEffort ?? item.reasoning_effort);
+    if (reasoningEffort) {
+        input.reasoning_effort = reasoningEffort;
+    }
+
+    const senderThreadId = asString(item.senderThreadId ?? item.sender_thread_id);
+    if (senderThreadId) {
+        input.sender_thread_id = senderThreadId;
+    }
+
+    if (targets.length > 0) {
+        input.targets = targets;
+        if (toolName === 'close_agent' || toolName === 'send_input' || toolName === 'resume_agent') {
+            input.target = targets[0];
+        }
+    }
+
+    return input;
+}
+
+function statusObjectFromAgentState(value: unknown): unknown {
+    const record = asRecord(value);
+    if (!record) return value;
+
+    const message = asString(record.message)
+        ?? asString(record.output)
+        ?? asString(record.result)
+        ?? asString(record.finalMessage)
+        ?? asString(record.final_message);
+    const status = asString(record.status ?? record.state);
+    const normalizedStatus = status?.trim().toLowerCase().replace(/[\s_-]/g, '');
+    const completed = normalizedStatus === 'completed'
+        || normalizedStatus === 'complete'
+        || normalizedStatus === 'done'
+        || record.completed === true
+        || record.done === true;
+    if (completed && message) return { completed: message };
+    if (completed) return { ...record, status: 'completed' };
+    if ((normalizedStatus === 'failed' || normalizedStatus === 'error') && message) return { failed: message };
+    if ((normalizedStatus === 'canceled' || normalizedStatus === 'cancelled') && message) return { canceled: message };
+    return value;
+}
+
+function buildCollabAgentOutput(item: Record<string, unknown>, toolName: string): Record<string, unknown> {
+    const targets = extractStringArray(item.receiverThreadIds ?? item.receiver_thread_ids ?? item.targets);
+    const agentsStates = asRecord(item.agentsStates ?? item.agents_states) ?? {};
+    const status = asString(item.status);
+    const error = asString(item.error ?? item.message);
+    const errorFields = error ? { error, message: error } : {};
+
+    if (toolName === 'spawn_agent') {
+        const agentId = targets[0] ?? null;
+        return {
+            ...(agentId ? { agent_id: agentId, agentId } : {}),
+            ...(status ? { status } : {}),
+            ...errorFields,
+            agentsStates
+        };
+    }
+
+    if (toolName === 'wait_agent') {
+        const normalizedStatus: Record<string, unknown> = {};
+        for (const [agentId, agentStatus] of Object.entries(agentsStates)) {
+            normalizedStatus[agentId] = statusObjectFromAgentState(agentStatus);
+        }
+        return {
+            status: normalizedStatus,
+            ...errorFields,
+            timed_out: status === 'timedOut' || status === 'timed_out'
+        };
+    }
+
+    if (toolName === 'close_agent') {
+        const firstStatus = targets[0] ? agentsStates[targets[0]] : Object.values(agentsStates)[0];
+        return {
+            previous_status: statusObjectFromAgentState(firstStatus),
+            ...errorFields,
+            ...(targets[0] ? { agent_id: targets[0] } : {})
+        };
+    }
+
+    return {
+        ...(targets.length > 0 ? { targets } : {}),
+        ...(status ? { status } : {}),
+        ...errorFields,
+        agentsStates
+    };
+}
+
 export class AppServerEventConverter {
     private readonly agentMessageBuffers = new Map<string, string>();
     private readonly reasoningBuffers = new Map<string, string>();

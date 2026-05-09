@@ -29,6 +29,28 @@ type Harness = {
     clearGoalReturnsFalse: boolean;
     suppressTurnCompletion: boolean;
     remainingThreadSystemErrors: number;
+    startTurnMessages: string[];
+    failResumeThreadIds: string[];
+    nextThreadSystemErrorMessage: string | null;
+    failNextCompact: boolean;
+    deferThreadStatusNotifications: boolean;
+    emitChildThreadEvents: boolean;
+    emitChildUsageEvents: boolean;
+    emitChildReasoningBurst: boolean;
+    emitChildDoneStatusWithoutMessage: boolean;
+    emitChildWaitStructuredOutput: boolean;
+    emitChildTaskCompleteBeforeMessage: boolean;
+    suppressChildTaskCompleteEvent: boolean;
+    emitSecondChildMessage: boolean;
+    emitLateChildCommandAfterParentTool: boolean;
+    emitParentUsageEvents: boolean;
+    emitChildNestedAgentTool: boolean;
+    emitParentTitleChange: boolean;
+    emitParentSpawnFailureWithoutAgentId: boolean;
+    emitParentSpawnStartWithoutEnd: boolean;
+    emitParentSendInputFailure: boolean;
+    emitParentResumeSuccess: boolean;
+    bridgeOptions: unknown[];
 };
 
 function getHarness(): Harness {
@@ -49,7 +71,29 @@ function getHarness(): Harness {
         failGoalApi: false,
         clearGoalReturnsFalse: false,
         suppressTurnCompletion: false,
-        remainingThreadSystemErrors: 0
+        remainingThreadSystemErrors: 0,
+        startTurnMessages: [],
+        failResumeThreadIds: [],
+        nextThreadSystemErrorMessage: null,
+        failNextCompact: false,
+        deferThreadStatusNotifications: false,
+        emitChildThreadEvents: false,
+        emitChildUsageEvents: false,
+        emitChildReasoningBurst: false,
+        emitChildDoneStatusWithoutMessage: false,
+        emitChildWaitStructuredOutput: false,
+        emitChildTaskCompleteBeforeMessage: false,
+        suppressChildTaskCompleteEvent: false,
+        emitSecondChildMessage: false,
+        emitLateChildCommandAfterParentTool: false,
+        emitParentUsageEvents: false,
+        emitChildNestedAgentTool: false,
+        emitParentTitleChange: false,
+        emitParentSpawnFailureWithoutAgentId: false,
+        emitParentSpawnStartWithoutEnd: false,
+        emitParentSendInputFailure: false,
+        emitParentResumeSuccess: false,
+        bridgeOptions: []
     };
     return globalWithHarness.__codexRemoteLauncherHarness;
 }
@@ -134,6 +178,390 @@ vi.mock('./codexAppServerClient', () => {
                 };
                 harness.notifications.push({ method: 'item/completed', params: commandEnd });
                 this.notificationHandler?.('item/completed', commandEnd);
+
+                if (harness.emitParentUsageEvents) {
+                    const parentUsage = {
+                        tokenUsage: {
+                            thread_id: threadId,
+                            turn_id: turnId,
+                            last_token_usage: {
+                                input_tokens: 100,
+                                output_tokens: 10
+                            },
+                            model_context_window: 200_000
+                        }
+                    };
+                    harness.notifications.push({ method: 'thread/tokenUsage/updated', params: parentUsage });
+                    this.notificationHandler?.('thread/tokenUsage/updated', parentUsage);
+
+                    const parentCompact = { thread: { id: threadId } };
+                    harness.notifications.push({ method: 'thread/compacted', params: parentCompact });
+                    this.notificationHandler?.('thread/compacted', parentCompact);
+                }
+
+                if (harness.emitParentSpawnFailureWithoutAgentId || harness.emitParentSpawnStartWithoutEnd) {
+                    const spawnStart = {
+                        item: {
+                            id: 'failed-spawn',
+                            type: 'collabAgentToolCall',
+                            tool: 'spawnAgent',
+                            prompt: 'do side work',
+                            reasoningEffort: 'medium',
+                            senderThreadId: threadId,
+                            receiverThreadIds: []
+                        },
+                        threadId,
+                        turnId
+                    };
+                    harness.notifications.push({ method: 'item/started', params: spawnStart });
+                    this.notificationHandler?.('item/started', spawnStart);
+
+                    if (harness.emitParentSpawnFailureWithoutAgentId) {
+                        const spawnCompleted = {
+                            item: {
+                                id: 'failed-spawn',
+                                type: 'collabAgentToolCall',
+                                tool: 'spawnAgent',
+                                status: 'failed',
+                                error: 'invalid spawn arguments',
+                                senderThreadId: threadId,
+                                receiverThreadIds: [],
+                                agentsStates: {}
+                            },
+                            threadId,
+                            turnId
+                        };
+                        harness.notifications.push({ method: 'item/completed', params: spawnCompleted });
+                        this.notificationHandler?.('item/completed', spawnCompleted);
+                    }
+                }
+            }
+
+            if (harness.emitChildThreadEvents) {
+                const childThreadId = 'child-thread';
+                const childTurnId = 'child-turn';
+                const childMessage = 'child output should stay hidden';
+                const secondChildMessage = 'final child output should win';
+
+                const emitChildDone = () => {
+                    const childDone = {
+                        msg: {
+                            type: 'task_complete',
+                            thread_id: childThreadId,
+                            turn_id: childTurnId
+                        }
+                    };
+                    harness.notifications.push({ method: 'codex/event/task_complete', params: childDone });
+                    this.notificationHandler?.('codex/event/task_complete', childDone);
+                };
+
+                if (harness.emitChildReasoningBurst) {
+                    for (let i = 0; i < 20; i += 1) {
+                        const reasoningDelta = {
+                            msg: {
+                                type: 'reasoning_content_delta',
+                                item_id: 'child-reasoning',
+                                delta: `step-${i} `,
+                                thread_id: childThreadId,
+                                turn_id: childTurnId
+                            }
+                        };
+                        harness.notifications.push({ method: 'codex/event/reasoning_content_delta', params: reasoningDelta });
+                        this.notificationHandler?.('codex/event/reasoning_content_delta', reasoningDelta);
+                    }
+                }
+
+                if (harness.emitChildDoneStatusWithoutMessage && harness.emitChildTaskCompleteBeforeMessage) {
+                    emitChildDone();
+                }
+
+                const childMessageCompleted = {
+                    item: {
+                        id: 'child-msg-1',
+                        type: 'agentMessage',
+                        content: [{ type: 'text', text: childMessage }]
+                    },
+                    threadId: childThreadId,
+                    turnId: childTurnId
+                };
+                harness.notifications.push({ method: 'item/completed', params: childMessageCompleted });
+                this.notificationHandler?.('item/completed', childMessageCompleted);
+
+                if (harness.emitSecondChildMessage) {
+                    const secondChildMessageCompleted = {
+                        item: {
+                            id: 'child-msg-2',
+                            type: 'agentMessage',
+                            content: [{ type: 'text', text: secondChildMessage }]
+                        },
+                        threadId: childThreadId,
+                        turnId: childTurnId
+                    };
+                    harness.notifications.push({ method: 'item/completed', params: secondChildMessageCompleted });
+                    this.notificationHandler?.('item/completed', secondChildMessageCompleted);
+                }
+
+                if (
+                    harness.emitChildDoneStatusWithoutMessage
+                    && !harness.emitChildTaskCompleteBeforeMessage
+                    && !harness.suppressChildTaskCompleteEvent
+                ) {
+                    emitChildDone();
+                }
+
+                if (harness.emitChildUsageEvents) {
+                    const childUsage = {
+                        tokenUsage: {
+                            thread_id: childThreadId,
+                            turn_id: childTurnId,
+                            last_token_usage: {
+                                input_tokens: 30,
+                                output_tokens: 3
+                            },
+                            model_context_window: 200_000
+                        }
+                    };
+                    harness.notifications.push({ method: 'thread/tokenUsage/updated', params: childUsage });
+                    this.notificationHandler?.('thread/tokenUsage/updated', childUsage);
+
+                    const childCompact = {
+                        msg: {
+                            type: 'context_compacted',
+                            thread_id: childThreadId,
+                            turn_id: childTurnId
+                        }
+                    };
+                    harness.notifications.push({ method: 'codex/event/context_compacted', params: childCompact });
+                    this.notificationHandler?.('codex/event/context_compacted', childCompact);
+
+                    const ambiguousUsage = {
+                        tokenUsage: {
+                            last_token_usage: {
+                                input_tokens: 999,
+                                output_tokens: 1
+                            }
+                        }
+                    };
+                    harness.notifications.push({ method: 'thread/tokenUsage/updated', params: ambiguousUsage });
+                    this.notificationHandler?.('thread/tokenUsage/updated', ambiguousUsage);
+                }
+
+                const childCommandStart = {
+                    item: {
+                        id: 'child-cmd-1',
+                        type: 'commandExecution',
+                        command: 'echo child'
+                    },
+                    threadId: childThreadId,
+                    turnId: childTurnId
+                };
+                harness.notifications.push({ method: 'item/started', params: childCommandStart });
+                this.notificationHandler?.('item/started', childCommandStart);
+                this.notificationHandler?.('item/commandExecution/outputDelta', {
+                    itemId: 'child-cmd-1',
+                    delta: 'child stdout\n',
+                    threadId: childThreadId,
+                    turnId: childTurnId
+                });
+                const childCommandEnd = {
+                    item: {
+                        id: 'child-cmd-1',
+                        type: 'commandExecution',
+                        exitCode: 0
+                    },
+                    threadId: childThreadId,
+                    turnId: childTurnId
+                };
+                harness.notifications.push({ method: 'item/completed', params: childCommandEnd });
+                this.notificationHandler?.('item/completed', childCommandEnd);
+
+                const childTitleStart = {
+                    item: {
+                        id: 'title-child',
+                        type: 'mcpToolCall',
+                        server: 'hapi',
+                        tool: 'change_title',
+                        arguments: { title: 'Child Title' }
+                    },
+                    threadId: childThreadId,
+                    turnId: childTurnId
+                };
+                harness.notifications.push({ method: 'item/started', params: childTitleStart });
+                this.notificationHandler?.('item/started', childTitleStart);
+
+                const childTitleEnd = {
+                    item: {
+                        id: 'title-child',
+                        type: 'mcpToolCall',
+                        server: 'hapi',
+                        tool: 'change_title',
+                        result: {
+                            content: [
+                                { type: 'text', text: 'Successfully changed chat title to: "Child Title"' }
+                            ]
+                        }
+                    },
+                    threadId: childThreadId,
+                    turnId: childTurnId
+                };
+                harness.notifications.push({ method: 'item/completed', params: childTitleEnd });
+                this.notificationHandler?.('item/completed', childTitleEnd);
+
+                if (harness.emitChildNestedAgentTool) {
+                    const nestedSpawnStart = {
+                        item: {
+                            id: 'nested-spawn',
+                            type: 'collabAgentToolCall',
+                            tool: 'spawn',
+                            senderThreadId: childThreadId,
+                            receiverThreadIds: ['grandchild-thread'],
+                            prompt: 'do nested work'
+                        },
+                        threadId: childThreadId,
+                        turnId: childTurnId
+                    };
+                    harness.notifications.push({ method: 'item/started', params: nestedSpawnStart });
+                    this.notificationHandler?.('item/started', nestedSpawnStart);
+
+                    const nestedSpawnCompleted = {
+                        item: {
+                            id: 'nested-spawn',
+                            type: 'collabAgentToolCall',
+                            tool: 'spawn',
+                            status: 'completed',
+                            senderThreadId: childThreadId,
+                            receiverThreadIds: ['grandchild-thread'],
+                            agentsStates: {}
+                        },
+                        threadId: childThreadId,
+                        turnId: childTurnId
+                    };
+                    harness.notifications.push({ method: 'item/completed', params: nestedSpawnCompleted });
+                    this.notificationHandler?.('item/completed', nestedSpawnCompleted);
+                }
+
+                const waitStarted = {
+                    item: {
+                        id: 'wait-child',
+                        type: 'collabAgentToolCall',
+                        tool: 'wait',
+                        senderThreadId: threadId,
+                        receiverThreadIds: [childThreadId],
+                        agentsStates: {}
+                    },
+                    threadId,
+                    turnId
+                };
+                harness.notifications.push({ method: 'item/started', params: waitStarted });
+                this.notificationHandler?.('item/started', waitStarted);
+
+                const waitCompleted = {
+                    item: {
+                        id: 'wait-child',
+                        type: 'collabAgentToolCall',
+                        tool: 'wait',
+                        status: 'completed',
+                        senderThreadId: threadId,
+                        receiverThreadIds: [childThreadId],
+                        agentsStates: {
+                            [childThreadId]: {
+                                status: harness.emitChildDoneStatusWithoutMessage ? 'done' : 'completed',
+                                message: harness.emitChildWaitStructuredOutput
+                                    ? ''
+                                    : harness.emitChildDoneStatusWithoutMessage
+                                        ? null
+                                        : harness.emitSecondChildMessage
+                                            ? secondChildMessage
+                                            : childMessage,
+                                ...(harness.emitChildWaitStructuredOutput ? { output: { value: 42 } } : {})
+                            }
+                        }
+                    },
+                    threadId,
+                    turnId
+                };
+                harness.notifications.push({ method: 'item/completed', params: waitCompleted });
+                this.notificationHandler?.('item/completed', waitCompleted);
+
+                if (harness.emitParentSendInputFailure) {
+                    const sendInputStarted = {
+                        item: {
+                            id: 'send-child',
+                            type: 'collabAgentToolCall',
+                            tool: 'sendInput',
+                            senderThreadId: threadId,
+                            receiverThreadIds: [childThreadId],
+                            message: 'follow up'
+                        },
+                        threadId,
+                        turnId
+                    };
+                    harness.notifications.push({ method: 'item/started', params: sendInputStarted });
+                    this.notificationHandler?.('item/started', sendInputStarted);
+
+                    const sendInputCompleted = {
+                        item: {
+                            id: 'send-child',
+                            type: 'collabAgentToolCall',
+                            tool: 'sendInput',
+                            status: 'failed',
+                            error: 'send failed',
+                            senderThreadId: threadId,
+                            receiverThreadIds: [childThreadId],
+                            agentsStates: {}
+                        },
+                        threadId,
+                        turnId
+                    };
+                    harness.notifications.push({ method: 'item/completed', params: sendInputCompleted });
+                    this.notificationHandler?.('item/completed', sendInputCompleted);
+                }
+
+                if (harness.emitParentResumeSuccess) {
+                    const resumeStarted = {
+                        item: {
+                            id: 'resume-child',
+                            type: 'collabAgentToolCall',
+                            tool: 'resumeAgent',
+                            senderThreadId: threadId,
+                            receiverThreadIds: [childThreadId]
+                        },
+                        threadId,
+                        turnId
+                    };
+                    harness.notifications.push({ method: 'item/started', params: resumeStarted });
+                    this.notificationHandler?.('item/started', resumeStarted);
+
+                    const resumeCompleted = {
+                        item: {
+                            id: 'resume-child',
+                            type: 'collabAgentToolCall',
+                            tool: 'resumeAgent',
+                            status: 'completed',
+                            senderThreadId: threadId,
+                            receiverThreadIds: [childThreadId],
+                            agentsStates: {}
+                        },
+                        threadId,
+                        turnId
+                    };
+                    harness.notifications.push({ method: 'item/completed', params: resumeCompleted });
+                    this.notificationHandler?.('item/completed', resumeCompleted);
+                }
+
+                if (harness.emitLateChildCommandAfterParentTool) {
+                    const lateChildCommandStart = {
+                        item: {
+                            id: 'late-child-cmd',
+                            type: 'commandExecution',
+                            command: 'echo late'
+                        },
+                        threadId: childThreadId,
+                        turnId: childTurnId
+                    };
+                    harness.notifications.push({ method: 'item/started', params: lateChildCommandStart });
+                    this.notificationHandler?.('item/started', lateChildCommandStart);
+                }
             }
 
             const completed = { status: 'Completed', turn: { id: turnId } };
@@ -204,12 +632,15 @@ vi.mock('./codexAppServerClient', () => {
 });
 
 vi.mock('./utils/buildHapiMcpBridge', () => ({
-    buildHapiMcpBridge: async () => ({
-        server: {
-            stop: () => {}
-        },
-        mcpServers: {}
-    })
+    buildHapiMcpBridge: async (_session: unknown, options?: unknown) => {
+        harness.bridgeOptions.push(options);
+        return {
+            server: {
+                stop: () => {}
+            },
+            mcpServers: {}
+        };
+    }
 }));
 
 import { codexRemoteLauncher } from './codexRemoteLauncher';
@@ -344,6 +775,26 @@ describe('codexRemoteLauncher', () => {
         harness.clearGoalReturnsFalse = false;
         harness.suppressTurnCompletion = false;
         harness.remainingThreadSystemErrors = 0;
+        harness.nextThreadSystemErrorMessage = null;
+        harness.failNextCompact = false;
+        harness.deferThreadStatusNotifications = false;
+        harness.emitChildThreadEvents = false;
+        harness.emitChildUsageEvents = false;
+        harness.emitChildReasoningBurst = false;
+        harness.emitChildDoneStatusWithoutMessage = false;
+        harness.emitChildWaitStructuredOutput = false;
+        harness.emitChildTaskCompleteBeforeMessage = false;
+        harness.suppressChildTaskCompleteEvent = false;
+        harness.emitSecondChildMessage = false;
+        harness.emitLateChildCommandAfterParentTool = false;
+        harness.emitParentUsageEvents = false;
+        harness.emitChildNestedAgentTool = false;
+        harness.emitParentTitleChange = false;
+        harness.emitParentSpawnFailureWithoutAgentId = false;
+        harness.emitParentSpawnStartWithoutEnd = false;
+        harness.emitParentSendInputFailure = false;
+        harness.emitParentResumeSuccess = false;
+        harness.bridgeOptions = [];
     });
 
     it('finishes a turn and emits ready when task lifecycle events include turn_id', async () => {

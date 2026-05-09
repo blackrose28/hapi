@@ -170,6 +170,140 @@ describe('AppServerEventConverter', () => {
         }]);
     });
 
+    it('maps Codex collab spawn agent calls', () => {
+        const converter = new AppServerEventConverter();
+
+        const started = converter.handleNotification('item/started', {
+            item: {
+                id: 'call-spawn',
+                type: 'collabAgentToolCall',
+                tool: 'spawnAgent',
+                prompt: 'Do side work',
+                agentType: 'explorer',
+                forkContext: true,
+                model: 'gpt-5.5',
+                reasoningEffort: 'low',
+                senderThreadId: 'parent-thread',
+                receiverThreadIds: []
+            }
+        });
+        expect(started).toEqual([{
+            type: 'codex_tool_call_begin',
+            call_id: 'call-spawn',
+            name: 'spawn_agent',
+            input: {
+                message: 'Do side work',
+                agent_type: 'explorer',
+                fork_context: true,
+                model: 'gpt-5.5',
+                reasoning_effort: 'low',
+                sender_thread_id: 'parent-thread'
+            }
+        }]);
+
+        const completed = converter.handleNotification('item/completed', {
+            item: {
+                id: 'call-spawn',
+                type: 'collabAgentToolCall',
+                tool: 'spawnAgent',
+                status: 'completed',
+                receiverThreadIds: ['agent-1'],
+                agentsStates: {
+                    'agent-1': { status: 'pendingInit', message: null }
+                }
+            }
+        });
+        expect(completed).toEqual([{
+            type: 'codex_tool_call_end',
+            call_id: 'call-spawn',
+            name: 'spawn_agent',
+            output: {
+                agent_id: 'agent-1',
+                agentId: 'agent-1',
+                status: 'completed',
+                agentsStates: {
+                    'agent-1': { status: 'pendingInit', message: null }
+                }
+            },
+            is_error: false
+        }]);
+    });
+
+    it('maps Codex collab wait and close outputs for web agent views', () => {
+        const converter = new AppServerEventConverter();
+
+        const waitStarted = converter.handleNotification('item/started', {
+            item: {
+                id: 'call-wait',
+                type: 'collabAgentToolCall',
+                tool: 'wait',
+                receiverThreadIds: ['agent-1', 'agent-2']
+            }
+        });
+        expect(waitStarted).toEqual([{
+            type: 'codex_tool_call_begin',
+            call_id: 'call-wait',
+            name: 'wait_agent',
+            input: {
+                targets: ['agent-1', 'agent-2']
+            }
+        }]);
+
+        const waitCompleted = converter.handleNotification('item/completed', {
+            item: {
+                id: 'call-wait',
+                type: 'collabAgentToolCall',
+                tool: 'wait',
+                status: 'completed',
+                receiverThreadIds: ['agent-1'],
+                agentsStates: {
+                    'agent-1': { status: 'completed', message: '42' },
+                    'agent-2': { status: 'done', message: null },
+                    'agent-3': { status: 'done', result: { text: 'structured result' } },
+                    'agent-4': { status: 'completed', message: '', output: { value: 42 } }
+                }
+            }
+        });
+        expect(waitCompleted).toEqual([{
+            type: 'codex_tool_call_end',
+            call_id: 'call-wait',
+            name: 'wait_agent',
+            output: {
+                status: {
+                    'agent-1': { completed: '42' },
+                    'agent-2': { status: 'completed', message: null },
+                    'agent-3': { status: 'completed', result: { text: 'structured result' } },
+                    'agent-4': { status: 'completed', message: '', output: { value: 42 } }
+                },
+                timed_out: false
+            },
+            is_error: false
+        }]);
+
+        const closeCompleted = converter.handleNotification('item/completed', {
+            item: {
+                id: 'call-close',
+                type: 'collabAgentToolCall',
+                tool: 'closeAgent',
+                status: 'completed',
+                receiverThreadIds: ['agent-1'],
+                agentsStates: {
+                    'agent-1': { status: 'completed', message: 'done' }
+                }
+            }
+        });
+        expect(closeCompleted).toEqual([{
+            type: 'codex_tool_call_end',
+            call_id: 'call-close',
+            name: 'close_agent',
+            output: {
+                previous_status: { completed: 'done' },
+                agent_id: 'agent-1'
+            },
+            is_error: false
+        }]);
+    });
+
     it('maps reasoning deltas', () => {
         const converter = new AppServerEventConverter();
 
