@@ -75,6 +75,23 @@ function getOutlineTitle(session: Session): string {
     return session.id.slice(0, 8)
 }
 
+function hasAbortableAgentRun(blocks: readonly ChatBlock[]): boolean {
+    for (const block of blocks) {
+        if (block.kind === 'tool-call') {
+            if (
+                block.tool.name === 'CodexAgent'
+                && (block.tool.state === 'running' || block.tool.state === 'pending')
+            ) {
+                return true
+            }
+            if (hasAbortableAgentRun(block.children)) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
 export function SessionChat(props: {
     api: ApiClient
     session: Session
@@ -417,6 +434,10 @@ export function SessionChat(props: {
         () => reconcileChatBlocks(reduced.blocks, blocksByIdRef.current),
         [reduced.blocks]
     )
+    const hasRunningChildAgent = useMemo(
+        () => hasAbortableAgentRun(reduced.blocks),
+        [reduced.blocks]
+    )
 
     useEffect(() => {
         blocksByIdRef.current = reconciled.byId
@@ -626,6 +647,7 @@ export function SessionChat(props: {
         session: props.session,
         blocks: reconciled.blocks,
         isSending: props.isSending,
+        isRunning: props.session.thinking || hasRunningChildAgent,
         onSendMessage: handleSend,
         onAbort: handleAbort,
         attachmentAdapter,

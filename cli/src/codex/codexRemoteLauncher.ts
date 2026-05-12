@@ -57,6 +57,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
     private abortController: AbortController = new AbortController();
     private currentThreadId: string | null = null;
     private currentTurnId: string | null = null;
+    private readonly activeChildTurns = new Map<string, string>();
 
     private recoveryContext: string | null = null
 
@@ -71,19 +72,50 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         return React.createElement(CodexDisplay, context);
     }
 
+    private async interruptActiveTurns(reason: string): Promise<void> {
+        const turnsToInterrupt = [
+            ...(this.currentThreadId && this.currentTurnId
+                ? [{ threadId: this.currentThreadId, turnId: this.currentTurnId, role: 'parent' as const }]
+                : []),
+            ...Array.from(this.activeChildTurns, ([threadId, turnId]) => ({
+                threadId,
+                turnId,
+                role: 'child' as const
+            }))
+        ];
+
+        if (turnsToInterrupt.length === 0) {
+            return;
+        }
+
+        const results = await Promise.allSettled(
+            turnsToInterrupt.map((target) => this.appServerClient.interruptTurn({
+                threadId: target.threadId,
+                turnId: target.turnId
+            }))
+        );
+
+        results.forEach((result, index) => {
+            const target = turnsToInterrupt[index];
+            if (result.status === 'fulfilled') {
+                if (target.role === 'child') {
+                    this.activeChildTurns.delete(target.threadId);
+                }
+                return;
+            }
+
+            logger.debug(
+                `[Codex] Error interrupting ${target.role} app-server turn ` +
+                `for ${reason}; threadId=${target.threadId} turnId=${target.turnId}:`,
+                result.reason
+            );
+        });
+    }
+
     private async handleAbort(): Promise<void> {
         logger.debug('[Codex] Abort requested - stopping current task');
         try {
-            if (this.currentThreadId && this.currentTurnId) {
-                try {
-                    await this.appServerClient.interruptTurn({
-                        threadId: this.currentThreadId,
-                        turnId: this.currentTurnId
-                    });
-                } catch (error) {
-                    logger.debug('[Codex] Error interrupting app-server turn:', error);
-                }
-            }
+            await this.interruptActiveTurns('abort');
             this.currentTurnId = null;
 
             this.abortController.abort();
@@ -1344,6 +1376,23 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 return;
             }
 
+            if (eventThreadId && this.currentThreadId && eventThreadId !== this.currentThreadId) {
+                logger.debug(
+                    `[Codex] Routing event from non-active thread into agent trace; ` +
+                    `type=${msgType}, eventThreadId=${eventThreadId}, activeThread=${this.currentThreadId}`
+                );
+                if (msgType === 'task_started') {
+                    if (eventTurnId) {
+                        this.activeChildTurns.set(eventThreadId, eventTurnId);
+                    } else {
+                        logger.debug(`[Codex] Child task_started missing turn id; threadId=${eventThreadId}`);
+                    }
+                } else if (isTerminalEvent) {
+                    this.activeChildTurns.delete(eventThreadId);
+                }
+                handleChildCodexEvent(eventThreadId, msg);
+                return;
+            }
             if (msgType === 'task_started') {
                 const turnId = eventTurnId;
                 if (turnId) {
@@ -1815,17 +1864,7 @@ ${formatGoalUsage(goal)}`;
         };
 
         const interruptActiveTurn = async () => {
-            const threadId = this.currentThreadId;
-            const turnId = this.currentTurnId;
-            if (!threadId || !turnId) {
-                return;
-            }
-
-            try {
-                await appServerClient.interruptTurn({ threadId, turnId });
-            } catch (error) {
-                logger.debug('[Codex] Error interrupting app-server turn for slash command:', error);
-            }
+            await this.interruptActiveTurns('slash command');
         };
 
         const resumeExistingThreadForCompact = async (mode: EnhancedMode): Promise<string | null> => {
@@ -2223,6 +2262,7 @@ ${formatGoalUsage(goal)}`;
         this.permissionHandler = null;
         this.reasoningProcessor = null;
         this.diffProcessor = null;
+        this.activeChildTurns.clear();
 
         logger.debug('[codex-remote]: cleanup done');
     }

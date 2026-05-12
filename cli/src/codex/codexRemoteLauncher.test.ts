@@ -150,6 +150,33 @@ vi.mock('./codexAppServerClient', () => {
                 return { turn: { id: turnId } };
             }
 
+            if (
+                harness.emitRunningChildTurnBeforeSuppressedParent
+                || harness.emitCompletedChildTurnBeforeSuppressedParent
+            ) {
+                const childStarted = {
+                    msg: {
+                        type: 'task_started',
+                        thread_id: 'child-thread',
+                        turn_id: 'child-turn'
+                    }
+                };
+                harness.notifications.push({ method: 'codex/event/task_started', params: childStarted });
+                this.notificationHandler?.('codex/event/task_started', childStarted);
+
+                if (harness.emitCompletedChildTurnBeforeSuppressedParent) {
+                    const childCompleted = {
+                        msg: {
+                            type: 'task_complete',
+                            thread_id: 'child-thread',
+                            turn_id: 'child-turn'
+                        }
+                    };
+                    harness.notifications.push({ method: 'codex/event/task_complete', params: childCompleted });
+                    this.notificationHandler?.('codex/event/task_complete', childCompleted);
+                }
+            }
+
             if (harness.suppressTurnCompletion) {
                 return { turn: { id: turnId } };
             }
@@ -572,10 +599,19 @@ vi.mock('./codexAppServerClient', () => {
         }
 
         async interruptTurn(params?: { threadId?: string; turnId?: string }): Promise<Record<string, never>> {
-            harness.interruptedTurns.push({
-                threadId: params?.threadId ?? 'thread-unknown',
-                turnId: params?.turnId ?? 'turn-unknown'
-            });
+            const threadId = params?.threadId ?? 'thread-unknown';
+            const turnId = params?.turnId ?? 'turn-unknown';
+            harness.interruptedTurns.push({ threadId, turnId });
+            if (harness.emitTurnAbortedOnInterrupt) {
+                const interrupted = {
+                    threadId,
+                    turnId,
+                    status: 'interrupted',
+                    turn: { id: turnId }
+                };
+                harness.notifications.push({ method: 'turn/completed', params: interrupted });
+                this.notificationHandler?.('turn/completed', interrupted);
+            }
             return {};
         }
 
@@ -794,6 +830,9 @@ describe('codexRemoteLauncher', () => {
         harness.emitParentSpawnStartWithoutEnd = false;
         harness.emitParentSendInputFailure = false;
         harness.emitParentResumeSuccess = false;
+        harness.emitRunningChildTurnBeforeSuppressedParent = false;
+        harness.emitCompletedChildTurnBeforeSuppressedParent = false;
+        harness.emitTurnAbortedOnInterrupt = false;
         harness.bridgeOptions = [];
     });
 
@@ -1180,5 +1219,4 @@ describe('codexRemoteLauncher', () => {
             message: 'Goal command is not available in this Codex app-server. Upgrade Codex or enable goals.'
         });
     });
-
 });
