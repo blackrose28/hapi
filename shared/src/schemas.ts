@@ -343,6 +343,22 @@ export const MarkTeamMentionNoActionInputSchema = z.object({
 
 export type MarkTeamMentionNoActionInput = z.input<typeof MarkTeamMentionNoActionInputSchema>
 
+export const ThreadGoalStatusSchema = z.enum(['active', 'paused', 'blocked', 'usageLimited', 'budgetLimited', 'complete'])
+export type ThreadGoalStatus = z.infer<typeof ThreadGoalStatusSchema>
+
+export const ThreadGoalSchema = z.object({
+    threadId: z.string(),
+    objective: z.string(),
+    status: ThreadGoalStatusSchema,
+    tokenBudget: z.number().nullable().optional(),
+    tokensUsed: z.number().optional().default(0),
+    timeUsedSeconds: z.number().optional().default(0),
+    createdAt: z.number().optional().default(0),
+    updatedAt: z.number().optional().default(0)
+})
+
+export type ThreadGoal = z.infer<typeof ThreadGoalSchema>
+
 export const AttachmentMetadataSchema = z.object({
     id: z.string(),
     filename: z.string(),

@@ -130,6 +130,7 @@ describe(RPC_METHODS.ListSlashCommands, () => {
         expect(commands.map((command) => command.name)).toEqual(expect.arrayContaining([
             'clear',
             'compact',
+            'goal',
             'plan',
             'status',
             'model',

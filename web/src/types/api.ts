@@ -48,6 +48,8 @@ export type {
     TeamMessage,
     TeamState,
     TeamTask,
+    ThreadGoal,
+    ThreadGoalStatus,
     TodoItem,
     WorktreeMetadata
 } from '@hapi/protocol/types'

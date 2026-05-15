@@ -28,6 +28,8 @@ export type {
     OpencodeReasoningEffortOption,
     ListOpencodeModelsResponse,
     ListOpencodeReasoningEffortOptionsResponse,
+    ThreadGoal,
+    ThreadGoalStatus,
     TodoItem,
     WorktreeMetadata
 } from './schemas'

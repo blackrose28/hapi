@@ -66,7 +66,7 @@ export async function loop(opts: LoopOptions): Promise<void> {
         startingMode: opts.startingMode,
         logTag: 'codex-loop',
         runLocal: (session) => codexLocalLauncher(session, opts.recoveryContext),
-        runRemote: (session) => codexRemoteLauncher(session, opts.recoveryContext),
+        runRemote: (session) => codexRemoteLauncher(session),
         onSessionReady: opts.onSessionReady
     });
 }

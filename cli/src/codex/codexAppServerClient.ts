@@ -22,7 +22,10 @@ import type {
     ThreadGoalGetParams,
     ThreadGoalGetResponse,
     ThreadGoalClearParams,
-    ThreadGoalClearResponse
+    ThreadGoalClearResponse,
+    ExperimentalFeatureEnablementSetParams,
+    ExperimentalFeatureEnablementSetResponse,
+    CollaborationModeListResponse
 } from './appServerTypes';
 
 type JsonRpcLiteRequest = {
@@ -151,6 +154,22 @@ export class CodexAppServerClient {
         return response as ModelListResponse;
     }
 
+
+    async listCollaborationModes(): Promise<CollaborationModeListResponse> {
+        const response = await this.sendRequest('collaborationMode/list', {}, {
+            timeoutMs: 30_000
+        });
+        return response as CollaborationModeListResponse;
+    }
+
+    async setExperimentalFeatureEnablement(
+        params: ExperimentalFeatureEnablementSetParams
+    ): Promise<ExperimentalFeatureEnablementSetResponse> {
+        const response = await this.sendRequest('experimentalFeature/enablement/set', params, {
+            timeoutMs: 30_000
+        });
+        return response as ExperimentalFeatureEnablementSetResponse;
+    }
     async startThread(params: ThreadStartParams, options?: { signal?: AbortSignal }): Promise<ThreadStartResponse> {
         const response = await this.sendRequest('thread/start', params, {
             signal: options?.signal,

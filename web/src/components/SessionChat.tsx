@@ -841,6 +841,7 @@ export function SessionChat(props: {
                                 ? props.session.collaborationMode
                                 : undefined
                         }
+                        threadGoal={reduced.latestGoal}
                         model={props.session.model}
                         modelReasoningEffort={
                             agentFlavor === 'codex' || agentFlavor === 'opencode'

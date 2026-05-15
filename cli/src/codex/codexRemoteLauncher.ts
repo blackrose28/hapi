@@ -1,4 +1,3 @@
-import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React from 'react';
 import { randomUUID } from 'node:crypto';
 
@@ -16,9 +15,9 @@ import { hasCodexCliOverrides } from './utils/codexCliOverrides';
 import { AppServerEventConverter } from './utils/appServerEventConverter';
 import { registerAppServerPermissionHandlers } from './utils/appServerPermissionAdapter';
 import { buildThreadStartParams, buildTurnStartParams } from './utils/appServerConfig';
+import type { ThreadGoal, ThreadGoalStatus } from './appServerTypes';
 import { shouldIgnoreTerminalEvent } from './utils/terminalEventGuard';
 import { parseCodexSpecialCommand } from './codexSpecialCommands';
-import { parseCodexGoalCommand, type CodexGoalCommand } from './utils/goalCommands';
 import {
     RemoteLauncherBase,
     type RemoteLauncherDisplayContext,
@@ -47,6 +46,62 @@ const AGENT_RUN_UPDATE_THROTTLE_MS = 300;
 const AGENT_RUN_START_TIMEOUT_MS = 30 * 1000;
 const THROTTLED_AGENT_RUN_ACTIVITY_KINDS = new Set(['thinking']);
 
+const SAME_THREAD_RETRYABLE_ERROR_PATTERNS = [
+    'selected model is at capacity',
+    'codex thread entered systemerror'
+];
+const CONTEXT_COMPACT_RETRYABLE_ERROR_PATTERNS = [
+    'ran out of room in the model',
+    'context window',
+    'clear earlier history'
+];
+const SAME_THREAD_MAX_RETRIES = 3;
+const SAME_THREAD_MAX_COMPACT_RETRIES = 1;
+const SAME_THREAD_COMPACT_TIMEOUT_MS = 10 * 60 * 1000;
+const CODEX_GOALS_UNSUPPORTED_MESSAGE = 'Codex goals are not supported by this Codex runtime. Upgrade Codex or enable features.goals.';
+const MAX_CODEX_GOAL_OBJECTIVE_CHARS = 4_000;
+
+function isSameThreadRetryableCodexError(error: string | null): boolean {
+    if (!error) {
+        return false;
+    }
+    const normalized = error.toLowerCase();
+    return SAME_THREAD_RETRYABLE_ERROR_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function isContextCompactRetryableCodexError(error: string | null): boolean {
+    if (!error) {
+        return false;
+    }
+    const normalized = error.toLowerCase();
+    return CONTEXT_COMPACT_RETRYABLE_ERROR_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function formatGoalStatus(status: unknown): string {
+    switch (status) {
+        case 'active':
+            return 'active';
+        case 'paused':
+            return 'paused';
+        case 'budgetLimited':
+            return 'limited by budget';
+        case 'complete':
+            return 'complete';
+        default:
+            return typeof status === 'string' ? status : 'updated';
+    }
+}
+
+function formatGoalUsage(goal: ThreadGoal): string {
+    const parts: string[] = [`Goal ${formatGoalStatus(goal.status)}`];
+    if (goal.tokenBudget !== null && goal.tokenBudget !== undefined) {
+        parts.push(`${goal.tokensUsed}/${goal.tokenBudget} tokens`);
+    } else if (goal.tokensUsed > 0) {
+        parts.push(`${goal.tokensUsed} tokens`);
+    }
+    return parts.join(' · ');
+}
+
 class CodexRemoteLauncher extends RemoteLauncherBase {
     private readonly session: CodexSession;
     private readonly appServerClient: CodexAppServerClient;
@@ -59,13 +114,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
     private currentTurnId: string | null = null;
     private readonly activeChildTurns = new Map<string, string>();
 
-    private recoveryContext: string | null = null
-
-    constructor(session: CodexSession, recoveryContext?: string) {
+    constructor(session: CodexSession) {
         super(process.env.DEBUG ? session.logPath : undefined);
         this.session = session;
         this.appServerClient = new CodexAppServerClient();
-        this.recoveryContext = recoveryContext ?? null;
     }
 
     protected createDisplay(context: RemoteLauncherDisplayContext): React.ReactElement {
@@ -197,8 +249,53 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             return typeof value === 'string' && value.length > 0 ? value : null;
         };
 
-        const asNumber = (value: unknown): number | null => {
-            return typeof value === 'number' && Number.isFinite(value) ? value : null;
+        const errorMessage = (error: unknown): string => {
+            return error instanceof Error ? error.message : String(error);
+        };
+
+        const isExitPlanModeTool = (toolName: string): boolean => {
+            return toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode';
+        };
+
+        const shouldRetryWithoutCollaborationMode = (error: unknown): boolean => {
+            const message = errorMessage(error).toLowerCase();
+            const mentionsCollaborationMode = message.includes('collaborationmode')
+                || message.includes('collaboration_mode')
+                || message.includes('collaboration mode');
+            if (!mentionsCollaborationMode) {
+                return false;
+            }
+
+            return message.includes('requires experimentalapi')
+                || message.includes('unknown field')
+                || message.includes('unsupported')
+                || message.includes('unrecognized')
+                || message.includes('unexpected')
+                || message.includes('invalid field');
+        };
+
+        const responseContainsPlanCollaborationMode = (response: unknown): boolean => {
+            const record = asRecord(response);
+            const candidates = [
+                Array.isArray(response) ? response : undefined,
+                Array.isArray(record?.data) ? record.data : undefined
+            ];
+
+            for (const candidate of candidates) {
+                if (!candidate) continue;
+                for (const entry of candidate) {
+                    if (entry === 'plan') {
+                        return true;
+                    }
+                    const entryRecord = asRecord(entry);
+                    const mode = asString(entryRecord?.mode) ?? asString(entryRecord?.name);
+                    if (mode === 'plan') {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         };
 
         const applyResolvedModel = (value: unknown): string | undefined => {
@@ -220,6 +317,18 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             return `mcp__${serverName}__${toolName}`;
         };
 
+        const isHapiChangeTitleToolName = (toolName: string | null): boolean => {
+            return toolName === 'mcp__hapi__change_title';
+        };
+
+        const sendTitleSummary = (title: string): void => {
+            session.client.sendClaudeSessionMessage({
+                type: 'summary',
+                summary: title,
+                leafUuid: randomUUID()
+            });
+        };
+
         const formatOutputPreview = (value: unknown): string => {
             if (typeof value === 'string') return value;
             if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -229,6 +338,117 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             } catch {
                 return String(value);
             }
+        };
+
+        const compactText = (text: string): string => {
+            return text.replace(/\s+/g, ' ').trim();
+        };
+
+        const truncateText = (text: string, maxLength: number): string => {
+            const compacted = compactText(text);
+            if (compacted.length <= maxLength) return compacted;
+            return `${compacted.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+        };
+
+        const previewText = (value: unknown, maxLength = 120): string | null => {
+            const text = formatOutputPreview(value);
+            const preview = truncateText(text, maxLength);
+            return preview.length > 0 ? preview : null;
+        };
+
+        const formatActivity = (verb: string, detail?: string | null, maxLength = 120): string => {
+            const normalizedDetail = detail ? truncateText(detail, maxLength) : '';
+            return normalizedDetail ? `${verb}: ${normalizedDetail}` : verb;
+        };
+
+        const extractTextItems = (input: unknown): string[] => {
+            const record = asRecord(input);
+            if (!record || !Array.isArray(record.items)) return [];
+            return record.items
+                .map((item) => {
+                    const itemRecord = asRecord(item);
+                    return asString(itemRecord?.text);
+                })
+                .filter((text): text is string => Boolean(text));
+        };
+
+        const extractAgentPrompt = (input: unknown): string | null => {
+            const record = asRecord(input);
+            if (!record) return null;
+
+            const direct = asString(record.message ?? record.prompt);
+            if (direct) return direct;
+
+            const textItems = extractTextItems(input);
+            return textItems.length > 0 ? textItems.join('\n\n') : null;
+        };
+
+        const cleanAgentPromptForSummary = (prompt: string): string => {
+            const withoutTags = prompt
+                .replace(/<[^>\n]+>/g, ' ')
+                .replace(/\r/g, '\n');
+            const noisePatterns = [
+                /not alone in the codebase/i,
+                /do not revert/i,
+                /don't revert/i,
+                /list the file paths/i,
+                /changed files/i,
+                /final answer/i,
+                /avoid merge conflicts/i,
+                /accommodate the changes/i
+            ];
+            const lines = withoutTags
+                .split('\n')
+                .map((line) => line.trim().replace(/^[-*]\s+/, '').replace(/^#{1,6}\s+/, ''))
+                .filter((line) => line.length > 0)
+                .filter((line) => !noisePatterns.some((pattern) => pattern.test(line)));
+            const candidate = lines.length > 0 ? lines.join(' ') : withoutTags;
+            return compactText(candidate)
+                .replace(/^(task|your task|request|prompt)\s*[:：]\s*/i, '')
+                .trim();
+        };
+
+        const summarizeAgentInput = (input: unknown): string | null => {
+            const prompt = extractAgentPrompt(input);
+            if (prompt) {
+                const cleaned = cleanAgentPromptForSummary(prompt);
+                if (cleaned.length > 0) {
+                    return truncateText(cleaned, 80);
+                }
+            }
+
+            const record = asRecord(input);
+            const agentType = asString(record?.agent_type ?? record?.subagent_type ?? record?.type);
+            return agentType ? `${agentType} agent` : null;
+        };
+
+        const getPatchFiles = (changes: unknown): string[] => {
+            const record = asRecord(changes);
+            if (!record) return [];
+            return Object.keys(record).filter((file) => file.length > 0);
+        };
+
+        const summarizeFiles = (files: string[]): string | null => {
+            if (files.length === 0) return null;
+            const first = files[0] ?? '';
+            const basename = first.split('/').filter(Boolean).pop() ?? first;
+            return files.length > 1 ? `${basename} (+${files.length - 1})` : basename;
+        };
+
+        const summarizeDiffFiles = (diff: string): string | null => {
+            const files: string[] = [];
+            for (const line of diff.split('\n')) {
+                if (!line.startsWith('+++ ')) continue;
+                const file = line.replace(/^\+\+\+ (b\/)?/, '').trim();
+                if (file && file !== '/dev/null') files.push(file);
+            }
+            return summarizeFiles([...new Set(files)]);
+        };
+
+        const displayMcpToolName = (toolName: string): string => {
+            const match = toolName.match(/^mcp__(.+?)__(.+)$/);
+            if (!match) return toolName;
+            return `${match[1]}.${match[2]}`;
         };
 
         const permissionHandler = new CodexPermissionHandler(session.client, () => {
@@ -286,6 +506,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     is_error: !approved,
                     id: randomUUID()
                 });
+                if (approved && isExitPlanModeTool(toolName)) {
+                    session.setCollaborationMode('default');
+                    logger.debug('[Codex] exit_plan_mode approved; collaborationMode reset to default');
+                }
             }
         });
         const reasoningProcessor = new ReasoningProcessor((message) => {
@@ -294,6 +518,26 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         const diffProcessor = new DiffProcessor((message) => {
             session.sendAgentMessage(message);
         });
+        const mcpTitleByCallId = new Map<string, string>();
+        const agentCardByAgentId = new Map<string, string>();
+        const agentSummaryByCardId = new Map<string, string>();
+        const agentSummaryByAgentId = new Map<string, string>();
+        const agentStatusByAgentId = new Map<string, string>();
+        const agentStartedAtByCardId = new Map<string, number>();
+        const agentStartedAtByAgentId = new Map<string, number>();
+        const pendingAgentStartCardIds = new Set<string>();
+        const pendingAgentUpdatesByAgentId = new Map<string, Record<string, unknown>[]>();
+        const pendingAgentTracesByAgentId = new Map<string, unknown[]>();
+        const pendingAgentToolInputByCallId = new Map<string, { name: string; input: unknown }>();
+        const childAgentRuntimeById = new Map<string, ChildAgentRuntime>();
+        const lastAgentRunUpdateAtByAgentId = new Map<string, number>();
+        const lastAgentRunUpdateSignatureByAgentId = new Map<string, string>();
+        const pendingThrottledAgentUpdateByAgentId = new Map<string, {
+            update: Record<string, unknown>;
+            cardIdOverride?: string | null;
+        }>();
+        const pendingThrottledAgentUpdateTimerByAgentId = new Map<string, ReturnType<typeof setTimeout>>();
+        const pendingAgentStartTimersByCardId = new Map<string, ReturnType<typeof setTimeout>>();
         this.permissionHandler = permissionHandler;
         this.reasoningProcessor = reasoningProcessor;
         this.diffProcessor = diffProcessor;
@@ -302,7 +546,6 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         let clearReadyAfterTurnTimer: (() => void) | null = null;
         let turnInFlight = false;
         let allowAnonymousTerminalEvent = false;
-        let hasSummary = false;
         let invalidThreadId: string | null = null;
         let childAgentActivityInCurrentTurn = false;
 
@@ -332,7 +575,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         };
 
         const isScopeSensitiveCodexEvent = (type: string): boolean => {
-            return type === 'token_count' || type === 'context_compacted';
+            return type === 'token_count'
+                || type === 'context_compacted'
+                || type === 'thread_goal_updated'
+                || type === 'thread_goal_cleared';
         };
 
         const hasKnownChildAgents = (): boolean => {
@@ -1360,6 +1606,44 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             }
         };
 
+        let activeMessage: QueuedMessage | null = null;
+        let sameThreadRetryAttempt = 0;
+        let sameThreadCompactAttempt = 0;
+        let recoveryInFlight = false;
+        let compactRecovery: {
+            threadId: string;
+            message: QueuedMessage;
+            timeout: ReturnType<typeof setTimeout> | null;
+        } | null = null;
+        let loopWakeWaiter: (() => void) | null = null;
+
+        const wakeLoop = () => {
+            const waiter = loopWakeWaiter;
+            if (!waiter) {
+                return;
+            }
+            loopWakeWaiter = null;
+            waiter();
+        };
+
+        const waitForTurnOrRecovery = (signal: AbortSignal): Promise<void> => new Promise((resolve) => {
+            if (!turnInFlight && !recoveryInFlight) {
+                resolve();
+                return;
+            }
+
+            const finish = () => {
+                if (loopWakeWaiter === finish) {
+                    loopWakeWaiter = null;
+                }
+                signal.removeEventListener('abort', finish);
+                resolve();
+            };
+
+            loopWakeWaiter = finish;
+            signal.addEventListener('abort', finish, { once: true });
+        });
+
         const handleCodexEvent = (msg: Record<string, unknown>) => {
             const msgType = asString(msg.type);
             if (!msgType) return;
@@ -1370,8 +1654,15 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             if (msgType === 'thread_started') {
                 const threadId = asString(msg.thread_id ?? msg.threadId);
                 if (threadId) {
-                    this.currentThreadId = threadId;
-                    session.onSessionFound(threadId);
+                    if (!this.currentThreadId || this.currentThreadId === threadId) {
+                        this.currentThreadId = threadId;
+                        session.onSessionFound(threadId);
+                    } else {
+                        logger.debug(
+                            `[Codex] Ignoring thread_started for non-active thread; ` +
+                            `eventThreadId=${threadId}, activeThread=${this.currentThreadId}`
+                        );
+                    }
                 }
                 return;
             }
@@ -1393,6 +1684,23 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 handleChildCodexEvent(eventThreadId, msg);
                 return;
             }
+
+            if (msgType === 'thread_goal_updated') {
+                session.sendAgentMessage({
+                    ...addCodexEventScope(msg, 'parent', eventThreadId ?? this.currentThreadId),
+                    id: randomUUID()
+                });
+                return;
+            }
+
+            if (msgType === 'thread_goal_cleared') {
+                session.sendAgentMessage({
+                    ...addCodexEventScope(msg, 'parent', eventThreadId ?? this.currentThreadId),
+                    id: randomUUID()
+                });
+                return;
+            }
+
             if (msgType === 'task_started') {
                 const turnId = eventTurnId;
                 if (turnId) {
@@ -1426,20 +1734,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 this.currentTurnId = null;
                 allowAnonymousTerminalEvent = false;
                 if (isThreadStatusFailure) {
-                    invalidThreadId = eventThreadId ?? this.currentThreadId;
-                    this.currentThreadId = null;
-                    hasThread = false;
-                    // Stop heartbeat so hub can mark session inactive.
-                    // Without this, the 2s keepalive would re-activate the session
-                    // before auto-resume can trigger.
-                    session.stopKeepAlive();
-                    // Notify hub that thread crashed so auto-resume can trigger.
-                    // Include error so hub can detect upstream API corruption
-                    // (e.g. tool_use.input invalid) and clear the stale thread id.
-                    session.sendSessionEvent({
-                        type: 'thread-crashed',
-                        ...(msg.error ? { error: asString(msg.error) ?? undefined } : {})
-                    });
+                    logger.warn(`[Codex] Thread-level failure on ${eventThreadId ?? this.currentThreadId ?? 'unknown thread'}; preserving same conversation`);
                 }
             }
 
@@ -1471,18 +1766,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             } else if (msgType === 'turn_aborted') {
                 messageBuffer.addMessage('Turn aborted', 'status');
             } else if (msgType === 'task_failed') {
-                const error = asString(msg.error);
+                const error = typeof msg.error === 'string' ? msg.error : null;
                 const message = error ? `Task failed: ${error}` : 'Task failed';
                 messageBuffer.addMessage(message, 'status');
                 session.sendSessionEvent({ type: 'message', message });
-            } else if (msgType === 'codex_goal') {
-                const action = asString(msg.action);
-                const goal = asRecord(msg.goal);
-                if (action === 'cleared') {
-                    messageBuffer.addMessage('Goal cleared', 'status');
-                } else if (goal) {
-                    messageBuffer.addMessage(formatGoalStatusMessage(goal), 'status');
-                }
             }
 
             if (msgType === 'task_started') {
@@ -1505,12 +1792,20 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 }
                 diffProcessor.reset();
                 appServerEventConverter.reset();
+                mcpTitleByCallId.clear();
+                pendingAgentToolInputByCallId.clear();
+                childAgentActivityInCurrentTurn = false;
+                wakeLoop();
             }
 
             if (isTerminalEvent && !turnInFlight) {
                 scheduleReadyAfterTurn?.();
             } else if (readyAfterTurnTimer && msgType !== 'task_started') {
                 scheduleReadyAfterTurn?.();
+            }
+
+            if (msgType === 'task_complete') {
+                activeMessage = null;
             }
 
             if (msgType === 'agent_reasoning_section_break') {
@@ -1536,24 +1831,6 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                         message,
                         id: randomUUID()
                     });
-
-                    // Auto-update session summary from first agent message
-                    if (!hasSummary) {
-                        hasSummary = true;
-                        const firstLine = message.split('\n')[0].trim();
-                        const summaryText = firstLine.length > 120
-                            ? firstLine.slice(0, 117) + '…'
-                            : firstLine;
-                        if (summaryText.length > 0) {
-                            session.client.updateMetadata((metadata) => ({
-                                ...metadata,
-                                summary: {
-                                    text: summaryText,
-                                    updatedAt: Date.now()
-                                }
-                            }));
-                        }
-                    }
                 }
             }
             if (msgType === 'exec_command_begin' || msgType === 'exec_approval_request') {
@@ -1591,15 +1868,20 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     });
                 }
             }
-            if (msgType === 'codex_goal') {
+            if (msgType === 'token_count') {
+                const threadId = eventThreadId ?? this.currentThreadId;
                 session.sendAgentMessage({
-                    ...msg,
+                    ...addCodexEventScope(msg, 'parent', threadId),
                     id: randomUUID()
                 });
             }
-            if (msgType === 'token_count') {
+            if (msgType === 'context_compacted') {
+                const threadId = eventThreadId ?? this.currentThreadId;
                 session.sendAgentMessage({
-                    ...msg,
+                    ...addCodexEventScope({
+                        type: 'context_compacted',
+                        ...(eventTurnId ? { turn_id: eventTurnId } : {})
+                    }, 'parent', threadId),
                     id: randomUUID()
                 });
             }
@@ -1680,11 +1962,17 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     invocation.tool ?? invocation.tool_name ?? msg.tool
                 );
                 if (callId && name) {
+                    const input = invocation.arguments ?? invocation.input ?? msg.arguments ?? msg.input ?? {};
+                    const inputRecord = asRecord(input);
+                    const requestedTitle = inputRecord ? asString(inputRecord.title) : null;
+                    if (isHapiChangeTitleToolName(name) && requestedTitle) {
+                        mcpTitleByCallId.set(callId, requestedTitle);
+                    }
                     session.sendAgentMessage({
                         type: 'tool-call',
                         name,
                         callId,
-                        input: invocation.arguments ?? invocation.input ?? msg.arguments ?? msg.input ?? {},
+                        input,
                         id: randomUUID()
                     });
                 }
@@ -1705,11 +1993,76 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 }
 
                 if (callId) {
+                    const title = mcpTitleByCallId.get(callId);
+                    mcpTitleByCallId.delete(callId);
+                    if (!isError && title) {
+                        sendTitleSummary(title);
+                    }
+
                     session.sendAgentMessage({
                         type: 'tool-call-result',
                         callId,
                         output,
                         is_error: isError,
+                        id: randomUUID()
+                    });
+                }
+            }
+            if (msgType === 'codex_tool_call_begin') {
+                const callId = asString(msg.call_id ?? msg.callId);
+                const name = asString(msg.name);
+                if (callId && name) {
+                    if (isCodexAgentToolName(name)) {
+                            const input = msg.input ?? {};
+                            pendingAgentToolInputByCallId.set(callId, { name, input });
+                            if (name === 'spawn_agent') {
+                                emitAgentRunStart(callId, input);
+                            } else {
+                                for (const agentId of extractAgentTargets(input)) {
+                                    if (!agentCardByAgentId.has(agentId)) {
+                                        continue;
+                                    }
+                                    const activity = name === 'wait_agent'
+                                        ? 'Waiting for agent'
+                                        : name === 'send_input'
+                                            ? 'Sending input'
+                                        : name === 'resume_agent'
+                                            ? 'Resuming agent'
+                                            : name === 'close_agent'
+                                                ? 'Closing agent'
+                                                : 'Running agent tool';
+                                emitAgentRunUpdate(agentId, {
+                                    status: 'running',
+                                    statusText: activity,
+                                    activity,
+                                    activityKind: name
+                                });
+                            }
+                        }
+                        return;
+                    }
+                    session.sendAgentMessage({
+                        type: 'tool-call',
+                        name,
+                        callId,
+                        input: msg.input ?? {},
+                        id: randomUUID()
+                    });
+                }
+            }
+            if (msgType === 'codex_tool_call_end') {
+                const callId = asString(msg.call_id ?? msg.callId);
+                const name = asString(msg.name) ?? pendingAgentToolInputByCallId.get(callId ?? '')?.name ?? null;
+                if (callId) {
+                    if (name && isCodexAgentToolName(name)) {
+                        handleAgentToolEnd(callId, name, msg.output, Boolean(msg.is_error ?? msg.isError));
+                        return;
+                    }
+                    session.sendAgentMessage({
+                        type: 'tool-call-result',
+                        callId,
+                        output: msg.output,
+                        is_error: Boolean(msg.is_error ?? msg.isError),
                         id: randomUUID()
                     });
                 }
@@ -1784,6 +2137,26 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 experimentalApi: true
             }
         });
+        let supportsTurnCollaborationMode = true;
+        let supportsPlanCollaborationMode = true;
+        let supportsGoals = true;
+        try {
+            await appServerClient.setExperimentalFeatureEnablement({ enablement: { goals: true } });
+            logger.debug('[Codex] goals feature enabled');
+        } catch (error) {
+            supportsGoals = false;
+            logger.debug(`[Codex] failed to enable goals feature: ${errorMessage(error)}`);
+        }
+        try {
+            const response = await appServerClient.listCollaborationModes();
+            const hasPlanMode = responseContainsPlanCollaborationMode(response);
+            logger.debug(`[Codex] collaborationMode/list plan=${hasPlanMode}`);
+            if (!hasPlanMode) {
+                supportsPlanCollaborationMode = false;
+            }
+        } catch (error) {
+            logger.debug(`[Codex] collaborationMode/list failed: ${errorMessage(error)}`);
+        }
 
         let hasThread = false;
         let pending: QueuedMessage | null = null;
@@ -1801,7 +2174,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             readyAfterTurnTimer = setTimeout(() => {
                 readyAfterTurnTimer = null;
                 emitReadyIfIdle({
-                    pending,
+                    pending: pending ?? (recoveryInFlight ? activeMessage : null),
                     queueSize: () => session.queue.size(),
                     shouldExit: this.shouldExit,
                     sendReady
@@ -1810,44 +2183,14 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             readyAfterTurnTimer.unref?.();
         };
 
-        const formatTokenCount = (value: number): string => {
-            if (Math.abs(value) >= 1000) {
-                const compact = value / 1000;
-                return `${Number.isInteger(compact) ? compact.toFixed(0) : compact.toFixed(1)}k`;
-            }
-            return value.toLocaleString();
-        };
-
-        const formatGoalUsage = (goal: Record<string, unknown>): string => {
-            const tokensUsed = asNumber(goal.tokensUsed ?? goal.tokens_used) ?? 0;
-            const tokenBudget = asNumber(goal.tokenBudget ?? goal.token_budget);
-            const timeUsedSeconds = asNumber(goal.timeUsedSeconds ?? goal.time_used_seconds) ?? 0;
-            const tokenPart = tokenBudget !== null
-                ? `${formatTokenCount(tokensUsed)}/${formatTokenCount(tokenBudget)} tokens`
-                : `${formatTokenCount(tokensUsed)} tokens`;
-            const minutes = Math.floor(timeUsedSeconds / 60);
-            const seconds = timeUsedSeconds % 60;
-            const timePart = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-            return `${tokenPart} · ${timePart}`;
-        };
-
-        const formatGoalStatusMessage = (goal: Record<string, unknown>): string => {
-            const status = asString(goal.status) ?? 'active';
-            const objective = asString(goal.objective) ?? 'Goal';
-            return `Goal ${status}: ${objective}
-${formatGoalUsage(goal)}`;
-        };
-
         const sendVisibleStatus = (message: string) => {
             messageBuffer.addMessage(message, 'status');
             session.sendSessionEvent({ type: 'message', message });
         };
 
-        const sendGoalCleared = (threadId: string) => {
+        const sendGoalEvent = (event: Record<string, unknown>) => {
             session.sendAgentMessage({
-                type: 'codex_goal',
-                action: 'cleared',
-                threadId,
+                ...addCodexEventScope(event, 'parent', this.currentThreadId),
                 id: randomUUID()
             });
         };
@@ -1909,7 +2252,31 @@ ${formatGoalUsage(goal)}`;
             }
         };
 
-        const resolveExistingThreadForGoal = async (mode: EnhancedMode): Promise<string | null> => {
+        const parseGoalCommand = (text: string): {
+            action: 'show' | 'set' | 'pause' | 'resume' | 'clear';
+            objective?: string;
+            error?: string;
+        } | null => {
+            const match = /^\s*\/goal(?:\s+([\s\S]*))?$/i.exec(text);
+            if (!match) return null;
+            const rest = match[1]?.trim() ?? '';
+            if (!rest) return { action: 'show' };
+            switch (rest.toLowerCase()) {
+                case 'clear':
+                    return { action: 'clear' };
+                case 'pause':
+                    return { action: 'pause' };
+                case 'resume':
+                    return { action: 'resume' };
+                default:
+                    if ([...rest].length > MAX_CODEX_GOAL_OBJECTIVE_CHARS) {
+                        return { action: 'set', error: `Goal objective must be at most ${MAX_CODEX_GOAL_OBJECTIVE_CHARS} characters.` };
+                    }
+                    return { action: 'set', objective: rest };
+            }
+        };
+
+        const ensureThreadForGoal = async (mode: EnhancedMode): Promise<string | null> => {
             if (this.currentThreadId && this.currentThreadId !== invalidThreadId) {
                 hasThread = true;
                 return this.currentThreadId;
@@ -1918,19 +2285,20 @@ ${formatGoalUsage(goal)}`;
             const resumeCandidate = session.sessionId && session.sessionId !== invalidThreadId
                 ? session.sessionId
                 : null;
-            const threadParams = buildThreadStartParams({
-                cwd: session.path,
-                mode,
-                mcpServers,
-                cliOverrides: session.codexCliOverrides
-            });
-
             if (resumeCandidate) {
+                const threadParams = buildThreadStartParams({
+                    cwd: session.path,
+                    mode,
+                    mcpServers,
+                    cliOverrides: session.codexCliOverrides
+                });
                 try {
                     const resumeResponse = await appServerClient.resumeThread({
                         threadId: resumeCandidate,
                         ...threadParams
-                    }, { signal: this.abortController.signal });
+                    }, {
+                        signal: this.abortController.signal
+                    });
                     const resumeRecord = asRecord(resumeResponse);
                     const resumeThread = resumeRecord ? asRecord(resumeRecord.thread) : null;
                     const threadId = asString(resumeThread?.id) ?? resumeCandidate;
@@ -1941,77 +2309,129 @@ ${formatGoalUsage(goal)}`;
                     return threadId;
                 } catch (error) {
                     logger.warn(`[Codex] Failed to resume app-server thread ${resumeCandidate} for /goal`, error);
+                    sendVisibleStatus(`Goal failed: Codex conversation ${resumeCandidate} could not be resumed`);
+                    return null;
                 }
+            }
+
+            if (!hasThread) {
+                const threadParams = buildThreadStartParams({
+                    cwd: session.path,
+                    mode,
+                    mcpServers,
+                    cliOverrides: session.codexCliOverrides
+                });
+                const threadResponse = await appServerClient.startThread(threadParams, {
+                    signal: this.abortController.signal
+                });
+                const threadRecord = asRecord(threadResponse);
+                const thread = threadRecord ? asRecord(threadRecord.thread) : null;
+                const threadId = asString(thread?.id);
+                applyResolvedModel(threadRecord?.model);
+                if (!threadId) {
+                    throw new Error('app-server thread/start did not return thread.id');
+                }
+                this.currentThreadId = threadId;
+                session.onSessionFound(threadId);
+                hasThread = true;
+                return threadId;
             }
 
             return null;
         };
 
-        const ensureThreadForGoal = async (mode: EnhancedMode): Promise<string> => {
-            const existingThreadId = await resolveExistingThreadForGoal(mode);
-            if (existingThreadId) return existingThreadId;
+        const normalizeGoal = (goal: ThreadGoal): ThreadGoal => ({
+            ...goal,
+            threadId: asString((goal as unknown as Record<string, unknown>).threadId ?? (goal as unknown as Record<string, unknown>).thread_id) ?? goal.threadId,
+            tokenBudget: (goal as unknown as Record<string, unknown>).tokenBudget as number | null | undefined
+                ?? (goal as unknown as Record<string, unknown>).token_budget as number | null | undefined
+                ?? null,
+            tokensUsed: (goal as unknown as Record<string, unknown>).tokensUsed as number | undefined
+                ?? (goal as unknown as Record<string, unknown>).tokens_used as number | undefined
+                ?? 0,
+            timeUsedSeconds: (goal as unknown as Record<string, unknown>).timeUsedSeconds as number | undefined
+                ?? (goal as unknown as Record<string, unknown>).time_used_seconds as number | undefined
+                ?? 0,
+            createdAt: (goal as unknown as Record<string, unknown>).createdAt as number | undefined
+                ?? (goal as unknown as Record<string, unknown>).created_at as number | undefined
+                ?? 0,
+            updatedAt: (goal as unknown as Record<string, unknown>).updatedAt as number | undefined
+                ?? (goal as unknown as Record<string, unknown>).updated_at as number | undefined
+                ?? 0
+        });
 
-            const threadParams = buildThreadStartParams({
-                cwd: session.path,
-                mode,
-                mcpServers,
-                cliOverrides: session.codexCliOverrides
-            });
-            const threadResponse = await appServerClient.startThread(threadParams, { signal: this.abortController.signal });
-            const threadRecord = asRecord(threadResponse);
-            const thread = threadRecord ? asRecord(threadRecord.thread) : null;
-            const threadId = asString(thread?.id);
-            applyResolvedModel(threadRecord?.model);
-            if (!threadId) {
-                throw new Error('app-server thread/start did not return thread.id for /goal');
+        const handleGoalCommand = async (message: QueuedMessage): Promise<boolean> => {
+            const command = parseGoalCommand(message.message);
+            if (!command) {
+                return false;
             }
-            this.currentThreadId = threadId;
-            session.onSessionFound(threadId);
-            hasThread = true;
-            return threadId;
-        };
 
-        const handleGoalCommand = async (slash: CodexGoalCommand, message: QueuedMessage): Promise<void> => {
-            // Goal-control commands must not interrupt or reset active turns.
-            // Native Codex owns goal mutation and emits thread/goal notifications.
-            if (slash.action === 'unsupported') {
-                sendVisibleStatus(slash.message);
-                return;
+            await interruptActiveTurn();
+            resetCurrentTurnState();
+
+            if (command.error) {
+                sendVisibleStatus(command.error);
+                return true;
+            }
+
+            if (!supportsGoals) {
+                sendVisibleStatus(CODEX_GOALS_UNSUPPORTED_MESSAGE);
+                return true;
+            }
+
+            const threadId = await ensureThreadForGoal(message.mode);
+            if (!threadId) {
+                return true;
             }
 
             try {
-                if (slash.action === 'set') {
-                    const threadId = await ensureThreadForGoal(message.mode);
-                    await appServerClient.setThreadGoal({ threadId, objective: slash.objective, status: 'active' }, { signal: this.abortController.signal });
-                    return;
-                }
-
-                const threadId = await resolveExistingThreadForGoal(message.mode);
-                if (!threadId) {
-                    sendVisibleStatus(slash.action === 'clear' ? 'No active goal to clear' : 'No active goal');
-                    return;
-                }
-
-                if (slash.action === 'set-status') {
-                    await appServerClient.setThreadGoal({ threadId, status: slash.status }, { signal: this.abortController.signal });
-                    return;
-                }
-
-                if (slash.action === 'clear') {
-                    const response = await appServerClient.clearThreadGoal({ threadId }, { signal: this.abortController.signal });
-                    if (!response.cleared) {
-                        sendVisibleStatus('No active goal to clear');
+                if (command.action === 'show') {
+                    const response = await appServerClient.getThreadGoal({ threadId }, {
+                        signal: this.abortController.signal
+                    });
+                    const goal = response.goal ? normalizeGoal(response.goal) : null;
+                    if (!goal) {
+                        sendVisibleStatus('Usage: /goal <objective>');
+                        sendGoalEvent({ type: 'thread_goal_cleared', thread_id: threadId });
+                        return true;
                     }
-                    return;
+                    sendVisibleStatus(formatGoalUsage(goal));
+                    sendGoalEvent({ type: 'thread_goal_updated', thread_id: threadId, goal });
+                    return true;
                 }
 
-                const response = await appServerClient.getThreadGoal({ threadId }, { signal: this.abortController.signal });
-                const goal = asRecord(response.goal);
-                sendVisibleStatus(goal ? formatGoalStatusMessage(goal) : 'No active goal');
+                if (command.action === 'clear') {
+                    const response = await appServerClient.clearThreadGoal({ threadId }, {
+                        signal: this.abortController.signal
+                    });
+                    if (response.cleared) {
+                        sendVisibleStatus('Goal cleared');
+                    } else {
+                        sendVisibleStatus('No goal to clear');
+                    }
+                    return true;
+                }
+
+                const status: ThreadGoalStatus = command.action === 'pause' ? 'paused' : 'active';
+                const response = await appServerClient.setThreadGoal({
+                    threadId,
+                    ...(command.action === 'set' ? { objective: command.objective } : {}),
+                    status
+                }, {
+                    signal: this.abortController.signal
+                });
+                const goal = normalizeGoal(response.goal);
+                sendVisibleStatus(formatGoalUsage(goal));
             } catch (error) {
-                logger.debug('[Codex] /goal command failed', error);
-                sendVisibleStatus('Goal command is not available in this Codex app-server. Upgrade Codex or enable goals.');
+                const detail = error instanceof Error ? error.message : String(error);
+                if (/goals feature is disabled|unsupported remote app-server request|method not found/i.test(detail)) {
+                    supportsGoals = false;
+                    sendVisibleStatus(CODEX_GOALS_UNSUPPORTED_MESSAGE);
+                } else {
+                    sendVisibleStatus(`Goal failed: ${detail}`);
+                }
             }
+            return true;
         };
 
         const handleSpecialCommand = async (message: QueuedMessage): Promise<boolean> => {
@@ -2030,19 +2450,10 @@ ${formatGoalUsage(goal)}`;
             if (specialCommand.type === 'clear') {
                 await interruptActiveTurn();
                 resetCurrentTurnState();
-                const clearedThreadId = this.currentThreadId && this.currentThreadId !== invalidThreadId
-                    ? this.currentThreadId
-                    : session.sessionId && session.sessionId !== invalidThreadId
-                        ? session.sessionId
-                        : null;
                 this.currentThreadId = null;
                 invalidThreadId = null;
                 hasThread = false;
-                hasSummary = false;
                 session.resetCodexThread();
-                if (clearedThreadId) {
-                    sendGoalCleared(clearedThreadId);
-                }
                 sendVisibleStatus('Context was reset');
                 return true;
             }
@@ -2070,9 +2481,22 @@ ${formatGoalUsage(goal)}`;
 
         while (!this.shouldExit) {
             logActiveHandles('loop-top');
+            if (!pending && (turnInFlight || recoveryInFlight) && session.queue.size() === 0) {
+                await waitForTurnOrRecovery(this.abortController.signal);
+                if (this.abortController.signal.aborted && !this.shouldExit) {
+                    logger.debug('[codex]: Internal wait aborted while turn/recovery was active; continuing');
+                    continue;
+                }
+                continue;
+            }
+
             let message: QueuedMessage | null = pending;
+            const isRetryMessage = Boolean(message);
             pending = null;
             if (!message) {
+                sameThreadRetryAttempt = 0;
+                sameThreadCompactAttempt = 0;
+                activeMessage = null;
                 const waitSignal = this.abortController.signal;
                 const batch = await session.queue.waitForMessagesAndGetAsString(waitSignal);
                 if (!batch) {
@@ -2090,12 +2514,13 @@ ${formatGoalUsage(goal)}`;
                 break;
             }
 
-            messageBuffer.addMessage(message.message, 'user');
+            if (!isRetryMessage) {
+                messageBuffer.addMessage(message.message, 'user');
+            }
+            activeMessage = message;
 
             try {
-                const goalCommand = parseCodexGoalCommand(message.message);
-                if (goalCommand) {
-                    await handleGoalCommand(goalCommand, message);
+                if (await handleGoalCommand(message)) {
                     continue;
                 }
 
@@ -2105,16 +2530,13 @@ ${formatGoalUsage(goal)}`;
 
                 if (!hasThread) {
                     const threadParams = buildThreadStartParams({
-                        developerInstructions: this.recoveryContext ?? undefined,
                         cwd: session.path,
                         mode: message.mode,
                         mcpServers,
                         cliOverrides: session.codexCliOverrides
                     });
 
-                    const resumeCandidate = session.sessionId && session.sessionId !== invalidThreadId
-                        ? session.sessionId
-                        : null;
+                    const resumeCandidate = session.sessionId ?? null;
                     let threadId: string | null = null;
 
                     if (resumeCandidate) {
@@ -2131,7 +2553,12 @@ ${formatGoalUsage(goal)}`;
                             applyResolvedModel(resumeRecord?.model);
                             logger.debug(`[Codex] Resumed app-server thread ${threadId}`);
                         } catch (error) {
-                            logger.warn(`[Codex] Failed to resume app-server thread ${resumeCandidate}, starting new thread`, error);
+                            logger.warn(`[Codex] Failed to resume app-server thread ${resumeCandidate}; preserving old conversation boundary`, error);
+                            const failureMessage = `Task failed: Codex conversation ${resumeCandidate} could not be resumed; no new conversation was created`;
+                            messageBuffer.addMessage(failureMessage, 'status');
+                            session.sendSessionEvent({ type: 'message', message: failureMessage });
+                            pending = null;
+                            continue;
                         }
                     }
 
@@ -2155,11 +2582,6 @@ ${formatGoalUsage(goal)}`;
                     this.currentThreadId = threadId;
                     session.onSessionFound(threadId);
                     hasThread = true;
-
-                // Consume recovery context after first successful thread creation
-                if (hasThread && this.recoveryContext) {
-                    this.recoveryContext = null
-                }
                 } else {
                     if (!this.currentThreadId) {
                         logger.debug('[Codex] Missing thread id; restarting app-server thread');
@@ -2169,21 +2591,52 @@ ${formatGoalUsage(goal)}`;
                     }
                 }
 
-                const turnParams = buildTurnStartParams({
-                    threadId: this.currentThreadId,
-                    message: message.message,
-                    cwd: session.path,
-                    mode: {
-                        ...message.mode,
-                        model: session.getModel() ?? message.mode.model
-                    },
-                    cliOverrides: session.codexCliOverrides
-                });
                 turnInFlight = true;
                 allowAnonymousTerminalEvent = false;
-                const turnResponse = await appServerClient.startTurn(turnParams, {
-                    signal: this.abortController.signal
+                const mode = {
+                    ...message.mode,
+                    model: session.getModel() ?? message.mode.model
+                };
+                const shouldSendCollaborationMode = supportsTurnCollaborationMode
+                    && Boolean(mode.collaborationMode)
+                    && (mode.collaborationMode !== 'plan' || supportsPlanCollaborationMode);
+                const buildParams = (suppressCollaborationMode: boolean) => buildTurnStartParams({
+                    threadId: this.currentThreadId!,
+                    message: message.message,
+                    cwd: session.path,
+                    mode,
+                    cliOverrides: session.codexCliOverrides
                 });
+                if (
+                    mode.collaborationMode === 'plan'
+                    && (!supportsTurnCollaborationMode || !supportsPlanCollaborationMode)
+                ) {
+                    session.sendSessionEvent({
+                        type: 'message',
+                        message: 'Plan mode is not supported by this Codex runtime. Sent as a normal turn instead.'
+                    });
+                }
+                let turnResponse: unknown;
+                try {
+                    turnResponse = await appServerClient.startTurn(buildParams(!shouldSendCollaborationMode), {
+                        signal: this.abortController.signal
+                    });
+                } catch (error) {
+                    if (shouldSendCollaborationMode && shouldRetryWithoutCollaborationMode(error)) {
+                        supportsTurnCollaborationMode = false;
+                        if (mode.collaborationMode === 'plan') {
+                            session.sendSessionEvent({
+                                type: 'message',
+                                message: 'Plan mode is not supported by this Codex runtime. Sent as a normal turn instead.'
+                            });
+                        }
+                        turnResponse = await appServerClient.startTurn(buildParams(true), {
+                            signal: this.abortController.signal
+                        });
+                    } else {
+                        throw error;
+                    }
+                }
                 const turnRecord = asRecord(turnResponse);
                 const turn = turnRecord ? asRecord(turnRecord.turn) : null;
                 const turnId = asString(turn?.id);
@@ -2205,21 +2658,11 @@ ${formatGoalUsage(goal)}`;
                     messageBuffer.addMessage('Aborted by user', 'status');
                     session.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
                 } else {
-                    const errorMsg = error instanceof Error ? error.message : String(error);
                     messageBuffer.addMessage('Process exited unexpectedly', 'status');
                     session.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
                     this.currentTurnId = null;
                     this.currentThreadId = null;
                     hasThread = false;
-                    // Stop heartbeat so hub can mark session inactive
-                    session.stopKeepAlive();
-                    // Notify hub that thread crashed so auto-resume can trigger.
-                    // Include error message so hub can detect upstream API corruption
-                    // and clear the stale thread id.
-                    session.sendSessionEvent({
-                        type: 'thread-crashed',
-                        error: errorMsg
-                    });
                 }
             } finally {
                 if (!turnInFlight) {
@@ -2227,10 +2670,15 @@ ${formatGoalUsage(goal)}`;
                     reasoningProcessor.abort();
                     diffProcessor.reset();
                     appServerEventConverter.reset();
+                    mcpTitleByCallId.clear();
+                    pendingAgentToolInputByCallId.clear();
+                    pendingAgentTracesByAgentId.clear();
+                    cancelAllPendingThrottledAgentRunUpdates();
+                    childAgentRuntimeById.clear();
                     session.onThinkingChange(false);
                     clearReadyAfterTurnTimer?.();
                     emitReadyIfIdle({
-                        pending,
+                        pending: pending ?? (recoveryInFlight ? activeMessage : null),
                         queueSize: () => session.queue.size(),
                         shouldExit: this.shouldExit,
                         sendReady
@@ -2239,6 +2687,9 @@ ${formatGoalUsage(goal)}`;
                 logActiveHandles('after-turn');
             }
         }
+
+        failPendingAgentStarts('spawn_agent did not return an agent id before the Codex session ended');
+        cancelAllPendingThrottledAgentRunUpdates();
     }
 
     protected async cleanup(): Promise<void> {
@@ -2268,7 +2719,7 @@ ${formatGoalUsage(goal)}`;
     }
 }
 
-export async function codexRemoteLauncher(session: CodexSession, recoveryContext?: string): Promise<'switch' | 'exit'> {
-    const launcher = new CodexRemoteLauncher(session, recoveryContext);
+export async function codexRemoteLauncher(session: CodexSession): Promise<'switch' | 'exit'> {
+    const launcher = new CodexRemoteLauncher(session);
     return launcher.launch();
 }

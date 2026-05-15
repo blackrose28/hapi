@@ -108,52 +108,29 @@ describe('getEventPresentation — token-count', () => {
     })
 })
 
-describe('getEventPresentation — Codex goal', () => {
-    it('formats Codex goal progress events without token budget', () => {
+describe('getEventPresentation — thread goals', () => {
+    it('formats goal status updates', () => {
         const result = getEventPresentation({
-            type: 'codex-goal',
-            action: 'updated',
+            type: 'thread-goal-updated',
             goal: {
                 threadId: 'thread-1',
-                objective: 'ship it',
-                status: 'active',
-                tokenBudget: null,
-                tokensUsed: 12000,
-                timeUsedSeconds: 90,
-                createdAt: 1776272400,
-                updatedAt: 1776272490
+                objective: 'ship goal support',
+                status: 'budgetLimited',
+                tokenBudget: 5000,
+                tokensUsed: 4100,
+                timeUsedSeconds: 0,
+                createdAt: 1,
+                updatedAt: 2
             }
         })
 
-        expect(result.icon).toBe('🎯')
-        expect(result.text).toBe('Goal active: ship it · 12k tokens · 1m 30s')
+        expect(result.text).toBe('Goal limited by budget · 4k / 5k')
     })
 
-    it('formats Codex goal progress events with explicit token budget', () => {
-        const result = getEventPresentation({
-            type: 'codex-goal',
-            action: 'updated',
-            goal: {
-                threadId: 'thread-1',
-                objective: 'ship it',
-                status: 'active',
-                tokenBudget: 200000,
-                tokensUsed: 12000,
-                timeUsedSeconds: 90,
-                createdAt: 1776272400,
-                updatedAt: 1776272490
-            }
-        })
+    it('formats goal clear events', () => {
+        const result = getEventPresentation({ type: 'thread-goal-cleared', threadId: 'thread-1' })
 
-        expect(result.text).toBe('Goal active: ship it · 12k/200k tokens · 1m 30s')
-    })
-
-    it('formats Codex goal clear events', () => {
-        expect(getEventPresentation({
-            type: 'codex-goal',
-            action: 'cleared',
-            threadId: 'thread-1'
-        }).text).toBe('Goal cleared')
+        expect(result.text).toBe('Goal cleared')
     })
 })
 

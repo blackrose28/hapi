@@ -179,7 +179,6 @@ export interface ThreadCompactStartResponse {
     [key: string]: unknown;
 }
 
-
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete';
 
 export interface ThreadGoal {
@@ -220,5 +219,19 @@ export interface ThreadGoalClearParams {
 
 export interface ThreadGoalClearResponse {
     cleared: boolean;
+    [key: string]: unknown;
+}
+export interface ExperimentalFeatureEnablementSetParams {
+    enablement: Record<string, boolean>;
+}
+
+export interface ExperimentalFeatureEnablementSetResponse {
+    enablement: Record<string, boolean>;
+    [key: string]: unknown;
+}
+
+export interface CollaborationModeListResponse {
+    data?: Array<{ name?: string; mode?: string; [key: string]: unknown }>;
+    modes?: Array<{ name?: string; mode?: string; [key: string]: unknown }>;
     [key: string]: unknown;
 }

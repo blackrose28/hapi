@@ -156,38 +156,54 @@ export async function runCodex(opts: {
                 syncCurrentConfigFromSession();
                 let text = message.content.text;
                 let isolatedCommandText: string | null = null;
-                const nativeGoalCommand = parseCodexGoalCommand(text);
-                if (nativeGoalCommand) {
-                    isolatedCommandText = text.trim();
-                } else {
-                    const commands = await listSlashCommands('codex', workingDirectory).catch(() => []);
-                    const slash = resolveCodexSlashCommand(text, {
-                        commands,
-                        permissionMode: currentPermissionMode,
-                        collaborationMode: currentCollaborationMode,
+                const commands = await listSlashCommands('codex', workingDirectory).catch(() => []);
+                const slash = resolveCodexSlashCommand(text, {
+                    commands,
+                    permissionMode: currentPermissionMode,
+                    collaborationMode: currentCollaborationMode,
+                    model: currentModel,
+                    modelReasoningEffort: currentModelReasoningEffort
+                });
+                if (slash.kind === 'goal') {
+                    if (slash.message) {
+                        session.sendAgentMessage({
+                            type: 'message',
+                            message: slash.message,
+                            id: randomUUID()
+                        });
+                    }
+                    const goalCommand = slash.action === 'set'
+                        ? `/goal ${slash.objective ?? ''}`
+                        : slash.action === 'show'
+                            ? '/goal'
+                            : `/goal ${slash.action}`;
+                    messageQueue.pushIsolateAndClear(goalCommand, {
+                        permissionMode: currentPermissionMode ?? 'default',
                         model: currentModel,
-                        modelReasoningEffort: currentModelReasoningEffort
-                    });
-                    if (slash.kind !== 'passthrough') {
-                        applySlashUpdates(slash.updates);
-                        if (slash.message) {
-                            session.sendAgentMessage({
-                                type: 'message',
-                                message: slash.message,
-                                id: randomUUID()
-                            });
-                        }
-                        if (slash.kind === 'handled') {
-                            if (localId) session.emitMessagesConsumed([localId]);
-                            return;
-                        }
-                        text = slash.text;
-                    } else {
-                        const specialCommand = parseCodexSpecialCommand(message.content.text);
-                        if (specialCommand.type) {
-                            logger.debug(`[Codex] Detected special command: ${specialCommand.type}`);
-                            isolatedCommandText = message.content.text.trim();
-                        }
+                        modelReasoningEffort: currentModelReasoningEffort,
+                        collaborationMode: currentCollaborationMode
+                    }, localId);
+                    return;
+                }
+                if (slash.kind !== 'passthrough') {
+                    applySlashUpdates(slash.updates);
+                    if (slash.message) {
+                        session.sendAgentMessage({
+                            type: 'message',
+                            message: slash.message,
+                            id: randomUUID()
+                        });
+                    }
+                    if (slash.kind === 'handled') {
+                        if (localId) session.emitMessagesConsumed([localId]);
+                        return;
+                    }
+                    text = slash.text;
+                } else {
+                    const specialCommand = parseCodexSpecialCommand(message.content.text);
+                    if (specialCommand.type) {
+                        logger.debug(`[Codex] Detected special command: ${specialCommand.type}`);
+                        isolatedCommandText = message.content.text.trim();
                     }
                 }
                 text = formatMessageWithAttachments(text, message.content.attachments);
@@ -206,11 +222,7 @@ export async function runCodex(opts: {
                     collaborationMode: currentCollaborationMode
                 };
                 if (isolatedCommandText) {
-                    if (nativeGoalCommand) {
-                        messageQueue.pushIsolate(isolatedCommandText, enhancedMode, localId);
-                    } else {
-                        messageQueue.pushIsolateAndClear(isolatedCommandText, enhancedMode, localId);
-                    }
+                    messageQueue.pushIsolateAndClear(isolatedCommandText, enhancedMode, localId);
                     return;
                 }
                 messageQueue.push(text, enhancedMode, localId);

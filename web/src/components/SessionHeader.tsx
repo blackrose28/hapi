@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import type { CodexGoalState } from '@/chat/types'
-import type { Machine, Session } from '@/types/api'
+import type { Machine, Session, ThreadGoal } from '@/types/api'
 import type { ApiClient } from '@/api/client'
 import { isTelegramApp } from '@/hooks/useTelegram'
 import { useMachines } from '@/hooks/queries/useMachines'
@@ -182,7 +181,7 @@ export function SessionHeader(props: {
     onFocusSession?: () => void
     compactCloseLabel?: string
     compactCloseButtonRef?: Ref<HTMLButtonElement>
-    codexGoal?: CodexGoalState | null
+    codexGoal?: ThreadGoal | null
     onGoalCommand?: (command: string) => void
 }) {
     const { t } = useTranslation()

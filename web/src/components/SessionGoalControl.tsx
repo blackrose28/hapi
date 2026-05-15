@@ -1,5 +1,5 @@
 import * as React from 'react'
-import type { CodexGoalState } from '@/chat/types'
+import type { ThreadGoal } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import {
     AppDialog,
@@ -28,29 +28,22 @@ function formatDuration(seconds: number): string {
     const safeSeconds = Math.max(0, Math.floor(seconds))
     const hours = Math.floor(safeSeconds / 3600)
     const minutes = Math.floor((safeSeconds % 3600) / 60)
-    const remainingSeconds = safeSeconds % 60
-
-    if (hours > 0) {
-        return `${hours}h ${minutes}m ${remainingSeconds}s`
-    }
-
-    if (minutes > 0) {
-        return `${minutes}m ${remainingSeconds}s`
-    }
-
-    return `${remainingSeconds}s`
+    const secs = safeSeconds % 60
+    if (hours > 0) return `${hours}h ${minutes}m`
+    if (minutes > 0) return `${minutes}m ${secs}s`
+    return `${secs}s`
 }
 
-function formatGoalProgress(goal: CodexGoalState): string {
-    const tokenPart = goal.tokenBudget === null
-        ? `${formatTokenCount(goal.tokensUsed)} tokens`
-        : `${formatTokenCount(goal.tokensUsed)}/${formatTokenCount(goal.tokenBudget)} tokens`
+function formatGoalProgress(goal: ThreadGoal): string {
+    const tokenPart = typeof goal.tokenBudget === 'number'
+        ? `${formatTokenCount(goal.tokensUsed)}/${formatTokenCount(goal.tokenBudget)} tokens`
+        : `${formatTokenCount(goal.tokensUsed)} tokens`
 
     return `${goal.status} · ${tokenPart} · ${formatDuration(goal.timeUsedSeconds)}`
 }
 
 export function SessionGoalControl(props: {
-    goal: CodexGoalState | null
+    goal: ThreadGoal | null
     onGoalCommand: (command: string) => void
     disabled?: boolean
     compact?: boolean

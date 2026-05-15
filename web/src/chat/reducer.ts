@@ -1,6 +1,5 @@
-import type { AgentState } from '@/types/api'
-import type { TeamMentionRequest } from '@/types/api'
-import type { ChatBlock, CodexGoalState, NormalizedMessage, UsageData } from '@/chat/types'
+import type { AgentState, TeamMentionRequest, ThreadGoal } from '@/types/api'
+import type { AgentEvent, ChatBlock, NormalizedMessage, UsageData } from '@/chat/types'
 import { traceMessages, type TracedMessage } from '@/chat/tracer'
 import { dedupeAgentEvents, foldApiErrorEvents, parseMessageAsEvent } from '@/chat/reducerEvents'
 import { collectTitleChanges, collectToolIdsFromMessages, ensureToolBlock, getPermissions } from '@/chat/reducerTools'
@@ -40,11 +39,24 @@ export type LatestQuota = {
     sevenDay: QuotaWindow | null
 }
 
+function getLatestThreadGoal(normalized: NormalizedMessage[]): ThreadGoal | null {
+    for (let i = normalized.length - 1; i >= 0; i--) {
+        const msg = normalized[i]
+        if (msg.role !== 'event') continue
+        const event = msg.content as AgentEvent
+        if (event.type === 'thread-goal-cleared') return null
+        if (event.type === 'thread-goal-updated') {
+            return (event as { goal?: ThreadGoal }).goal ?? null
+        }
+    }
+    return null
+}
+
 export function reduceChatBlocks(
     normalized: NormalizedMessage[],
     agentState: AgentState | null | undefined,
     teamMentionRequests: TeamMentionRequest[] = []
-): { blocks: ChatBlock[]; hasReadyEvent: boolean; latestUsage: LatestUsage | null; latestGoal: CodexGoalState | null; latestQuota: LatestQuota } {
+): { blocks: ChatBlock[]; hasReadyEvent: boolean; latestUsage: LatestUsage | null; latestGoal: ThreadGoal | null; latestQuota: LatestQuota } {
     const permissionsById = getPermissions(agentState)
     const toolIdsInMessages = collectToolIdsFromMessages(normalized)
     const titleChangesByToolUseId = collectTitleChanges(normalized)
@@ -153,18 +165,11 @@ export function reduceChatBlocks(
         }
     }
 
-    let latestGoal: CodexGoalState | null = null
-    for (const msg of normalized) {
-        if (msg.role !== 'event' || msg.content.type !== 'codex-goal') continue
-        const goalEvent = msg.content as
-            | { type: 'codex-goal'; action: 'updated'; goal: CodexGoalState }
-            | { type: 'codex-goal'; action: 'cleared'; threadId: string }
-        if (goalEvent.action === 'updated') {
-            latestGoal = goalEvent.goal
-        } else if (goalEvent.action === 'cleared') {
-            latestGoal = null
-        }
+    return {
+        blocks: dedupeAgentEvents(foldApiErrorEvents(rootResult.blocks)),
+        hasReadyEvent,
+        latestUsage,
+        latestGoal: getLatestThreadGoal(normalized),
+        latestQuota
     }
-
-    return { blocks: dedupeAgentEvents(foldApiErrorEvents(rootResult.blocks)), hasReadyEvent, latestUsage, latestGoal, latestQuota }
 }

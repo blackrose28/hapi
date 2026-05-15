@@ -536,6 +536,34 @@ export class AppServerEventConverter {
             return events;
         }
 
+        if (method === 'thread/goal/updated') {
+            const goal = asRecord(paramsRecord.goal);
+            const threadId = asString(paramsRecord.threadId ?? paramsRecord.thread_id ?? goal?.threadId ?? goal?.thread_id);
+            if (!threadId || !goal) {
+                return events;
+            }
+            const turnId = asString(paramsRecord.turnId ?? paramsRecord.turn_id);
+            events.push({
+                type: 'thread_goal_updated',
+                thread_id: threadId,
+                ...(turnId ? { turn_id: turnId } : {}),
+                goal
+            });
+            return events;
+        }
+
+        if (method === 'thread/goal/cleared') {
+            const threadId = asString(paramsRecord.threadId ?? paramsRecord.thread_id);
+            if (!threadId) {
+                return events;
+            }
+            events.push({
+                type: 'thread_goal_cleared',
+                thread_id: threadId
+            });
+            return events;
+        }
+
         if (method === 'thread/started' || method === 'thread/resumed') {
             const thread = asRecord(paramsRecord.thread) ?? paramsRecord;
             const threadId = asString(thread.threadId ?? thread.thread_id ?? thread.id);

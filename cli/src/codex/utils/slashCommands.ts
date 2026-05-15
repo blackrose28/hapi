@@ -6,6 +6,7 @@ import type { EnhancedMode } from '../loop';
 import type { SlashCommand } from '@/modules/common/slashCommands';
 
 const REASONING_EFFORTS = new Set<ReasoningEffort>(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+export const MAX_CODEX_GOAL_OBJECTIVE_CHARS = 4_000;
 
 const UNSUPPORTED_CODEX_BUILTIN_COMMANDS = new Set([
     'compat',
@@ -44,6 +45,12 @@ export type CodexSlashResolution =
             model?: string | null;
             modelReasoningEffort?: ReasoningEffort | null;
         };
+    }
+    | {
+        kind: 'goal';
+        action: 'show' | 'set' | 'pause' | 'resume' | 'clear';
+        objective?: string;
+        message?: string;
     };
 
 export function resolveCodexSlashCommand(
@@ -95,6 +102,40 @@ export function resolveCodexSlashCommand(
             kind: 'handled',
             message: 'Codex plan mode enabled',
             updates: { collaborationMode: 'plan' }
+        };
+    }
+
+    if (command === 'goal') {
+        const lowerRest = rest.toLowerCase();
+        if (!rest) {
+            return { kind: 'goal', action: 'show' };
+        }
+        if (lowerRest === 'clear') {
+            return { kind: 'goal', action: 'clear' };
+        }
+        if (lowerRest === 'pause') {
+            return { kind: 'goal', action: 'pause' };
+        }
+        if (lowerRest === 'resume') {
+            return { kind: 'goal', action: 'resume' };
+        }
+        const objective = rest.trim();
+        if (!objective) {
+            return {
+                kind: 'handled',
+                message: 'Goal objective must not be empty.'
+            };
+        }
+        if ([...objective].length > MAX_CODEX_GOAL_OBJECTIVE_CHARS) {
+            return {
+                kind: 'handled',
+                message: `Goal objective must be at most ${MAX_CODEX_GOAL_OBJECTIVE_CHARS} characters.`
+            };
+        }
+        return {
+            kind: 'goal',
+            action: 'set',
+            objective
         };
     }
 
@@ -179,6 +220,8 @@ export function resolveCodexSlashCommand(
                 'Supported Codex slash commands:',
                 '/plan [prompt] — enable plan mode, optionally send prompt',
                 '/plan off — return to default mode',
+                '/goal [objective] — set or view the persistent goal',
+                '/goal pause|resume|clear — update the current goal',
                 '/clear — reset current Codex thread context',
                 '/compact — compact current Codex thread context',
                 '/status — show current Codex session config',

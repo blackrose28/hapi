@@ -47,6 +47,37 @@ describe('resolveCodexSlashCommand', () => {
         });
     });
 
+    it('resolves Codex goal commands for native handling', () => {
+        expect(resolveCodexSlashCommand('/goal', state)).toEqual({
+            kind: 'goal',
+            action: 'show'
+        });
+        expect(resolveCodexSlashCommand('/goal improve benchmark coverage', state)).toEqual({
+            kind: 'goal',
+            action: 'set',
+            objective: 'improve benchmark coverage'
+        });
+        expect(resolveCodexSlashCommand('/goal pause', state)).toEqual({
+            kind: 'goal',
+            action: 'pause'
+        });
+        expect(resolveCodexSlashCommand('/goal resume', state)).toEqual({
+            kind: 'goal',
+            action: 'resume'
+        });
+        expect(resolveCodexSlashCommand('/goal clear', state)).toEqual({
+            kind: 'goal',
+            action: 'clear'
+        });
+    });
+
+    it('rejects oversized Codex goal objectives', () => {
+        expect(resolveCodexSlashCommand(`/goal ${'x'.repeat(4001)}`, state)).toEqual({
+            kind: 'handled',
+            message: 'Goal objective must be at most 4000 characters.'
+        });
+    });
+
     it('expands custom Codex prompt commands', () => {
         expect(resolveCodexSlashCommand('/review src/index.ts', {
             ...state,

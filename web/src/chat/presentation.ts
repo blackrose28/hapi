@@ -58,38 +58,25 @@ function formatTokenCount(value: number): string {
     return String(value)
 }
 
-function formatGoalTokenCount(value: number): string {
-    return formatTokenCount(value).replace(/\.0([kM])$/, '$1')
+function formatGoalStatus(status: string): string {
+    if (status === 'active') return 'active'
+    if (status === 'paused') return 'paused'
+    if (status === 'budgetLimited') return 'limited by budget'
+    if (status === 'complete') return 'complete'
+    return status
 }
 
-function formatElapsedSeconds(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    if (secs === 0) return `${mins}m`
-    return `${mins}m ${secs}s`
-}
-
-function formatGoalProgress(event: AgentEvent): EventPresentation {
-    const record = event as Record<string, unknown>
-    if (record.action === 'cleared') return { icon: '🎯', text: 'Goal cleared' }
-
-    const goal = asRecord(record.goal)
-    if (!goal) return { icon: '🎯', text: 'Goal updated' }
-
-    const status = typeof goal.status === 'string' ? goal.status : 'active'
-    const objective = typeof goal.objective === 'string' ? goal.objective : 'Goal'
-    const tokensUsed = asNumber(goal.tokensUsed) ?? 0
-    const tokenBudget = asNumber(goal.tokenBudget)
-    const timeUsedSeconds = asNumber(goal.timeUsedSeconds) ?? 0
-    const tokenText = tokenBudget !== null
-        ? `${formatGoalTokenCount(tokensUsed)}/${formatGoalTokenCount(tokenBudget)} tokens`
-        : `${formatGoalTokenCount(tokensUsed)} tokens`
-
-    return {
-        icon: '🎯',
-        text: `Goal ${status}: ${objective} · ${tokenText} · ${formatElapsedSeconds(timeUsedSeconds)}`
+function formatThreadGoalEvent(event: AgentEvent): EventPresentation {
+    const goal = asRecord((event as Record<string, unknown>).goal)
+    if (!goal) return { icon: null, text: 'Goal updated' }
+    const status = typeof goal.status === 'string' ? goal.status : 'updated'
+    const tokensUsed = asNumber(goal.tokensUsed ?? goal.tokens_used)
+    const tokenBudget = asNumber(goal.tokenBudget ?? goal.token_budget)
+    const parts = [`Goal ${formatGoalStatus(status)}`]
+    if (tokensUsed !== null && tokenBudget !== null) {
+        parts.push(`${formatTokenCount(tokensUsed)} / ${formatTokenCount(tokenBudget)}`)
     }
+    return { icon: null, text: parts.join(' · ') }
 }
 
 function formatTokenCountEvent(event: AgentEvent): EventPresentation {
@@ -193,11 +180,14 @@ export function getEventPresentation(event: AgentEvent): EventPresentation {
     if (event.type === 'compact') {
         return { icon: '📦', text: 'Conversation compacted' }
     }
+    if (event.type === 'thread-goal-updated') {
+        return formatThreadGoalEvent(event)
+    }
+    if (event.type === 'thread-goal-cleared') {
+        return { icon: null, text: 'Goal cleared' }
+    }
     if (event.type === 'token-count') {
         return formatTokenCountEvent(event)
-    }
-    if (event.type === 'codex-goal') {
-        return formatGoalProgress(event)
     }
     try {
         return { icon: null, text: JSON.stringify(event) }
