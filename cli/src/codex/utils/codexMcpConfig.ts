@@ -173,3 +173,7 @@ export function buildDeveloperInstructionsArg(instructions: string): string[] {
     const escaped = escapeTomlString(instructions);
     return ['-c', `developer_instructions="${escaped}"`];
 }
+
+export function buildModelReasoningEffortConfigArgs(effort: string): string[] {
+    return ['-c', `model_reasoning_effort="${escapeTomlString(effort)}"`];
+}

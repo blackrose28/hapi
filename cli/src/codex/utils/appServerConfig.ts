@@ -261,9 +261,10 @@ export function buildTurnStartParams(args: {
         ? undefined
         : args.mode?.collaborationMode;
     const model = args.overrides?.model ?? args.mode?.model;
+    const modelReasoningEffort = args.mode?.modelReasoningEffort;
 
-    if (args.mode?.modelReasoningEffort) {
-        params.effort = args.mode.modelReasoningEffort;
+    if (modelReasoningEffort) {
+        params.effort = modelReasoningEffort;
         if (!collaborationMode && supportsReasoningSummary(model)) {
             params.summary = 'detailed';
         }
@@ -278,7 +279,7 @@ export function buildTurnStartParams(args: {
             mode: collaborationMode,
             settings: {
                 model,
-                reasoning_effort: args.mode?.modelReasoningEffort ?? null,
+                reasoning_effort: modelReasoningEffort ?? null,
                 developer_instructions: appendCollaborationInstructions(developerInstructions, args.mode?.proactiveMultiAgent)
             }
         };
