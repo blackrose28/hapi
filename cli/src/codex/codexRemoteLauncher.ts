@@ -314,9 +314,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 return false;
             }
 
-            return message.includes('requires experimentalapi')
-                || message.includes('unknown field')
+            return message.includes('experimentalapi')
                 || message.includes('unsupported')
+                || message.includes('unknown')
                 || message.includes('unrecognized')
                 || message.includes('unexpected')
                 || message.includes('invalid field');
@@ -326,7 +326,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             const record = asRecord(response);
             const candidates = [
                 Array.isArray(response) ? response : undefined,
-                Array.isArray(record?.data) ? record.data : undefined
+                Array.isArray(record?.data) ? record.data : undefined,
+                Array.isArray(record?.modes) ? record.modes : undefined,
+                Array.isArray(record?.collaborationModes) ? record.collaborationModes : undefined,
+                Array.isArray(record?.items) ? record.items : undefined
             ];
 
             for (const candidate of candidates) {
@@ -336,7 +339,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                         return true;
                     }
                     const entryRecord = asRecord(entry);
-                    const mode = asString(entryRecord?.mode) ?? asString(entryRecord?.name);
+                    const mode = asString(entryRecord?.mode)
+                        ?? asString(entryRecord?.name)
+                        ?? asString(entryRecord?.id);
                     if (mode === 'plan') {
                         return true;
                     }
@@ -2356,7 +2361,6 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             }
         });
         let supportsTurnCollaborationMode = true;
-        let supportsPlanCollaborationMode = true;
         let supportsGoals = true;
         try {
             await appServerClient.setExperimentalFeatureEnablement({ enablement: { goals: true } });
@@ -2370,7 +2374,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             const hasPlanMode = responseContainsPlanCollaborationMode(response);
             logger.debug(`[Codex] collaborationMode/list plan=${hasPlanMode}`);
             if (!hasPlanMode) {
-                supportsPlanCollaborationMode = false;
+                logger.debug('[Codex] collaborationMode/list did not report plan; will still attempt collaborationMode until rejected');
             }
         } catch (error) {
             logger.debug(`[Codex] collaborationMode/list failed: ${errorMessage(error)}`);
@@ -2840,8 +2844,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     model: session.getModel() ?? message.mode.model
                 };
                 const shouldSendCollaborationMode = supportsTurnCollaborationMode
-                    && Boolean(mode.collaborationMode)
-                    && (mode.collaborationMode !== 'plan' || supportsPlanCollaborationMode);
+                    && Boolean(mode.collaborationMode);
                 const buildParams = (suppressCollaborationMode: boolean) => buildTurnStartParams({
                     threadId: this.currentThreadId!,
                     message: message.message,
@@ -2851,7 +2854,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 });
                 if (
                     mode.collaborationMode === 'plan'
-                    && (!supportsTurnCollaborationMode || !supportsPlanCollaborationMode)
+                    && !supportsTurnCollaborationMode
                 ) {
                     session.sendSessionEvent({
                         type: 'message',
