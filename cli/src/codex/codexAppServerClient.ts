@@ -4,6 +4,7 @@ import { logger } from '@/ui/logger';
 import { killProcessByChildProcess } from '@/utils/process';
 import { JsonLineParser } from '@/utils/jsonLineParser';
 import type {
+    CollaborationModeListResponse,
     InitializeParams,
     InitializeResponse,
     ModelListParams,
@@ -242,9 +243,6 @@ export class CodexAppServerClient extends JsonLineParser {
             timeoutMs: 30_000
         });
         return response as ModelListResponse;
-    }
-
-
     async listCollaborationModes(): Promise<CollaborationModeListResponse> {
         const response = await this.sendRequest('collaborationMode/list', {}, {
             timeoutMs: 30_000
@@ -260,6 +258,7 @@ export class CodexAppServerClient extends JsonLineParser {
         });
         return response as ExperimentalFeatureEnablementSetResponse;
     }
+
     async startThread(params: ThreadStartParams, options?: { signal?: AbortSignal }): Promise<ThreadStartResponse> {
         const response = await this.sendRequest('thread/start', params, {
             signal: options?.signal,

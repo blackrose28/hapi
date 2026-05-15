@@ -53,6 +53,7 @@ function pickToolName(record: Record<string, unknown>): string {
         ?? asString(record.permission)
         ?? 'CodexTool';
 }
+
 function mapDecision(decision: PermissionDecision): { decision: string } {
     switch (decision) {
         case 'approved':
@@ -66,7 +67,28 @@ function mapDecision(decision: PermissionDecision): { decision: string } {
     }
 }
 
+function mapPermissionGrant(
+    requested: unknown,
+    decision: PermissionDecision
+): {
+    permissions: unknown;
+    scope: 'turn' | 'session';
+} {
+    if (decision === 'approved' || decision === 'approved_for_session') {
+        return {
+            permissions: requested,
+            scope: decision === 'approved_for_session' ? 'session' : 'turn'
+        };
+    }
 
+    return {
+        permissions: {
+            network: null,
+            fileSystem: null
+        },
+        scope: 'turn'
+    };
+}
 
 function firstString(values: unknown): string | undefined {
     if (!Array.isArray(values)) {
@@ -397,6 +419,38 @@ export function registerAppServerPermissionHandlers(args: {
                 message: reason,
                 grantRoot
             }
+        ) as PermissionResult;
+
+        return mapDecision(result.decision);
+    });
+
+    client.registerRequestHandler('item/permissions/requestApproval', async (params) => {
+        const record = asRecord(params) ?? {};
+        const toolCallId = asString(record.itemId) ?? randomUUID();
+        const permissions = record.permissions ?? {};
+
+        const result = await permissionHandler.handleToolCall(
+            toolCallId,
+            'CodexPermission',
+            {
+                message: asString(record.reason),
+                cwd: asString(record.cwd),
+                permissions
+            }
+        ) as PermissionResult;
+
+        return mapPermissionGrant(permissions, result.decision);
+    });
+
+    client.registerRequestHandler('item/tool/requestApproval', async (params) => {
+        const record = asRecord(params) ?? {};
+        const toolCallId = asString(record.itemId) ?? asString(record.item_id) ?? randomUUID();
+        const toolName = pickToolName(record);
+
+        const result = await permissionHandler.handleToolCall(
+            toolCallId,
+            toolName,
+            record.input ?? record.arguments ?? params
         ) as PermissionResult;
 
         return mapDecision(result.decision);

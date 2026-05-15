@@ -107,7 +107,6 @@ vi.mock('./codexAppServerClient', () => {
             }
             return params;
         }
-
         registerRequestHandler(method: string, handler: (params: unknown) => Promise<unknown> | unknown): void {
             harness.registerRequestCalls.push(method);
             harness.requestHandlers.set(method, handler);
@@ -958,7 +957,6 @@ function createMode(): EnhancedMode {
         model: 'gpt-5.4'
     };
 }
-
 function createSessionStub(
     messages = ['hello from launcher test'],
     mode = createMode(),
@@ -999,30 +997,26 @@ function createSessionStub(
                 rpcHandlers.set(method, handler);
             }
         },
-        updateAgentState(handler: (state: FakeAgentState) => FakeAgentState) {
-            agentState = handler(agentState);
-        },
         sendAgentMessage(message: unknown) {
             codexMessages.push(message);
         },
-        sendUserMessage(_text: string) {},
-        sendClaudeSessionMessage(message: unknown) {
-            summaryMessages.push(message);
-        },
         sendSessionEvent(event: { type: string; [key: string]: unknown }) {
             sessionEvents.push(event);
+        },
+        sendUserMessage(text: string) {
+            summaryMessages.push(text);
         }
     };
 
     const session = {
-        path: '/tmp/hapi-update',
-        logPath: '/tmp/hapi-update/test.log',
-        client,
-        queue,
-        codexArgs: undefined,
-        codexCliOverrides: undefined,
         sessionId: null as string | null,
+        path: '/workspace/project',
         thinking: false,
+        permissionMode: mode.permissionMode,
+        model: mode.model,
+        setPermissionMode(nextMode: EnhancedMode['permissionMode']) {
+            currentPermissionMode = nextMode;
+        },
         getPermissionMode() {
             return currentPermissionMode;
         },
@@ -1368,7 +1362,7 @@ describe('codexRemoteLauncher', () => {
         });
     });
 
-    it('still attempts plan mode when collaborationMode/list omits plan', async () => {
+    it('falls back to a normal turn when collaborationMode/list omits plan', async () => {
         harness.collaborationModeResponse = { data: [{ mode: 'default' }] };
         const { session, sessionEvents } = createSessionStub(['plan this'], {
             permissionMode: 'default',
@@ -1380,10 +1374,9 @@ describe('codexRemoteLauncher', () => {
 
         expect(exitReason).toBe('exit');
         expect(harness.startTurnParams).toHaveLength(1);
-        expect(harness.startTurnParams[0]?.collaborationMode).toMatchObject({
-            mode: 'plan'
-        });
-        expect(sessionEvents).not.toContainEqual({
+        expect(harness.startTurnParams[0]?.collaborationMode).toBeUndefined();
+        expect(harness.startTurnParams[0]?.model).toBe('gpt-5.4');
+        expect(sessionEvents).toContainEqual({
             type: 'message',
             message: 'Plan mode is not supported by this Codex runtime. Sent as a normal turn instead.'
         });
@@ -1476,6 +1469,8 @@ describe('codexRemoteLauncher', () => {
         });
     });
 
+=======
+>>>>>>> 66e41c90 (fix(codex): support app-server plan mode (#622))
     it('switches collaboration mode to default after approving exit_plan_mode', async () => {
         const { session, rpcHandlers, collaborationModes, getCollaborationMode } = createSessionStub(['plan this'], {
             permissionMode: 'default',

@@ -359,6 +359,8 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             return message.includes('experimentalapi')
                 || message.includes('unsupported')
                 || message.includes('unknown')
+                || message.includes('requires experimentalapi')
+                || message.includes('unknown field')
                 || message.includes('unrecognized')
                 || message.includes('unexpected')
                 || message.includes('invalid field');
@@ -3103,12 +3105,13 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             supportsGoals = false;
             logger.debug(`[Codex] failed to enable goals feature: ${errorMessage(error)}`);
         }
+        let supportsPlanCollaborationMode = true;
         try {
             const response = await appServerClient.listCollaborationModes();
             const hasPlanMode = responseContainsPlanCollaborationMode(response);
             logger.debug(`[Codex] collaborationMode/list plan=${hasPlanMode}`);
             if (!hasPlanMode) {
-                logger.debug('[Codex] collaborationMode/list did not report plan; will still attempt collaborationMode until rejected');
+                supportsPlanCollaborationMode = false;
             }
         } catch (error) {
             logger.debug(`[Codex] collaborationMode/list failed: ${errorMessage(error)}`);
@@ -3618,17 +3621,21 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     model: session.getModel() ?? message.mode.model
                 };
                 const shouldSendCollaborationMode = supportsTurnCollaborationMode
-                    && Boolean(mode.collaborationMode);
+                    && Boolean(mode.collaborationMode)
+                    && (mode.collaborationMode !== 'plan' || supportsPlanCollaborationMode);
                 const buildParams = (suppressCollaborationMode: boolean) => buildTurnStartParams({
                     threadId: this.currentThreadId!,
                     message: message.message,
                     cwd: session.path,
                     mode,
-                    cliOverrides: session.codexCliOverrides
+                    cliOverrides: session.codexCliOverrides,
+                    overrides: suppressCollaborationMode
+                        ? { suppressCollaborationMode: true }
+                        : undefined
                 });
                 if (
                     mode.collaborationMode === 'plan'
-                    && !supportsTurnCollaborationMode
+                    && (!supportsTurnCollaborationMode || !supportsPlanCollaborationMode)
                 ) {
                     session.sendSessionEvent({
                         type: 'message',
