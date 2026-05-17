@@ -680,6 +680,7 @@ describe('AcpMessageHandler', () => {
         expect((messages[0] as { text: string }).text).toMatch(/^Claude AI usage limit warning\|/);
     });
 
+<<<<<<< HEAD
     it('drops a metadata envelope split across delta chunks', () => {
         // In delta mode every chunk is a fragment, so no individual chunk ever
         // parses as JSON and the per-chunk filter never fires. Only the flush
@@ -799,6 +800,7 @@ describe('AcpMessageHandler', () => {
             content: { type: 'text', text: 'mid-stream thought' }
         });
 
+<<<<<<< HEAD
         // Nothing emitted yet — both buffers hold their content
         expect(messages).toHaveLength(0);
 
@@ -809,6 +811,18 @@ describe('AcpMessageHandler', () => {
         expect(messages).toHaveLength(2);
         expect(messages[0]).toEqual({ type: 'reasoning', text: 'mid-stream thought' });
         expect(messages[1]).toEqual({ type: 'text', text: 'partial answer' });
+=======
+        // The thought chunk must not flush the live text buffer — otherwise
+        // a single text segment would split across two messages.
+        handler.flushReasoning();
+        handler.flushText();
+
+        expect(messages).toHaveLength(2);
+        // Reasoning was buffered separately and is now delivered as a single
+        // coalesced message. The text buffer survived the thought.
+        expect(messages).toContainEqual({ type: 'reasoning', text: 'mid-stream thought' });
+        expect(messages).toContainEqual({ type: 'text', text: 'partial answer' });
+>>>>>>> c5e80e9a (fix: restore opencode hook plugin channel and coalesce ACP reasoning chunks across all consumers (#631))
     });
 
     it('buffers thought chunks with non-assistant audience annotation', () => {
@@ -823,6 +837,7 @@ describe('AcpMessageHandler', () => {
                 annotations: { audience: ['user'] }
             }
         });
+        handler.flushReasoning();
 
         expect(messages).toHaveLength(0);
 
@@ -837,21 +852,149 @@ describe('AcpMessageHandler', () => {
 
         handler.handleUpdate({
             sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
-            content: { type: 'text', text: 'first thought' }
+            content: { type: 'text', text: 'first thought ' }
         });
         handler.handleUpdate({
             sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
-            content: { type: 'text', text: 'second thought' }
+            content: { type: 'text', text: 'second thought ' }
         });
         handler.handleUpdate({
             sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
             content: { type: 'text', text: 'third thought' }
         });
+        handler.flushReasoning();
+
+        // OpenCode/Zen streams thoughts at one chunk per token; emitting
+        // each chunk as its own reasoning message made the web reducer
+        // render one row per token. The handler now coalesces a thought
+        // segment into a single reasoning message.
+        expect(messages).toEqual([
+            { type: 'reasoning', text: 'first thought second thought third thought' }
+        ]);
+    });
+
+    it('emits buffered reasoning before a tool_call boundary', () => {
+        const messages: AgentMessage[] = [];
+        const handler = new AcpMessageHandler((message) => messages.push(message));
+
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+            content: { type: 'text', text: 'I should call the tool. ' }
+        });
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+            content: { type: 'text', text: 'Calling now.' }
+        });
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.toolCall,
+            toolCallId: 'tc-1',
+            title: 'do_thing',
+            kind: 'execute',
+            rawInput: { foo: 1 },
+            status: 'in_progress'
+        });
+
+        // Reasoning is coalesced and emitted before the tool call so the
+        // arrival order between thought and tool lifecycle is preserved.
+        expect(messages[0]).toEqual({
+            type: 'reasoning',
+            text: 'I should call the tool. Calling now.'
+        });
+        expect(messages[1]).toMatchObject({ type: 'tool_call', id: 'tc-1' });
+    });
+
+    // Locks the flush-before-every-non-thought-boundary contract introduced
+    // in this fix: a future refactor that forgets to call flushReasoning() in
+    // one branch of handleUpdate would otherwise silently regress reasoning
+    // ordering for that update type.
+    it.each([
+        [
+            'agentMessageChunk',
+            {
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentMessageChunk,
+                content: { type: 'text', text: 'visible answer' }
+            }
+        ],
+        [
+            'toolCall',
+            {
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.toolCall,
+                toolCallId: 'tc-x',
+                title: 'do_thing',
+                kind: 'execute',
+                rawInput: {},
+                status: 'in_progress'
+            }
+        ],
+        [
+            'plan',
+            {
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.plan,
+                entries: [{ content: 'Step 1', priority: 'high', status: 'pending' }]
+            }
+        ]
+    ])('flushes buffered reasoning before %s', (_label, boundaryUpdate) => {
+        const messages: AgentMessage[] = [];
+        const handler = new AcpMessageHandler((message) => messages.push(message));
+
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+            content: { type: 'text', text: 'thinking first' }
+        });
+        handler.handleUpdate(boundaryUpdate);
+        handler.drainBuffers();
+
+        // Reasoning must arrive at index 0, before anything the boundary
+        // update produced.
+        expect(messages[0]).toEqual({ type: 'reasoning', text: 'thinking first' });
+        expect(messages.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('drops whitespace-only buffered reasoning rather than emitting an empty bubble', () => {
+        const messages: AgentMessage[] = [];
+        const handler = new AcpMessageHandler((message) => messages.push(message));
+
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+            content: { type: 'text', text: '   ' }
+        });
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+            content: { type: 'text', text: '\n\n' }
+        });
+        handler.drainBuffers();
+
+        // A whitespace-only reasoning bubble in the web UI is visible only as
+        // empty space — drop it instead.
+        expect(messages.filter((m) => m.type === 'reasoning')).toEqual([]);
+    });
+
+    it('drainBuffers emits reasoning before any pending text', () => {
+        const messages: AgentMessage[] = [];
+        const handler = new AcpMessageHandler((message) => messages.push(message));
+
+        // Build up text and reasoning together — text first, then thought
+        // interleaved (per the existing intra-segment contract).
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentMessageChunk,
+            content: { type: 'text', text: 'visible' }
+        });
+        handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+            content: { type: 'text', text: 'silent' }
+        });
+
+        handler.drainBuffers();
 
         handler.flushReasoning();
 
         expect(messages).toEqual([
+<<<<<<< HEAD
             { type: 'reasoning', text: 'first thoughtsecond thoughtthird thought' }
+=======
+            { type: 'reasoning', text: 'silent' },
+            { type: 'text', text: 'visible' }
+>>>>>>> c5e80e9a (fix: restore opencode hook plugin channel and coalesce ACP reasoning chunks across all consumers (#631))
         ]);
     });
 

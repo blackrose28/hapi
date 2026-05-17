@@ -410,8 +410,12 @@ export class AcpSdkBackend implements AgentBackend {
             AcpSdkBackend.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS,
             AcpSdkBackend.PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS
         );
-        this.messageHandler?.flushReasoning();
-        this.messageHandler?.flushText();
+        this.messageHandler?.drainBuffers();
+        this.messageHandler = null;
+        await this.waitForSessionUpdateQuiet(
+            AcpSdkBackend.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS,
+            AcpSdkBackend.PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS
+        );
         this.messageHandler = new AcpMessageHandler(onUpdate);
         this.isProcessingMessage = true;
         this.lastSessionUpdateAt = Date.now();
@@ -437,8 +441,7 @@ export class AcpSdkBackend implements AgentBackend {
                 AcpSdkBackend.UPDATE_QUIET_PERIOD_MS,
                 AcpSdkBackend.UPDATE_DRAIN_TIMEOUT_MS
             );
-            this.messageHandler?.flushReasoning();
-            this.messageHandler?.flushText();
+            this.messageHandler?.drainBuffers();
             // Block here until the model truly stops streaming straggler
             // chunks (or LATE_FLUSH_WINDOW_MS elapses), so turn_complete only
             // fires once every chunk has been emitted to this turn's onUpdate.
@@ -564,8 +567,7 @@ export class AcpSdkBackend implements AgentBackend {
             clearTimeout(timer);
         }
         this.sessionInfoRefreshTimers.clear();
-        this.messageHandler?.flushReasoning();
-        this.messageHandler?.flushText();
+        this.messageHandler?.drainBuffers();
         this.messageHandler = null;
         this.activeSessionId = null;
         this.isProcessingMessage = false;
