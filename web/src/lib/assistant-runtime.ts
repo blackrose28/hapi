@@ -16,6 +16,7 @@ export type HappyChatMessageMetadata = {
     kind: 'user' | 'assistant' | 'tool' | 'event' | 'cli-output' | 'team-mention'
     status?: HappyMessageStatus
     localId?: string | null
+    invokedAt?: number | null
     originalText?: string
     toolCallId?: string
     event?: AgentEvent
@@ -70,6 +71,28 @@ export function toThreadMessageLike(block: ChatBlock): ThreadMessageLike {
             content: [{ type: 'text', text: block.text }],
             metadata: {
                 custom: { kind: 'assistant' } satisfies HappyChatMessageMetadata
+            }
+        }
+    }
+
+    if (block.kind === 'generated-image') {
+        return {
+            role: 'assistant',
+            id: `generated-image:${block.id}`,
+            createdAt: new Date(block.createdAt),
+            content: [{
+                type: 'tool-call',
+                toolCallId: block.id,
+                toolName: 'GeneratedImage',
+                argsText: '',
+                artifact: block
+            }],
+            metadata: {
+                custom: {
+                    kind: 'tool',
+                    toolCallId: block.id,
+                    invokedAt: block.invokedAt ?? null
+                } satisfies HappyChatMessageMetadata
             }
         }
     }

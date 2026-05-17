@@ -5,6 +5,7 @@ import { createHash } from 'crypto'
 import { resolve } from 'path'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { validatePath } from '../pathSecurity'
+import { getGeneratedImage } from '../generatedImages'
 import { getErrorMessage, rpcError } from '../rpcResponses'
 
 interface ReadFileRequest {
@@ -14,6 +15,18 @@ interface ReadFileRequest {
 interface ReadFileResponse {
     success: boolean
     content?: string
+    error?: string
+}
+
+interface ReadGeneratedImageRequest {
+    id: string
+}
+
+interface ReadGeneratedImageResponse {
+    success: boolean
+    content?: string
+    mimeType?: string
+    fileName?: string
     error?: string
 }
 
@@ -46,6 +59,28 @@ export function registerFileHandlers(rpcHandlerManager: RpcHandlerManager, worki
         } catch (error) {
             logger.debug('Failed to read file:', error)
             return rpcError(getErrorMessage(error, 'Failed to read file'))
+        }
+    })
+
+    rpcHandlerManager.registerHandler<ReadGeneratedImageRequest, ReadGeneratedImageResponse>(RPC_METHODS.ReadGeneratedImage, async (data) => {
+        logger.debug('Read generated image request:', data.id)
+
+        const image = getGeneratedImage(data.id)
+        if (!image) {
+            return rpcError('Generated image not found')
+        }
+
+        try {
+            const buffer = await readFile(image.path)
+            return {
+                success: true,
+                content: buffer.toString('base64'),
+                mimeType: image.mimeType,
+                fileName: image.fileName
+            }
+        } catch (error) {
+            logger.debug('Failed to read generated image:', error)
+            return rpcError(getErrorMessage(error, 'Failed to read generated image'))
         }
     })
 

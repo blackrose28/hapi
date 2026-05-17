@@ -214,6 +214,21 @@ export function reduceTimeline(
                     continue
                 }
 
+                if (c.type === 'generated-image') {
+                    blocks.push({
+                        kind: 'generated-image',
+                        id: `${msg.id}:${idx}`,
+                        localId: msg.localId,
+                        createdAt: msg.createdAt,
+                        invokedAt: (msg as { invokedAt?: number | null }).invokedAt ?? null,
+                        imageId: c.imageId,
+                        fileName: c.fileName || 'generated-image',
+                        mimeType: c.mimeType ?? null,
+                        meta: msg.meta
+                    })
+                    continue
+                }
+
                 if (c.type === 'reasoning') {
                     const streamId = asString(c.streamId)
                     if (streamId) {

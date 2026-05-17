@@ -547,6 +547,10 @@ export class RpcGateway {
         return await this.sessionRpc(sessionId, 'readFile', { path }) as RpcReadFileResponse
     }
 
+    async readGeneratedImage(sessionId: string, imageId: string): Promise<RpcGeneratedImageResponse> {
+        return await this.sessionRpc(sessionId, 'readGeneratedImage', { id: imageId }) as RpcGeneratedImageResponse
+    }
+
     async listDirectory(sessionId: string, path: string): Promise<RpcListDirectoryResponse> {
         return await this.sessionRpc(sessionId, 'listDirectory', { path }) as RpcListDirectoryResponse
     }

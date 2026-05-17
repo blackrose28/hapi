@@ -91,6 +91,28 @@ function extractCommand(value: unknown): string | null {
     return null;
 }
 
+function extractGeneratedImagePath(item: Record<string, unknown>): string | null {
+    return asString(
+        item.savedPath
+        ?? item.saved_path
+        ?? item.path
+        ?? item.filePath
+        ?? item.file_path
+        ?? item.outputPath
+        ?? item.output_path
+    );
+}
+
+function extractGeneratedImageMimeType(item: Record<string, unknown>): string | null {
+    return asString(item.mimeType ?? item.mime_type ?? item.mediaType ?? item.media_type);
+}
+
+function extractGeneratedImageFileName(item: Record<string, unknown>, savedPath: string): string {
+    const direct = asString(item.fileName ?? item.file_name ?? item.filename ?? item.name);
+    if (direct) return direct;
+    return savedPath.split(/[\\/]/).filter(Boolean).pop() ?? 'generated-image.png';
+}
+
 function extractChanges(value: unknown): Record<string, unknown> | null {
     const record = asRecord(value);
     if (record) return record;
@@ -950,6 +972,51 @@ export class AppServerEventConverter {
                         tool,
                         result: error ? { Err: error } : item.result
                     });
+                }
+
+                return events;
+            }
+
+            if (itemType === 'imagegeneration') {
+                if (method === 'item/completed') {
+                    const savedPath = extractGeneratedImagePath(item);
+                    if (!savedPath) {
+                        logger.debug('[AppServerEventConverter] imageGeneration missing savedPath', { item });
+                        return events;
+                    }
+                    events.push(scoped({
+                        type: 'generated_image',
+                        image_id: itemId,
+                        saved_path: savedPath,
+                        file_name: extractGeneratedImageFileName(item, savedPath),
+                        ...(extractGeneratedImageMimeType(item) ? { mime_type: extractGeneratedImageMimeType(item) } : {})
+                    }));
+                }
+                return events;
+            }
+
+            if (itemType === 'collabagenttoolcall') {
+                const toolName = normalizeCollabAgentToolName(item.tool ?? item.name);
+                if (!toolName) return events;
+
+                if (method === 'item/started') {
+                    events.push(scoped({
+                        type: 'codex_tool_call_begin',
+                        call_id: itemId,
+                        name: toolName,
+                        input: buildCollabAgentInput(item, toolName)
+                    }));
+                }
+
+                if (method === 'item/completed') {
+                    const status = asString(item.status);
+                    events.push(scoped({
+                        type: 'codex_tool_call_end',
+                        call_id: itemId,
+                        name: toolName,
+                        output: buildCollabAgentOutput(item, toolName),
+                        is_error: status === 'failed' || status === 'error'
+                    }));
                 }
 
                 return events;

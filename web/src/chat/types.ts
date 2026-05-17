@@ -69,6 +69,15 @@ export type ToolResult = {
     permissions?: ToolResultPermission
 }
 
+export type GeneratedImageContent = {
+    type: 'generated-image'
+    imageId: string
+    fileName: string
+    mimeType: string | null
+    uuid: string
+    parentUUID: string | null
+}
+
 export type NormalizedAgentContent =
     | {
         type: 'text'
@@ -85,6 +94,7 @@ export type NormalizedAgentContent =
     }
     | ToolUse
     | ToolResult
+    | GeneratedImageContent
     | { type: 'summary'; summary: string }
     | { type: 'sidechain'; uuid: string; parentUUID: string | null; prompt: string }
     | {
@@ -182,6 +192,18 @@ export type CliOutputBlock = {
     meta?: unknown
 }
 
+export type GeneratedImageBlock = {
+    kind: 'generated-image'
+    id: string
+    localId: string | null
+    createdAt: number
+    invokedAt?: number | null
+    imageId: string
+    fileName: string
+    mimeType: string | null
+    meta?: unknown
+}
+
 export type AgentEventBlock = {
     kind: 'agent-event'
     id: string
@@ -213,4 +235,4 @@ export type ToolCallBlock = {
     meta?: unknown
 }
 
-export type ChatBlock = UserTextBlock | AgentTextBlock | AgentReasoningBlock | CliOutputBlock | ToolCallBlock | AgentEventBlock | TeamMentionBlock
+export type ChatBlock = UserTextBlock | AgentTextBlock | AgentReasoningBlock | CliOutputBlock | ToolCallBlock | GeneratedImageBlock | AgentEventBlock | TeamMentionBlock

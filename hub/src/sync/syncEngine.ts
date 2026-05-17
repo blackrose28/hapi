@@ -29,6 +29,7 @@ import {
     type RpcEditorFileMutationResponse,
     type RpcEditorGitStatusResponse, RpcEditorGitListBranchesResponse, RpcEditorGitStashListResponse, RpcEditorGitStashEntry, RpcEditorGitBranch,
     type RpcEditorProjectsResponse,
+    type RpcGeneratedImageResponse,
     type RpcListDirectoryResponse,
     type RpcListCodexModelsResponse,
     type RpcArchiveCodexSessionResponse,
@@ -62,6 +63,7 @@ export type {
     RpcEditorFileMutationResponse,
     RpcEditorGitStatusResponse,
     RpcEditorProjectsResponse,
+    RpcGeneratedImageResponse,
     RpcListDirectoryResponse,
     RpcListCodexModelsResponse,
     RpcListCursorModelsResponse,
@@ -1910,6 +1912,10 @@ export class SyncEngine {
 
     async readSessionFile(sessionId: string, path: string): Promise<RpcReadFileResponse> {
         return await this.rpcGateway.readSessionFile(sessionId, path)
+    }
+
+    async readGeneratedImage(sessionId: string, imageId: string): Promise<RpcGeneratedImageResponse> {
+        return await this.rpcGateway.readGeneratedImage(sessionId, imageId)
     }
 
     async listDirectory(sessionId: string, path: string): Promise<RpcListDirectoryResponse> {

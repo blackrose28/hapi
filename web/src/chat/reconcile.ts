@@ -4,6 +4,7 @@ import type {
     AgentReasoningBlock,
     AgentTextBlock,
     ChatBlock,
+    GeneratedImageBlock,
     CliOutputBlock,
     TeamMentionBlock,
     ToolCallBlock,
@@ -147,6 +148,15 @@ function areTeamMentionBlocksEqual(left: TeamMentionBlock, right: TeamMentionBlo
         && left.meta === right.meta
 }
 
+function areGeneratedImageBlocksEqual(left: GeneratedImageBlock, right: GeneratedImageBlock): boolean {
+    return left.localId === right.localId
+        && left.createdAt === right.createdAt
+        && left.imageId === right.imageId
+        && left.fileName === right.fileName
+        && left.mimeType === right.mimeType
+        && left.meta === right.meta
+}
+
 function areAgentEventBlocksEqual(left: AgentEventBlock, right: AgentEventBlock): boolean {
     return left.createdAt === right.createdAt
         && left.meta === right.meta
@@ -228,6 +238,11 @@ function reconcileBlock(block: ChatBlock, prevById: ChatBlocksById): ChatBlock {
     if (block.kind === 'agent-reasoning') {
         const prevBlock = prev as AgentReasoningBlock
         return areAgentReasoningBlocksEqual(prevBlock, block) ? prevBlock : block
+    }
+
+    if (block.kind === 'generated-image') {
+        const prevBlock = prev as GeneratedImageBlock
+        return areGeneratedImageBlocksEqual(prevBlock, block) ? prevBlock : block
     }
 
     const prevBlock = prev as AgentEventBlock

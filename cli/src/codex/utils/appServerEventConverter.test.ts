@@ -807,11 +807,13 @@ describe('AppServerEventConverter', () => {
         });
 
         expect(events).toEqual([{
-            type: 'image_generation_completed',
-            id: 'image-1',
+            type: 'generated_image',
+            image_id: 'image-1',
             saved_path: '/tmp/image.png',
+            file_name: 'image.png',
             mime_type: 'image/png'
         }]);
+        expect(JSON.stringify(events)).not.toContain(largeImageResult);
     });
 
     it('maps thread goal cleared notifications', () => {
