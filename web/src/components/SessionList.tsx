@@ -19,6 +19,7 @@ import { formatScheduledTooltipDetail } from '@/lib/scheduledTime'
 import { getCodexImportedAt, subscribeCodexImportedSessions } from '@/lib/codexImportedSessions'
 import { formatReopenError } from '@/lib/reopenError'
 import type { Machine } from '@/types/api'
+import { DEFAULT_SESSION_PREVIEW_LIMIT, useSessionPreviewLimit } from '@/hooks/useSessionPreviewLimit'
 
 type SessionGroup = {
     key: string
@@ -131,6 +132,7 @@ function getGroupDisplayName(directory: string): string {
 }
 
 export const UNKNOWN_MACHINE_ID = '__unknown__'
+<<<<<<< HEAD
 export const GROUP_SESSION_PREVIEW_LIMIT = 5
 
 export function getSessionTitle(session: SessionSummary): string {
@@ -144,6 +146,9 @@ export function getSessionDedupKey(session: SessionSummary): string | null {
     // stale cross-flavor value (codexSessionId ?? claudeSessionId ?? ...).
     return `${session.metadata?.flavor ?? 'unknown'}:${agentId}`
 }
+=======
+export const GROUP_SESSION_PREVIEW_LIMIT = DEFAULT_SESSION_PREVIEW_LIMIT
+>>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
 
 export function deduplicateSessionsByAgentId(sessions: SessionSummary[], selectedSessionId?: string | null): SessionSummary[] {
     const byAgentId = new Map<string, SessionSummary[]>()
@@ -1047,7 +1052,7 @@ export function SessionList(props: {
 }) {
     const { t } = useTranslation()
     const { renderHeader = true, api, selectedSessionId, machineLabelsById = {}, machinesById = {}, onNewSessionInDirectory } = props
-    const sessionPreviewLimit = 5
+    const { sessionPreviewLimit } = useSessionPreviewLimit()
     const showDetailedStatus = true
     const showActiveSessionsOnly = false
     const machineFilter = null
@@ -1148,6 +1153,7 @@ export function SessionList(props: {
         })
     }
 
+<<<<<<< HEAD
     // Per-group reveal cap for paginated "Show N more". Absent = collapsed to the
     // preview limit; each "Show more" bumps it by one batch (step = preview limit).
     const [sessionVisibleCounts, setSessionVisibleCounts] = useState<Map<string, number>>(
@@ -1156,6 +1162,14 @@ export function SessionList(props: {
 
     const getGroupVisibleCount = (group: SessionGroup): number => {
         return sessionVisibleCounts.get(group.key) ?? sessionPreviewLimit
+=======
+    const isSessionGroupExpanded = (group: SessionGroup): boolean => {
+        if (isSearching || group.sessions.length <= sessionPreviewLimit) return true
+        const key = `sessions::${group.key}`
+        const override = collapseOverrides.get(key)
+        if (override !== undefined) return !override
+        return false
+>>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
     }
 
     const showMoreSessions = (group: SessionGroup) => {
@@ -1180,8 +1194,14 @@ export function SessionList(props: {
         return getVisibleSessionPreview(
             group.sessions,
             {
+<<<<<<< HEAD
                 selectedSessionId,
                 limit: getGroupVisibleCount(group)
+=======
+                expanded: isSessionGroupExpanded(group),
+                selectedSessionId,
+                limit: sessionPreviewLimit
+>>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
             }
         )
     }
@@ -1342,6 +1362,7 @@ export function SessionList(props: {
                             {/* Sessions */}
                             <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
                                 <div className="collapsible-inner">
+<<<<<<< HEAD
                                 <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
                                     {visibleGroupSessions.map((s) => (
                                         <SessionItem
@@ -1370,6 +1391,83 @@ export function SessionList(props: {
                                                 : t('sessions.group.showLess')}
                                         </button>
                                     ) : null}
+=======
+                                <div className="flex flex-col ml-3.5 pl-1 mt-0.5">
+                                    {mg.projectGroups.map((group) => {
+                                        const isCollapsed = isGroupCollapsed(group)
+                                        const visibleGroupSessions = getVisibleGroupSessions(group)
+                                        const hiddenSessionCount = group.sessions.length - visibleGroupSessions.length
+                                        const sessionGroupExpanded = isSessionGroupExpanded(group)
+                                        const canStartInGroupDirectory = group.directory !== 'Other'
+                                        return (
+                                            <div key={group.key}>
+                                                <div
+                                                    className="group/project sticky top-0 z-10 flex items-center gap-2 px-1 py-1.5 text-left rounded-lg transition-colors hover:bg-[var(--app-subtle-bg)] cursor-pointer min-w-0 w-full select-none"
+                                                    onClick={() => toggleGroup(group.key, isCollapsed)}
+                                                    title={group.directory}
+                                                >
+                                                    <ChevronIcon className="h-3.5 w-3.5 text-[var(--app-hint)] shrink-0" collapsed={isCollapsed} />
+                                                    <span className="font-medium text-sm truncate flex-1">
+                                                        {group.displayName}
+                                                    </span>
+                                                    <CopyPathButton path={group.directory} className="opacity-0 group-hover/project:opacity-100 transition-opacity duration-150" />
+                                                    {onNewSessionInDirectory && canStartInGroupDirectory ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                onNewSessionInDirectory({
+                                                                    machineId: group.machineId,
+                                                                    directory: group.directory
+                                                                })
+                                                            }}
+                                                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--app-hint)] opacity-70 transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-link)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                                                            title={t('sessions.group.new')}
+                                                            aria-label={t('sessions.group.new')}
+                                                        >
+                                                            <PlusIcon className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    ) : null}
+                                                    <span className="text-[11px] tabular-nums text-[var(--app-hint)] shrink-0">
+                                                        ({group.sessions.length})
+                                                    </span>
+                                                </div>
+
+                                                {/* Level 3: Sessions */}
+                                                <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
+                                                    <div className="collapsible-inner">
+                                                    <div className="flex flex-col gap-0.5 ml-3 pl-1 pr-1 py-1">
+                                                        {visibleGroupSessions.map((s) => (
+                                                            <SessionItem
+                                                                key={s.id}
+                                                                session={s}
+                                                                onSelect={props.onSelect}
+                                                                showPath={false}
+                                                                api={api}
+                                                                selected={s.id === selectedSessionId}
+                                                            />
+                                                        ))}
+                                                        {!isSearching && group.sessions.length > sessionPreviewLimit && (sessionGroupExpanded || hiddenSessionCount > 0) ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleSessionGroup(group)}
+                                                                className={cn(
+                                                                    'mx-2 my-1 rounded-md px-2 py-1 text-left text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]',
+                                                                    hiddenSessionCount > 0 && 'border border-dashed border-[var(--app-border)]'
+                                                                )}
+                                                            >
+                                                                {sessionGroupExpanded
+                                                                    ? t('sessions.group.showLess')
+                                                                    : t('sessions.group.showMore', { n: hiddenSessionCount })}
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+>>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
                                 </div>
                                 </div>
                             </div>

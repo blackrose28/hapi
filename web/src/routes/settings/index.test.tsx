@@ -32,7 +32,11 @@ vi.mock('@/hooks/useTerminalFontSize', () => ({
         { value: 9, label: '9px' },
         { value: 13, label: '13px' },
         { value: 17, label: '17px' },
-    ],
+  vi.mock('@/hooks/useSessionPreviewLimit', () => ({
+    MIN_SESSION_PREVIEW_LIMIT: 1,
+    MAX_SESSION_PREVIEW_LIMIT: 99,
+    normalizeSessionPreviewLimit: (value: number) => Number.isInteger(value) ? Math.min(99, Math.max(1, value)) : 8,
+    useSessionPreviewLimit: () => ({ sessionPreviewLimit: 8, setSessionPreviewLimit: vi.fn() }),
 }))
 
 // Mock useTheme hook
@@ -136,11 +140,58 @@ describe('SettingsPage', () => {
         const calledKeys = spyT.mock.calls.map((call) => call[0])
         expect(calledKeys).toContain('settings.display.appearance')
         expect(calledKeys).toContain('settings.display.appearance.system')
+        expect(calledKeys).toContain('settings.display.sessionPreviewLimit')
+        expect(calledKeys).toContain('settings.display.sessionPreviewLimit.decrease')
+        expect(calledKeys).toContain('settings.display.sessionPreviewLimit.increase')
     })
 
     it('renders the Terminal Font Size setting', () => {
         renderWithProviders(<SettingsPage />)
         expect(screen.getAllByText('Terminal Font Size').length).toBeGreaterThanOrEqual(1)
         expect(screen.getAllByText('13px').length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('renders the Session Preview Limit setting', () => {
+        renderWithProviders(<SettingsPage />)
+        expect(screen.getAllByText('Sessions Before Folding').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getByLabelText('Sessions Before Folding')).toHaveValue(8)
+        expect(screen.getAllByLabelText('Show fewer sessions before folding').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByLabelText('Show more sessions before folding').length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('renders the Enter Key setting', () => {
+        renderWithProviders(<SettingsPage />)
+        expect(screen.getAllByText('Enter Key').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('Send message').length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('renders the Terminal Tool Display setting', () => {
+        renderWithProviders(<SettingsPage />)
+        expect(screen.getAllByText('Terminal Tool Cards').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('Compact (command only)').length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('renders grouped tool and user message background settings', () => {
+        renderWithProviders(<SettingsPage />)
+        expect(screen.getAllByText('Grouped Tool Use Background').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('User Message Background').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('Default color').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('Soft blue').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('Soft green').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByText('Soft yellow').length).toBeGreaterThanOrEqual(1)
+        expect(screen.getAllByLabelText('Custom color').length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('uses correct i18n keys for the Enter Key setting', () => {
+        const spyT = renderWithSpyT(<SettingsPage />)
+        const calledKeys = spyT.mock.calls.map((call) => call[0])
+        expect(calledKeys).toContain('settings.chat.title')
+        expect(calledKeys).toContain('settings.chat.enterBehavior')
+        expect(calledKeys).toContain('settings.chat.enterBehavior.send')
+        expect(calledKeys).toContain('settings.chat.terminalToolDisplay')
+        expect(calledKeys).toContain('settings.chat.terminalToolDisplay.compact')
+        expect(calledKeys).toContain('settings.chat.groupedToolBackground')
+        expect(calledKeys).toContain('settings.chat.userMessageBackground')
+        expect(calledKeys).toContain('settings.chat.surfaceColor.default')
     })
 })
