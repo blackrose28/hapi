@@ -11,6 +11,8 @@ import { CLI_OUTPUT_TOOL_NAME } from '@/lib/cliOutputPart'
 import { REASONING_TOOL_NAME } from '@/lib/reasoningPart'
 import { getAssistantCopyText } from '@/components/AssistantChat/messages/assistantCopyText'
 import { getConversationMessageAnchorId } from '@/chat/outline'
+import { CodexReviewCard } from '@/components/AssistantChat/messages/CodexReviewCard'
+import type { HappyChatMessageMetadata } from '@/lib/assistant-runtime'
 
 const TOOL_COMPONENTS = {
     Fallback: HappyToolMessage,
@@ -31,6 +33,10 @@ const MESSAGE_PART_COMPONENTS = {
 export function HappyAssistantMessage() {
     const { copied, copy } = useCopyToClipboard()
     const messageId = useAssistantState(({ message }) => message.id)
+    const codexReview = useAssistantState(({ message }) => {
+        const custom = message.metadata.custom as Partial<HappyChatMessageMetadata> | undefined
+        return custom?.kind === 'codex-review' ? custom.review : undefined
+    })
     const toolOnly = useAssistantState(({ message }) => {
         if (message.role !== 'assistant') return false
         const parts = message.content
@@ -43,6 +49,35 @@ export function HappyAssistantMessage() {
     const rootClass = toolOnly
         ? 'py-1 min-w-0 max-w-full overflow-x-hidden'
         : 'px-1 min-w-0 max-w-full overflow-x-hidden'
+
+    if (codexReview) {
+        return (
+            <MessagePrimitive.Root
+                id={getConversationMessageAnchorId(messageId)}
+                className={`${rootClass} ${copyText ? 'group/msg' : ''} scroll-mt-4`}
+            >
+                <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                        <CodexReviewCard review={codexReview} />
+                    </div>
+                    {copyText ? (
+                        <div className="happy-message-actions-first-line hidden sm:flex shrink-0 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                            <button
+                                type="button"
+                                title="Copy"
+                                className="p-0.5 rounded hover:bg-[var(--app-subtle-bg)] transition-colors"
+                                onClick={() => copy(copyText)}
+                            >
+                                {copied
+                                    ? <CheckIcon className="h-3.5 w-3.5 text-green-500" />
+                                    : <CopyIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" />}
+                            </button>
+                        </div>
+                    ) : null}
+                </div>
+            </MessagePrimitive.Root>
+        )
+    }
 
     return (
         <MessagePrimitive.Root

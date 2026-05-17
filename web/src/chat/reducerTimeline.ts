@@ -1,4 +1,4 @@
-import type { AgentReasoningBlock, ChatBlock, TeamMentionBlock, ToolCallBlock, ToolPermission } from '@/chat/types'
+import type { AgentReasoningBlock, AgentTextBlock, ChatBlock, CliOutputBlock, CodexReviewBlock, TeamMentionBlock, ToolCallBlock, ToolPermission } from '@/chat/types'
 import type { TracedMessage } from '@/chat/tracer'
 import { createCliOutputBlock, isCliOutputText, mergeCliOutputBlocks } from '@/chat/reducerCliOutput'
 import { parseMessageAsEvent } from '@/chat/reducerEvents'
@@ -82,6 +82,7 @@ export function reduceTimeline(
             if (msg.content.type === 'token-count' || msg.content.type === 'codex-goal') {
                 continue
             }
+
             blocks.push({
                 kind: 'agent-event',
                 id: msg.id,
@@ -252,6 +253,21 @@ export function reduceTimeline(
                     if (streamId) {
                         reasoningBlocksByStreamId.set(streamId, block)
                     }
+                    continue
+                }
+
+                if (c.type === 'codex-review') {
+                    blocks.push({
+                        kind: 'codex-review',
+                        id: `${msg.id}:${idx}`,
+                        localId: msg.localId,
+                        createdAt: msg.createdAt,
+                        invokedAt: (msg as { invokedAt?: number | null }).invokedAt ?? null,
+                        usage: msg.usage,
+                        model: (msg as { model?: string | null }).model ?? null,
+                        review: c.review,
+                        meta: msg.meta
+                    })
                     continue
                 }
 

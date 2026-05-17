@@ -168,6 +168,12 @@ export default {
   'dialog.reopen.errorTitle': 'Không thể mở lại phiên',
   'dialog.reopen.dismiss': 'Đóng',
 
+  // Codex review
+  'codexReview.title': 'Đánh giá từ Codex',
+  'codexReview.findings': '{count} phát hiện',
+  'codexReview.confidence': 'Độ tin cậy {value}',
+  'codexReview.location.missing': 'Không có vị trí',
+
   'dialog.delete.title': 'Xoá phiên',
   'dialog.delete.description': 'Bạn có chắc muốn xoá "{name}"? Thao tác này không thể hoàn tác.',
   'dialog.delete.confirm': 'Xoá',

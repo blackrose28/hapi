@@ -279,6 +279,12 @@ export default {
   'chat.terminal': '终端',
   'chat.switchRemote': '切换到远程模式',
 
+  // Codex review
+  'codexReview.title': 'Codex review',
+  'codexReview.findings': '{count} 条发现',
+  'codexReview.confidence': '置信度 {value}',
+  'codexReview.location.missing': '无位置',
+
   // Terminal
   'terminal.commandName': '命令',
   'terminal.commandMessage': '命令消息',

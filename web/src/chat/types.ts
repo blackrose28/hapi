@@ -78,6 +78,23 @@ export type GeneratedImageContent = {
     parentUUID: string | null
 }
 
+export type CodexReviewFinding = {
+    title: string
+    body: string
+    priority: number | null
+    confidenceScore: number | null
+    filePath: string | null
+    lineStart: number | null
+    lineEnd: number | null
+}
+
+export type CodexReview = {
+    findings: CodexReviewFinding[]
+    overallCorrectness: string | null
+    overallExplanation: string | null
+    overallConfidenceScore: number | null
+}
+
 export type NormalizedAgentContent =
     | {
         type: 'text'
@@ -95,6 +112,12 @@ export type NormalizedAgentContent =
     | ToolUse
     | ToolResult
     | GeneratedImageContent
+    | {
+        type: 'codex-review'
+        review: CodexReview
+        uuid: string
+        parentUUID: string | null
+    }
     | { type: 'summary'; summary: string }
     | { type: 'sidechain'; uuid: string; parentUUID: string | null; prompt: string }
     | {
@@ -182,6 +205,19 @@ export type AgentReasoningBlock = {
     meta?: unknown
 }
 
+export type CodexReviewBlock = {
+    kind: 'codex-review'
+    id: string
+    localId: string | null
+    createdAt: number
+    invokedAt?: number | null
+    durationMs?: number
+    usage?: UsageData
+    model?: string | null
+    review: CodexReview
+    meta?: unknown
+}
+
 export type CliOutputBlock = {
     kind: 'cli-output'
     id: string
@@ -235,4 +271,4 @@ export type ToolCallBlock = {
     meta?: unknown
 }
 
-export type ChatBlock = UserTextBlock | AgentTextBlock | AgentReasoningBlock | CliOutputBlock | ToolCallBlock | GeneratedImageBlock | AgentEventBlock | TeamMentionBlock
+export type ChatBlock = UserTextBlock | AgentTextBlock | AgentReasoningBlock | CodexReviewBlock | CliOutputBlock | ToolCallBlock | GeneratedImageBlock | AgentEventBlock | TeamMentionBlock

@@ -6,14 +6,14 @@ import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePic
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { safeStringify } from '@hapi/protocol'
 import { renderEventLabel } from '@/chat/presentation'
-import type { ChatBlock, CliOutputBlock } from '@/chat/types'
+import type { ChatBlock, CliOutputBlock, CodexReview, UsageData } from '@/chat/types'
 import type { AgentEvent, TeamMentionBlock, ToolCallBlock } from '@/chat/types'
 import { CLI_OUTPUT_TOOL_NAME } from '@/lib/cliOutputPart'
 import { REASONING_TOOL_NAME, reasoningToolCallId } from '@/lib/reasoningPart'
 import type { AttachmentMetadata, MessageStatus as HappyMessageStatus, Session } from '@/types/api'
 
 export type HappyChatMessageMetadata = {
-    kind: 'user' | 'assistant' | 'tool' | 'event' | 'cli-output' | 'team-mention'
+    kind: 'user' | 'assistant' | 'tool' | 'event' | 'cli-output' | 'team-mention' | 'codex-review'
     status?: HappyMessageStatus
     localId?: string | null
     invokedAt?: number | null
@@ -23,6 +23,32 @@ export type HappyChatMessageMetadata = {
     source?: CliOutputBlock['source']
     attachments?: AttachmentMetadata[]
     teamMention?: TeamMentionBlock
+    durationMs?: number
+    usage?: UsageData
+    model?: string | null
+    review?: CodexReview
+}
+
+function formatCodexReviewText(review: CodexReview): string {
+    const lines = ['Codex review']
+    if (review.overallCorrectness) {
+        lines.push(`Overall: ${review.overallCorrectness}`)
+    }
+    if (review.overallExplanation) {
+        lines.push('', review.overallExplanation)
+    }
+    if (review.findings.length > 0) {
+        lines.push('', 'Findings:')
+        for (const finding of review.findings) {
+            const priority = finding.priority === null ? '' : `[P${finding.priority}] `
+            const location = finding.filePath
+                ? ` (${finding.filePath}${finding.lineStart === null ? '' : `:${finding.lineStart}${finding.lineEnd !== null && finding.lineEnd !== finding.lineStart ? `-${finding.lineEnd}` : ''}`})`
+                : ''
+            lines.push(`- ${priority}${finding.title}${location}`)
+            lines.push(`  ${finding.body}`)
+        }
+    }
+    return lines.join('\n')
 }
 
 export function toThreadMessageLike(block: ChatBlock): ThreadMessageLike {
@@ -113,6 +139,26 @@ export function toThreadMessageLike(block: ChatBlock): ThreadMessageLike {
             }],
             metadata: {
                 custom: { kind: 'assistant' } satisfies HappyChatMessageMetadata
+            }
+        }
+    }
+
+    if (block.kind === 'codex-review') {
+        const messageId = `review:${block.id}`
+        return {
+            role: 'assistant',
+            id: messageId,
+            createdAt: new Date(block.createdAt),
+            content: [{ type: 'text', text: formatCodexReviewText(block.review) }],
+            metadata: {
+                custom: {
+                    kind: 'codex-review',
+                    invokedAt: block.invokedAt,
+                    durationMs: block.durationMs,
+                    usage: block.usage,
+                    model: block.model,
+                    review: block.review
+                } satisfies HappyChatMessageMetadata
             }
         }
     }

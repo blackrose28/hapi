@@ -446,6 +446,102 @@ describe('normalizeDecryptedMessage', () => {
         })
     })
 
+    it('normalizes Codex review JSON messages as structured review content', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'codex',
+                data: {
+                    type: 'message',
+                    message: JSON.stringify({
+                        findings: [{
+                            title: '[P2] Remove retained sessions when sockets disconnect',
+                            body: 'Retained sockets survive disconnects.',
+                            confidence_score: 0.82,
+                            priority: 2,
+                            code_location: {
+                                absolute_file_path: '/data/dz/wapair-ts/src/pairing/manager.ts',
+                                line_range: { start: 1614, end: 1619 }
+                            }
+                        }],
+                        overall_correctness: 'patch is incorrect',
+                        overall_explanation: 'The message-sending feature retains long-lived sockets but does not fully manage their lifecycle.',
+                        overall_confidence_score: 0.8
+                    })
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            content: [{
+                type: 'codex-review',
+                review: {
+                    overallCorrectness: 'patch is incorrect',
+                    overallExplanation: 'The message-sending feature retains long-lived sockets but does not fully manage their lifecycle.',
+                    overallConfidenceScore: 0.8,
+                    findings: [{
+                        title: '[P2] Remove retained sessions when sockets disconnect',
+                        body: 'Retained sockets survive disconnects.',
+                        priority: 2,
+                        confidenceScore: 0.82,
+                        filePath: '/data/dz/wapair-ts/src/pairing/manager.ts',
+                        lineStart: 1614,
+                        lineEnd: 1619
+                    }]
+                }
+            }]
+        })
+    })
+
+    it('keeps non-review Codex JSON messages as text', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'codex',
+                data: {
+                    type: 'message',
+                    message: JSON.stringify({ status: 'ok', message: 'plain JSON' })
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            content: [{
+                type: 'text',
+                text: '{"status":"ok","message":"plain JSON"}'
+            }]
+        })
+    })
+
+    it('keeps malformed Codex review-looking messages as text', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'codex',
+                data: {
+                    type: 'message',
+                    message: '{"findings": ['
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            content: [{
+                type: 'text',
+                text: '{"findings": ['
+            }]
+        })
+    })
+
     it('normalizes Codex plan updates as completed update_plan snapshots', () => {
         const message = makeMessage({
             role: 'agent',

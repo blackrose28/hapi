@@ -80,6 +80,10 @@ function formatAgentContentBlock(block: NormalizedAgentContent): string | null {
             return null
         case 'generated-image':
             return `![${block.fileName ?? 'image'}](image://${block.imageId})`
+        case 'codex-review': {
+            const summary = block.review.overallExplanation ?? `${block.review.findings.length} findings`
+            return `> Codex review: ${summary}`
+        }
         default: {
             const _exhaustive: never = block
             return safeStringify(_exhaustive)
