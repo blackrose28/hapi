@@ -85,6 +85,7 @@ export type SocketServerDeps = {
     onSessionActivity?: (sessionId: string, updatedAt: number) => void
     onSessionCrashed?: (sessionId: string, error?: string) => void
     onAgentTextMessage?: (input: { namespace: string; sessionId: string; text: string; requestId?: string | null }) => void
+    onSweepImmediateQueued?: (sessionId: string, now: number) => void
 }
 
 export function createSocketServer(deps: SocketServerDeps): {
@@ -171,6 +172,7 @@ export function createSocketServer(deps: SocketServerDeps): {
         onSessionActivity: deps.onSessionActivity,
         onSessionCrashed: deps.onSessionCrashed,
         onAgentTextMessage: deps.onAgentTextMessage,
+        onSweepImmediateQueued: deps.onSweepImmediateQueued,
         resolveCapability: deps.resolveCapability
     }))
 

@@ -58,6 +58,7 @@ export type CliHandlersDeps = {
     onSessionActivity?: (sessionId: string, updatedAt: number) => void
     onSessionCrashed?: (sessionId: string, error?: string) => void
     onAgentTextMessage?: (input: { namespace: string; sessionId: string; text: string; requestId?: string | null }) => void
+    onSweepImmediateQueued?: (sessionId: string, now: number) => void
     resolveCapability: ResourceCapabilityResolver
 }
 
@@ -94,7 +95,7 @@ export function broadcastLostTerminalLists(
 }
 
 export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlersDeps): void {
-    const { io, store, rpcRegistry, terminalRegistry, terminalHistoryRequests, terminalSessionState, onSessionAlive, onSessionReady, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, resolveCapability } = deps
+    const { io, store, rpcRegistry, terminalRegistry, terminalHistoryRequests, terminalSessionState, onSessionAlive, onSessionReady, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, onSweepImmediateQueued, resolveCapability } = deps
     const terminalNamespace = io.of('/terminal')
     const namespace = typeof socket.data.namespace === 'string' ? socket.data.namespace : null
 
@@ -181,7 +182,15 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
         onBackgroundTaskDelta,
         onSessionActivity,
         onSessionCrashed,
-        onAgentTextMessage
+        onAgentTextMessage,
+        onSweepImmediateQueued
+    })
+    registerMachineHandlers(socket, {
+        store,
+        resolveMachineAccess,
+        emitAccessError,
+        onMachineAlive,
+        onWebappEvent
     })
     registerTerminalHandlers(socket, {
         terminalRegistry,

@@ -137,11 +137,14 @@ export class Store {
             6: () => this.migrateFromV6ToV7(),
             7: () => this.migrateFromV7ToV8(),
             8: () => this.migrateFromV8ToV9(),
+<<<<<<< HEAD
             9: () => this.migrateFromV9ToV10(),
             10: () => this.migrateFromV10ToV11(),
             11: () => this.migrateFromV11ToV12(),
             12: () => this.migrateFromV12ToV13(),
             13: () => this.migrateFromV13ToV14(),
+=======
+>>>>>>> b2a30c2e (feat(hub,web): support scheduling messages for future delivery (#590))
         })
 
         if (currentVersion === 0) {
@@ -238,12 +241,16 @@ export class Store {
                 seq INTEGER NOT NULL,
                 local_id TEXT,
                 invoked_at INTEGER,
+                scheduled_at INTEGER,
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, seq);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_local_id ON messages(session_id, local_id) WHERE local_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_messages_session_position
                 ON messages(session_id, COALESCE(invoked_at, created_at) DESC, seq DESC);
+            CREATE INDEX IF NOT EXISTS idx_messages_scheduled_pending
+                ON messages(scheduled_at)
+                WHERE scheduled_at IS NOT NULL AND invoked_at IS NULL;
 
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -517,13 +524,6 @@ export class Store {
         }
     }
 
-    private migrateFromV8ToV9(): void {
-        const columns = this.getSessionColumnNames()
-        if (columns.size === 0) return
-        if (!columns.has('collapse_reasoning')) {
-            this.db.exec('ALTER TABLE sessions ADD COLUMN collapse_reasoning INTEGER DEFAULT 0')
-        }
-    }
 
     private migrateFromV9ToV10(): void {
         this.createTeamChatSchema()
@@ -589,6 +589,22 @@ export class Store {
             CREATE INDEX IF NOT EXISTS idx_messages_session_position
                 ON messages(session_id, COALESCE(invoked_at, created_at) DESC, seq DESC)
         `)
+    }
+
+    private migrateFromV8ToV9(): void {
+        const sessionColumns = this.getSessionColumnNames()
+        if (sessionColumns.size > 0 && !sessionColumns.has('collapse_reasoning')) {
+            this.db.exec('ALTER TABLE sessions ADD COLUMN collapse_reasoning INTEGER DEFAULT 0')
+        }
+        const msgColumns = this.getMessageColumnNames()
+        if (msgColumns.size > 0 && !msgColumns.has('scheduled_at')) {
+            this.db.exec('ALTER TABLE messages ADD COLUMN scheduled_at INTEGER')
+            this.db.exec(`
+                CREATE INDEX IF NOT EXISTS idx_messages_scheduled_pending
+                    ON messages(scheduled_at)
+                    WHERE scheduled_at IS NOT NULL AND invoked_at IS NULL
+            `)
+        }
     }
 
     private getSessionColumnNames(): Set<string> {

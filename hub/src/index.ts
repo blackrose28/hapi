@@ -2,7 +2,6 @@ import { startHub } from './startHub'
 
 async function main() {
     const hub = await startHub()
-
     const shutdown = async () => {
         console.log('\nShutting down...')
         await hub.stop()

@@ -146,7 +146,15 @@ export function createCliRoutes(
         }
 
         const limit = parsed.data.limit ?? 200
-        const messages = engine.getMessagesAfter(resolved.sessionId, { afterSeq: parsed.data.afterSeq, limit })
+        // Future-scheduled rows are excluded from CLI backfill — see
+        // messages.ts:getDeliverableMessagesAfter for the rationale.  The
+        // mature-scan path (releaseMatureScheduledMessages) is the sole
+        // emit channel for scheduled rows.
+        const messages = engine.getDeliverableMessagesAfter(resolved.sessionId, {
+            afterSeq: parsed.data.afterSeq,
+            limit,
+            now: Date.now()
+        })
         return c.json({ messages })
     })
 

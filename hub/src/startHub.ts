@@ -227,7 +227,8 @@ export async function startHub(options?: { args?: string[] }) {
         onBackgroundTaskDelta: (sessionId, delta) => syncEngine?.handleBackgroundTaskDelta(sessionId, delta),
         onSessionActivity: (sessionId, updatedAt) => syncEngine?.recordSessionActivity(sessionId, updatedAt),
         onSessionCrashed: (sessionId, error) => syncEngine?.handleSessionCrashed(sessionId, error),
-        onAgentTextMessage: (input) => syncEngine?.autoReportSessionReply(input)
+        onAgentTextMessage: (input) => syncEngine?.autoReportSessionReply(input),
+        onSweepImmediateQueued: (sessionId, now) => syncEngine?.sweepImmediateQueuedOnSessionEnd(sessionId, now)
     })
     const runnerLifecycle = new RunnerLifecycleService(
         sharedStore,

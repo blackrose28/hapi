@@ -32,6 +32,7 @@ import { FloatingOverlay } from '@/components/ChatInput/FloatingOverlay'
 import { Autocomplete } from '@/components/ChatInput/Autocomplete'
 import { StatusBar } from '@/components/AssistantChat/StatusBar'
 import { ComposerButtons } from '@/components/AssistantChat/ComposerButtons'
+<<<<<<< HEAD
 import {
     CompactComposerActionButton,
     CompactComposerAttachmentButton,
@@ -39,6 +40,9 @@ import {
 } from '@/components/AssistantChat/CompactComposerControls'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import { SessionComposerSettingsPanel } from '@/components/AssistantChat/SessionComposerSettingsPanel'
+=======
+import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
+>>>>>>> b2a30c2e (feat(hub,web): support scheduling messages for future delivery (#590))
 import { AttachmentItem } from '@/components/AssistantChat/AttachmentItem'
 import { useTranslation } from '@/lib/use-translation'
 import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
@@ -152,6 +156,10 @@ export function HappyComposer(props: {
     onAppendTextConsumed?: () => void
     compactComposerMode?: boolean
     compactSendStatus?: SendStatus
+    // Schedule props (lifted from internal state when provided)
+    pendingSchedule?: PendingSchedule | null
+    onSchedule?: (pending: PendingSchedule) => void
+    onClearSchedule?: () => void
 }) {
     const { t } = useTranslation()
     const {
@@ -198,7 +206,10 @@ export function HappyComposer(props: {
         appendText,
         onAppendTextConsumed,
         compactComposerMode = false,
-        compactSendStatus
+        compactSendStatus,
+        pendingSchedule: pendingScheduleProp,
+        onSchedule: onScheduleProp,
+        onClearSchedule: onClearScheduleProp
     } = props
 
     // Use ?? so missing values fall back to default (destructuring defaults only handle undefined)
@@ -250,6 +261,12 @@ export function HappyComposer(props: {
         && attachmentsReady
         && !controlsDisabled
         && (!compactComposerMode || (!threadIsRunning && !compactSendLocked))
+
+    // pendingSchedule is controlled externally when onSchedule prop is provided; otherwise local state
+    const [pendingScheduleLocal, setPendingScheduleLocal] = useState<PendingSchedule | null>(null)
+    const isControlled = onScheduleProp !== undefined
+    const pendingSchedule = isControlled ? (pendingScheduleProp ?? null) : pendingScheduleLocal
+    const setPendingSchedule = isControlled ? onScheduleProp : setPendingScheduleLocal
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const prevControlledByUser = useRef(controlledByUser)
@@ -713,6 +730,16 @@ export function HappyComposer(props: {
 
         if (imageFiles.length === 0) return
 
+        // The backend rejects scheduledAt + attachments (per-CLI upload dir is
+        // torn down before a mature emit could read the files). The button-based
+        // attachment flow is disabled by ComposerButtons.hasAttachments, but the
+        // paste path bypasses that — guard here so a pasted image while a
+        // schedule is active cannot produce a submission the hub will reject.
+        if (pendingSchedule != null) {
+            e.preventDefault()
+            return
+        }
+
         e.preventDefault()
 
         try {
@@ -722,7 +749,7 @@ export function HappyComposer(props: {
         } catch (error) {
             console.error('Error adding pasted image:', error)
         }
-    }, [api])
+    }, [api, pendingSchedule])
 
     const handleSettingsToggle = useCallback(() => {
         haptic('light')
@@ -802,6 +829,7 @@ export function HappyComposer(props: {
         if (!canSend) return
         beginCompactSend()
         api.composer().send()
+<<<<<<< HEAD
     }, [api, beginCompactSend, canSend])
 
     // Pi: selected model info for UI labels and thinking level filtering
@@ -842,6 +870,14 @@ export function HappyComposer(props: {
         setShowPiModelPanel(false)
         haptic('light')
     }, [controlsDisabled, haptic])
+=======
+        // SessionChat owns clearing the schedule — it clears only after awaiting
+        // the send hook's accepted result, which covers both pre-mutation guards
+        // and async inactive-session resume failure. Clearing here unconditionally
+        // would race ahead of that check and drop the user's schedule on every
+        // rejected send path.
+    }, [api])
+>>>>>>> b2a30c2e (feat(hub,web): support scheduling messages for future delivery (#590))
 
     const overlays = useMemo(() => {
         // Pi flavor: separate floating panels for model and thinking level.
@@ -1118,6 +1154,10 @@ export function HappyComposer(props: {
                                 piThinkingDisabled={controlsDisabled || !piHasModels || !selectedPiModel || selectedPiModel.reasoning === false}
                                 piThinkingOpen={showPiThinkingPanel}
                                 onPiThinkingToggle={handlePiThinkingToggle}
+                                pendingSchedule={pendingSchedule}
+                                onSchedule={setPendingSchedule}
+                                onClearSchedule={isControlled ? onClearScheduleProp : () => setPendingScheduleLocal(null)}
+                                hasAttachments={hasAttachments}
                             />
                         </div>
                     )}

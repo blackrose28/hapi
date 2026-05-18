@@ -492,7 +492,8 @@ export class ApiClient {
         sessionId: string,
         text: string,
         localId?: string | null,
-        attachments?: AttachmentMetadata[]
+        attachments?: AttachmentMetadata[],
+        scheduledAt?: number | null
     ): Promise<{ status: 'sent'; sessionId: string } | { status: 'resuming'; sessionId: string }> {
         const headers = new Headers({
             'content-type': 'application/json'
@@ -507,7 +508,8 @@ export class ApiClient {
             body: JSON.stringify({
                 text,
                 localId: localId ?? undefined,
-                attachments: attachments ?? undefined
+                attachments: attachments ?? undefined,
+                scheduledAt: scheduledAt ?? undefined
             })
         })
 
