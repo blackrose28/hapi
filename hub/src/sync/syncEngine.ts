@@ -7,7 +7,7 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
-import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult } from '@hapi/protocol'
+import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult, type LocalResumeTarget, type ResumableSession } from '@hapi/protocol'
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant, CancelQueuedMessageResult } from '../store'
@@ -100,6 +100,14 @@ function isUpstreamApiCorruptionError(error: string): boolean {
     const hasToolUseMarker = /tool_use\.input|tool_use_id|Input should be a valid dictionary|valid dictionary/i.test(error)
     return hasInvalidRequest && hasToolUseMarker
 }
+
+export type LocalResumeTargetResult =
+    | { type: 'success'; target: LocalResumeTarget }
+    | { type: 'error'; message: string; code: 'session_not_found' | 'access_denied' | 'resume_unavailable' }
+
+export type LocalHandoffResult =
+    | { type: 'success' }
+    | { type: 'error'; message: string; code: 'session_not_found' | 'access_denied' | 'already_local' | 'handoff_failed' }
 
 export class SyncEngine {
     listScratchlistEntrys(sessionId: string): import('@hapi/protocol/schemas').ScratchlistEntry[] {
@@ -738,6 +746,7 @@ export class SyncEngine {
         )
     }
 
+<<<<<<< HEAD
     /**
      * Revive an archived session so the web UI can reach it again.
      *
@@ -760,6 +769,31 @@ export class SyncEngine {
      * needed to resume is missing.
      */
     async reopenSession(sessionId: string, namespace: string): Promise<ReopenSessionResult> {
+=======
+    private resolveFlavor(session: Session): AgentFlavor {
+        const flavor = session.metadata?.flavor
+        return flavor === 'codex' || flavor === 'gemini' || flavor === 'opencode' || flavor === 'cursor'
+            ? flavor
+            : 'claude'
+    }
+
+    private resolveAgentResumeId(session: Session, namespace: string): string | null {
+        const metadata = session.metadata
+        if (!metadata) {
+            return null
+        }
+
+        const flavor = this.resolveFlavor(session)
+        if (flavor === 'codex') return metadata.codexSessionId ?? null
+        if (flavor === 'gemini') return metadata.geminiSessionId ?? null
+        if (flavor === 'opencode') return metadata.opencodeSessionId ?? null
+        if (flavor === 'cursor') return metadata.cursorSessionId ?? null
+
+        return metadata.claudeSessionId ?? this.recoverClaudeSessionIdFromMessages(session.id, namespace)
+    }
+
+    resolveLocalResumeTarget(sessionId: string, namespace: string): LocalResumeTargetResult {
+>>>>>>> 197f3275 (feat: add hapi resume command (#647))
         const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
         if (!access.ok) {
             return {
@@ -771,6 +805,7 @@ export class SyncEngine {
 
         const session = access.session
         const metadata = session.metadata
+<<<<<<< HEAD
 
         if (session.active) {
             return { type: 'success', sessionId: access.sessionId, resumed: false }
@@ -836,6 +871,66 @@ export class SyncEngine {
         }
 
         return { type: 'success', sessionId: resumeResult.sessionId, resumed: true }
+=======
+        if (!metadata || typeof metadata.path !== 'string' || metadata.path.length === 0) {
+            return { type: 'error', message: 'Session metadata missing path', code: 'resume_unavailable' }
+        }
+
+        const agentSessionId = this.resolveAgentResumeId(session, namespace)
+        if (!agentSessionId) {
+            return { type: 'error', message: 'Resume session ID unavailable', code: 'resume_unavailable' }
+        }
+
+        return {
+            type: 'success',
+            target: {
+                sessionId: access.sessionId,
+                flavor: this.resolveFlavor(session),
+                directory: metadata.path,
+                machineId: metadata.machineId,
+                host: metadata.host,
+                active: session.active,
+                thinking: session.thinking,
+                controlledByUser: session.agentState?.controlledByUser === true,
+                agentSessionId,
+                model: session.model ?? null,
+                effort: session.effort ?? null,
+                modelReasoningEffort: session.modelReasoningEffort ?? null,
+                permissionMode: session.permissionMode,
+                collaborationMode: session.collaborationMode
+            }
+        }
+    }
+
+    listLocalResumableSessions(namespace: string, opts?: { machineId?: string }): ResumableSession[] {
+        return this.getSessionsByNamespace(namespace)
+            .map((session) => this.resolveLocalResumeTarget(session.id, namespace))
+            .filter((result): result is { type: 'success'; target: LocalResumeTarget } => result.type === 'success')
+            .map(({ target }) => {
+                const session = this.getSessionByNamespace(target.sessionId, namespace)
+                return {
+                    sessionId: target.sessionId,
+                    flavor: target.flavor,
+                    directory: target.directory,
+                    machineId: target.machineId,
+                    host: target.host,
+                    active: target.active,
+                    thinking: target.thinking,
+                    controlledByUser: target.controlledByUser,
+                    agentSessionId: target.agentSessionId,
+                    model: target.model,
+                    effort: target.effort,
+                    modelReasoningEffort: target.modelReasoningEffort,
+                    permissionMode: target.permissionMode,
+                    collaborationMode: target.collaborationMode,
+                    updatedAt: session?.updatedAt ?? 0,
+                    name: session?.metadata?.name,
+                    summary: session?.metadata?.summary?.text
+                }
+            })
+            .filter((session) => !opts?.machineId || session.machineId === opts.machineId)
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+>>>>>>> 197f3275 (feat: add hapi resume command (#647))
     }
 
     async resumeSession(sessionId: string, namespace: string, opts?: { permissionMode?: PermissionMode }): Promise<ResumeSessionResult> {
@@ -853,11 +948,12 @@ export class SyncEngine {
             return { type: 'success', sessionId: access.sessionId }
         }
 
-        const metadata = session.metadata
-        if (!metadata || typeof metadata.path !== 'string') {
-            return { type: 'error', message: 'Session metadata missing path', code: 'resume_unavailable' }
+        const targetResult = this.resolveLocalResumeTarget(access.sessionId, namespace)
+        if (targetResult.type === 'error') {
+            return targetResult
         }
 
+<<<<<<< HEAD
         const flavor = isKnownFlavor(metadata.flavor) ? metadata.flavor : 'claude'
         const resumeToken = flavor === 'codex'
             ? metadata.codexSessionId
@@ -878,6 +974,12 @@ export class SyncEngine {
         if (!resumeToken) {
             return { type: 'error', message: 'Resume session ID unavailable', code: 'resume_unavailable' }
         }
+=======
+        const target = targetResult.target
+        const metadata = session.metadata!
+        const flavor = target.flavor
+        const resumeToken = target.agentSessionId
+>>>>>>> 197f3275 (feat: add hapi resume command (#647))
 
         const onlineMachines = this.machineCache.getOnlineMachinesByNamespace(namespace)
         if (onlineMachines.length === 0) {
@@ -914,7 +1016,7 @@ export class SyncEngine {
             ?? session.metadata?.preferredPermissionMode
         const spawnResult = await this.rpcGateway.spawnSession(
             targetMachine.id,
-            metadata.path,
+            target.directory,
             flavor,
             session.model ?? undefined,
             session.modelReasoningEffort ?? undefined,
@@ -970,6 +1072,125 @@ export class SyncEngine {
         return { type: 'success', sessionId: spawnResult.sessionId }
     }
 
+<<<<<<< HEAD
+=======
+    async handoffSessionToLocal(sessionId: string, namespace: string): Promise<LocalHandoffResult> {
+        const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
+        if (!access.ok) {
+            return {
+                type: 'error',
+                message: access.reason === 'access-denied' ? 'Session access denied' : 'Session not found',
+                code: access.reason === 'access-denied' ? 'access_denied' : 'session_not_found'
+            }
+        }
+
+        if (!access.session.active) {
+            return { type: 'success' }
+        }
+
+        if (access.session.agentState?.controlledByUser === true) {
+            return {
+                type: 'error',
+                message: 'Session is already controlled by a local terminal',
+                code: 'already_local'
+            }
+        }
+
+        try {
+            await this.rpcGateway.handoffSessionToLocal(access.sessionId)
+        } catch (error) {
+            return {
+                type: 'error',
+                message: error instanceof Error ? error.message : String(error),
+                code: 'handoff_failed'
+            }
+        }
+
+        const inactive = await this.waitForSessionInactive(access.sessionId)
+        if (!inactive) {
+            return {
+                type: 'error',
+                message: 'Timed out waiting for remote session to hand off',
+                code: 'handoff_failed'
+            }
+        }
+
+        return { type: 'success' }
+    }
+
+    private recoverClaudeSessionIdFromMessages(sessionId: string, namespace: string): string | null {
+        const messages = this.messageService.getMessages(sessionId, 200)
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const found = this.extractClaudeSessionId(messages[i].content)
+            if (!found) continue
+
+            this.persistRecoveredClaudeSessionId(sessionId, namespace, found)
+            return found
+        }
+        return null
+    }
+
+    private extractClaudeSessionId(value: unknown): string | null {
+        if (!value || typeof value !== 'object') {
+            return null
+        }
+
+        const obj = value as Record<string, unknown>
+        const direct = this.normalizeClaudeSessionId(obj.session_id) ?? this.normalizeClaudeSessionId(obj.sessionId)
+        if (direct) {
+            return direct
+        }
+
+        const content = obj.content
+        if (content && typeof content === 'object') {
+            const found = this.extractClaudeSessionId(content)
+            if (found) return found
+        }
+
+        const data = obj.data
+        if (data && typeof data === 'object') {
+            const found = this.extractClaudeSessionId(data)
+            if (found) return found
+        }
+
+        return null
+    }
+
+    private normalizeClaudeSessionId(value: unknown): string | null {
+        if (typeof value !== 'string') {
+            return null
+        }
+        const trimmed = value.trim()
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)
+            ? trimmed
+            : null
+    }
+
+    private persistRecoveredClaudeSessionId(sessionId: string, namespace: string, claudeSessionId: string): void {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            const latest = this.sessionCache.getSessionByNamespace(sessionId, namespace)
+                ?? this.sessionCache.refreshSession(sessionId)
+            if (!latest?.metadata) return
+            if (latest.metadata.claudeSessionId === claudeSessionId) return
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                { ...latest.metadata, claudeSessionId },
+                latest.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'success') {
+                this.sessionCache.refreshSession(sessionId)
+                return
+            }
+            if (result.result !== 'version-mismatch') {
+                return
+            }
+        }
+    }
+
+>>>>>>> 197f3275 (feat: add hapi resume command (#647))
     private hasSameAgentSessionIds(
         prev: Session['metadata'] | null,
         next: NonNullable<Session['metadata']>
@@ -1024,6 +1245,18 @@ export class SyncEngine {
         while (Date.now() - start < timeoutMs) {
             const session = this.getSession(sessionId)
             if (session?.active) {
+                return true
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250))
+        }
+        return false
+    }
+
+    async waitForSessionInactive(sessionId: string, timeoutMs: number = 15_000): Promise<boolean> {
+        const start = Date.now()
+        while (Date.now() - start < timeoutMs) {
+            const session = this.getSession(sessionId)
+            if (!session?.active) {
                 return true
             }
             await new Promise((resolve) => setTimeout(resolve, 250))

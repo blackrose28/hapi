@@ -12,7 +12,8 @@ import { startHookServer } from '@/claude/utils/startHookServer';
 import { generateHookSettingsFile, cleanupHookSettingsFile } from '@/modules/common/hooks/generateHookSettings';
 import { registerKillSessionHandler } from './registerKillSessionHandler';
 import type { Session } from './session';
-import { bootstrapSession } from '@/agent/sessionFactory';
+import { bootstrapExistingSession, bootstrapSession } from '@/agent/sessionFactory';
+import { registerLocalHandoffHandler } from '@/agent/localHandoff';
 import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } from '@/agent/runnerLifecycle';
 import { isPermissionModeAllowedForFlavor } from '@hapi/protocol';
 import { PermissionModeSchema } from '@hapi/protocol/schemas';
@@ -30,10 +31,13 @@ export interface StartOptions {
     claudeEnvVars?: Record<string, string>
     claudeArgs?: string[]
     startedBy?: 'runner' | 'terminal'
+    existingSessionId?: string
+    workingDirectory?: string
+    resumeSessionId?: string
 }
 
 export async function runClaude(options: StartOptions = {}): Promise<void> {
-    const workingDirectory = getInvokedCwd();
+    const workingDirectory = options.workingDirectory ?? getInvokedCwd();
     const startedBy = options.startedBy ?? 'terminal';
 
     // Log environment info at startup
@@ -51,14 +55,22 @@ export async function runClaude(options: StartOptions = {}): Promise<void> {
     const initialState: AgentState = {};
     const initialModel = normalizeClaudeSessionModel(options.model);
     const initialEffort = normalizeClaudeSessionEffort(options.effort);
-    const { api, session, sessionInfo } = await bootstrapSession({
-        flavor: 'claude',
-        startedBy,
-        workingDirectory,
-        agentState: initialState,
-        model: initialModel ?? undefined,
-        effort: initialEffort ?? undefined
-    });
+    const bootstrap = options.existingSessionId
+        ? await bootstrapExistingSession({
+            sessionId: options.existingSessionId,
+            flavor: 'claude',
+            startedBy,
+            workingDirectory
+        })
+        : await bootstrapSession({
+            flavor: 'claude',
+            startedBy,
+            workingDirectory,
+            agentState: initialState,
+            model: initialModel ?? undefined,
+            effort: initialEffort ?? undefined
+        });
+    const { api, session, sessionInfo } = bootstrap;
     logger.debug(`Session created: ${sessionInfo.id}`);
 
     // Extract SDK metadata in background and update session when ready
@@ -132,6 +144,7 @@ export async function runClaude(options: StartOptions = {}): Promise<void> {
 
     lifecycle.registerProcessHandlers();
     registerKillSessionHandler(session.rpcHandlerManager, lifecycle.cleanupAndExit);
+    registerLocalHandoffHandler(session.rpcHandlerManager, lifecycle);
 
     // Set initial agent state
     const startingMode = options.startingMode ?? (startedBy === 'runner' ? 'remote' : 'local');
@@ -383,6 +396,7 @@ export async function runClaude(options: StartOptions = {}): Promise<void> {
             claudeEnvVars: options.claudeEnvVars,
             claudeArgs: options.claudeArgs,
             startedBy,
+            resumeSessionId: options.resumeSessionId,
             hookSettingsPath
         });
     } catch (error) {

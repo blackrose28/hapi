@@ -6,7 +6,8 @@ import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler'
 import type { AgentState } from '@/api/types';
 import type { KimiSession } from './session';
 import type { KimiMode, PermissionMode } from './types';
-import { bootstrapSession } from '@/agent/sessionFactory';
+import { bootstrapExistingSession, bootstrapSession } from '@/agent/sessionFactory';
+import { registerLocalHandoffHandler } from '@/agent/localHandoff';
 import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } from '@/agent/runnerLifecycle';
 import { isPermissionModeAllowedForFlavor } from '@hapi/protocol';
 import { PermissionModeSchema } from '@hapi/protocol/schemas';
@@ -20,8 +21,10 @@ export async function runKimi(opts: {
     permissionMode?: PermissionMode;
     model?: string;
     resumeSessionId?: string;
+    existingSessionId?: string;
+    workingDirectory?: string;
 } = {}): Promise<void> {
-    const workingDirectory = getInvokedCwd();
+    const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 
     logger.debug(`[kimi] Starting with options: startedBy=${startedBy}, startingMode=${opts.startingMode}`);
@@ -41,13 +44,21 @@ export async function runKimi(opts: {
         ? undefined
         : runtimeConfig.model;
 
-    const { api, session } = await bootstrapSession({
-        flavor: 'kimi',
-        startedBy,
-        workingDirectory,
-        agentState: initialState,
-        model: persistedModel
-    });
+    const bootstrap = opts.existingSessionId
+        ? await bootstrapExistingSession({
+            sessionId: opts.existingSessionId,
+            flavor: 'kimi',
+            startedBy,
+            workingDirectory
+        })
+        : await bootstrapSession({
+            flavor: 'kimi',
+            startedBy,
+            workingDirectory,
+            agentState: initialState,
+            model: persistedModel
+        });
+    const { api, session } = bootstrap;
 
     const startingMode: 'local' | 'remote' = opts.startingMode
         ?? (startedBy === 'runner' ? 'remote' : 'local');
@@ -72,6 +83,7 @@ export async function runKimi(opts: {
 
     lifecycle.registerProcessHandlers();
     registerKillSessionHandler(session.rpcHandlerManager, lifecycle.cleanupAndExit);
+    registerLocalHandoffHandler(session.rpcHandlerManager, lifecycle);
 
     const syncSessionMode = () => {
         const sessionInstance = sessionWrapperRef.current;

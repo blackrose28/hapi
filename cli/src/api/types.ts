@@ -13,7 +13,12 @@ import {
     RunnerStateSchema,
     TodosSchema
 } from '@hapi/protocol/schemas'
-import type {  CodexCollaborationMode, PermissionMode, Machine, MachineMetadata, RunnerState } from '@hapi/protocol'
+import {
+    LocalHandoffResponseSchema,
+    LocalResumeTargetResponseSchema,
+    ResumableSessionsResponseSchema
+} from '@hapi/protocol/schemas'
+import type { CodexCollaborationMode, PermissionMode, Machine, MachineMetadata, RunnerState } from '@hapi/protocol'
 import { z } from 'zod'
 import { UsageSchema } from '@/claude/types'
 
@@ -43,6 +48,15 @@ export type SessionEffort = string | null
 
 export { CliMessagesResponseSchema, CreateMachineResponseSchema, CreateSessionResponseSchema, AgentStateSchema, AttachmentMetadataSchema, MachineMetadataSchema, MetadataSchema, RunnerStateSchema }
 
+
+export const GetSessionResponseSchema = CreateSessionResponseSchema
+export type GetSessionResponse = z.infer<typeof GetSessionResponseSchema>
+
+export {
+    LocalHandoffResponseSchema,
+    LocalResumeTargetResponseSchema,
+    ResumableSessionsResponseSchema
+}
 
 export const MessageMetaSchema = z.object({
     sentFrom: z.string().optional(),

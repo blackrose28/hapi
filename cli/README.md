@@ -33,6 +33,16 @@ Run Claude Code, Codex, Cursor Agent, Grok Build, or OpenCode sessions from your
 - `hapi grok` - Start Grok Build mode. See `src/grok/runGrok.ts`.
 - `hapi opencode` - Start OpenCode mode via ACP. See `src/opencode/runOpencode.ts`.
   Note: OpenCode supports local and remote modes; local mode streams via OpenCode plugins.
+- `hapi resume [sessionId]` - List resumable sessions for this machine or resume one locally.
+
+### Resume a remote session locally
+
+```bash
+hapi resume
+hapi resume <session-id>
+```
+
+`hapi resume` lists resumable sessions for the current machine. `hapi resume <session-id>` hands off an active remote session and opens the same HAPI session in the local terminal.
 
 ### Authentication
 

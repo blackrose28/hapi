@@ -5,7 +5,8 @@ import { hashObject } from '@/utils/deterministicJson';
 import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
 import type { AgentState } from '@/api/types';
 import type { CursorSession } from './session';
-import { bootstrapSession } from '@/agent/sessionFactory';
+import { bootstrapExistingSession, bootstrapSession } from '@/agent/sessionFactory';
+import { registerLocalHandoffHandler } from '@/agent/localHandoff';
 import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } from '@/agent/runnerLifecycle';
 import { isPermissionModeAllowedForFlavor } from '@hapi/protocol';
 import { PermissionModeSchema } from '@hapi/protocol/schemas';
@@ -27,8 +28,10 @@ export async function runCursor(opts: {
     permissionMode?: PermissionMode;
     resumeSessionId?: string;
     model?: string;
+    existingSessionId?: string;
+    workingDirectory?: string;
 }): Promise<void> {
-    const workingDirectory = getInvokedCwd();
+    const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 
     logger.debug(`[cursor] Starting with options: startedBy=${startedBy}`);
@@ -36,13 +39,21 @@ export async function runCursor(opts: {
     const state: AgentState = {
         controlledByUser: false
     };
-    const { api, session } = await bootstrapSession({
-        flavor: 'cursor',
-        startedBy,
-        workingDirectory,
-        agentState: state,
-        model: opts.model
-    });
+    const bootstrap = opts.existingSessionId
+        ? await bootstrapExistingSession({
+            sessionId: opts.existingSessionId,
+            flavor: 'cursor',
+            startedBy,
+            workingDirectory
+        })
+        : await bootstrapSession({
+            flavor: 'cursor',
+            startedBy,
+            workingDirectory,
+            agentState: state,
+            model: opts.model
+        });
+    const { api, session } = bootstrap;
 
     const startingMode: 'local' | 'remote' = startedBy === 'runner' ? 'remote' : 'local';
 
@@ -68,6 +79,7 @@ export async function runCursor(opts: {
 
     lifecycle.registerProcessHandlers();
     registerKillSessionHandler(session.rpcHandlerManager, lifecycle.cleanupAndExit);
+    registerLocalHandoffHandler(session.rpcHandlerManager, lifecycle);
 
     const syncSessionMode = () => {
         const sessionInstance = sessionWrapperRef.current;
