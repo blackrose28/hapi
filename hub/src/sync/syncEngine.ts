@@ -151,6 +151,19 @@ function extractUserMessageText(content: unknown): string | undefined {
     return undefined
 }
 
+function extractClaudeUserMessageTextFromAgentOutput(content: unknown): string | undefined {
+    const record = asRecord(content)
+    if (record?.type !== 'output') return undefined
+
+    const data = asRecord(record.data)
+    if (data?.type !== 'user') return undefined
+
+    const message = asRecord(data.message)
+    if (message?.role !== 'user') return undefined
+
+    return extractUserMessageText(message.content)
+}
+
 export class SyncEngine {
     listScratchlistEntrys(sessionId: string): import('@hapi/protocol/schemas').ScratchlistEntry[] {
         return this.db.scratchlist.list(sessionId)
@@ -966,9 +979,11 @@ export class SyncEngine {
     private resolveFirstUserMessage(sessionId: string): string | undefined {
         for (const message of this.store.messages.getFirstMessages(sessionId, 50)) {
             const roleWrapped = unwrapRoleWrappedRecordEnvelope(message.content)
-            if (roleWrapped?.role !== 'user') continue
-
-            const text = extractUserMessageText(roleWrapped.content)
+            const text = roleWrapped?.role === 'user'
+                ? extractUserMessageText(roleWrapped.content)
+                : roleWrapped?.role === 'agent'
+                    ? extractClaudeUserMessageTextFromAgentOutput(roleWrapped.content)
+                    : undefined
             if (text) return text
         }
 

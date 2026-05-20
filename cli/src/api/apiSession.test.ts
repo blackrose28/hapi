@@ -525,7 +525,16 @@ describe('isExternalUserMessage', () => {
         expect(isExternalUserMessage({ ...baseUserMsg, isSidechain: true })).toBe(false)
     })
 
-    it('returns false when content is an array (tool results)', () => {
+    it('returns true when content is an array of text blocks', () => {
+        expect(
+            isExternalUserMessage({
+                ...baseUserMsg,
+                message: { role: 'user', content: [{ type: 'text', text: 'hello array' }] },
+            } as never)
+        ).toBe(true)
+    })
+
+    it('returns false when content is a non-text array (tool results)', () => {
         expect(
             isExternalUserMessage({
                 ...baseUserMsg,

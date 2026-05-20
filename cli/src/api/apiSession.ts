@@ -66,6 +66,28 @@ const markTeamMentionNoActionResponseSchema = z.object({
     request: TeamMentionRequestSchema
 })
 
+function extractRawUserTextContent(content: unknown): string | null {
+    if (typeof content === 'string') {
+        return content
+    }
+
+    if (!Array.isArray(content)) {
+        return null
+    }
+
+    const parts = content
+        .map((block) => {
+            if (!block || typeof block !== 'object' || Array.isArray(block)) return null
+            const record = block as Record<string, unknown>
+            return record.type === 'text' && typeof record.text === 'string'
+                ? record.text
+                : null
+        })
+        .filter((text): text is string => text !== null)
+
+    return parts.length > 0 ? parts.join('\n') : null
+}
+
 /**
  * Returns true if a JSONL message should be classified as a user-role message
  * (i.e., text typed by a real human) rather than an agent-role message.
@@ -76,13 +98,14 @@ const markTeamMentionNoActionResponseSchema = z.object({
  * genuine user messages, so the only reliable signal is the message content
  * itself: injected messages always start with a well-known XML tag.
  */
-export function isExternalUserMessage(body: RawJSONLines): body is Extract<RawJSONLines, { type: 'user' }> & { message: { content: string } } {
+export function isExternalUserMessage(body: RawJSONLines): body is Extract<RawJSONLines, { type: 'user' }> {
     if (body.type !== 'user') return false
-    if (typeof body.message.content !== 'string') return false
+    const text = extractRawUserTextContent(body.message.content)
+    if (text === null) return false
     if (body.isSidechain === true) return false
     if (body.isMeta === true) return false
 
-    const trimmed = body.message.content.trimStart()
+    const trimmed = text.trimStart()
     for (const prefix of SYSTEM_INJECTION_PREFIXES) {
         if (trimmed.startsWith(prefix)) return false
     }
@@ -519,7 +542,7 @@ export class ApiSessionClient extends EventEmitter {
                 role: 'user',
                 content: {
                     type: 'text',
-                    text: body.message.content
+                    text: extractRawUserTextContent(body.message.content) ?? ''
                 },
                 meta: {
                     sentFrom: 'cli'
