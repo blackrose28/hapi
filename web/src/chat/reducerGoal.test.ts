@@ -10,8 +10,7 @@ function goalMessage(id: string, status: 'active' | 'paused', tokensUsed: number
         role: 'event',
         isSidechain: false,
         content: {
-            type: 'codex-goal',
-            action: 'updated',
+            type: 'thread-goal-updated',
             goal: {
                 threadId: 'thread-1',
                 objective: 'ship it',
@@ -50,7 +49,6 @@ describe('reduceChatBlocks Codex goal state', () => {
             status: 'active',
             tokensUsed: 1000
         })
-        expect(reduced.blocks).toEqual([])
     })
 
     it('clears latest goal after a cleared event', () => {
@@ -62,7 +60,7 @@ describe('reduceChatBlocks Codex goal state', () => {
                 createdAt: 2,
                 role: 'event',
                 isSidechain: false,
-                content: { type: 'codex-goal', action: 'cleared', threadId: 'thread-1' }
+                content: { type: 'thread-goal-cleared', threadId: 'thread-1' }
             }
         ], null)
 

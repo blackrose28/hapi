@@ -1775,6 +1775,39 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         });
 
         const forwardedGoalSignaturesByThreadId = new Map<string, string>();
+        const forwardedGoalClearsByThreadId = new Set<string>();
+        const adminInterruptedTurnIds = new Set<string>();
+        const adminInterruptedTurnTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+        const suppressReadyForInterruptedTurn = (turnId: string | null) => {
+            if (!turnId) {
+                return;
+            }
+            adminInterruptedTurnIds.add(turnId);
+            const previousTimer = adminInterruptedTurnTimers.get(turnId);
+            if (previousTimer) {
+                clearTimeout(previousTimer);
+            }
+            const timer = setTimeout(() => {
+                adminInterruptedTurnIds.delete(turnId);
+                adminInterruptedTurnTimers.delete(turnId);
+            }, 30_000);
+            timer.unref?.();
+            adminInterruptedTurnTimers.set(turnId, timer);
+        };
+
+        const consumeInterruptedTurnReadySuppression = (turnId: string | null): boolean => {
+            if (!turnId || !adminInterruptedTurnIds.has(turnId)) {
+                return false;
+            }
+            adminInterruptedTurnIds.delete(turnId);
+            const timer = adminInterruptedTurnTimers.get(turnId);
+            if (timer) {
+                clearTimeout(timer);
+                adminInterruptedTurnTimers.delete(turnId);
+            }
+            return true;
+        };
 
         const shouldForwardGoalUpdate = (msg: Record<string, unknown>, threadId: string | null): boolean => {
             const goal = asRecord(msg.goal);
@@ -1791,14 +1824,22 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 return false;
             }
 
+            forwardedGoalClearsByThreadId.delete(scopedThreadId);
             forwardedGoalSignaturesByThreadId.set(scopedThreadId, signature);
             return true;
         };
 
-        const noteGoalCleared = (threadId: string | null) => {
-            if (threadId) {
-                forwardedGoalSignaturesByThreadId.delete(threadId);
+        const shouldForwardGoalClear = (threadId: string | null): boolean => {
+            if (!threadId) {
+                return true;
             }
+            if (forwardedGoalClearsByThreadId.has(threadId)) {
+                logger.debug(`[Codex] Suppressing duplicate thread goal clear; threadId=${threadId}`);
+                return false;
+            }
+            forwardedGoalClearsByThreadId.add(threadId);
+            forwardedGoalSignaturesByThreadId.delete(threadId);
+            return true;
         };
         const handleCodexEvent = (msg: Record<string, unknown>) => {
             const msgType = asString(msg.type);
@@ -1806,6 +1847,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             const eventTurnId = asString(msg.turn_id ?? msg.turnId);
             const eventThreadId = asString(msg.thread_id ?? msg.threadId);
             const isTerminalEvent = msgType === 'task_complete' || msgType === 'turn_aborted' || msgType === 'task_failed';
+            const suppressReadyForThisTerminalEvent = isTerminalEvent
+                ? consumeInterruptedTurnReadySuppression(eventTurnId)
+                : false;
 
             if (msgType === 'thread_started') {
                 const threadId = asString(msg.thread_id ?? msg.threadId);
@@ -1853,7 +1897,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             }
 
             if (msgType === 'thread_goal_cleared') {
-                noteGoalCleared(eventThreadId ?? this.currentThreadId);
+                if (!shouldForwardGoalClear(eventThreadId ?? this.currentThreadId)) {
+                    return;
+                }
                 session.sendAgentMessage({
                     ...addCodexEventScope(msg, 'parent', eventThreadId ?? this.currentThreadId),
                     id: randomUUID()
@@ -1958,9 +2004,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 wakeLoop();
             }
 
-            if (isTerminalEvent && !turnInFlight) {
+            if (isTerminalEvent && !turnInFlight && !suppressReadyForThisTerminalEvent) {
                 scheduleReadyAfterTurn?.();
-            } else if (readyAfterTurnTimer && msgType !== 'task_started') {
+            } else if (readyAfterTurnTimer && msgType !== 'task_started' && !suppressReadyForThisTerminalEvent) {
                 scheduleReadyAfterTurn?.();
             }
 
@@ -2332,6 +2378,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
 
         let hasThread = false;
         let pending: QueuedMessage | null = null;
+        let suppressReadyForAdminCommand = false;
 
         clearReadyAfterTurnTimer = () => {
             if (!readyAfterTurnTimer) {
@@ -2343,8 +2390,14 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
 
         scheduleReadyAfterTurn = () => {
             clearReadyAfterTurnTimer?.();
+            if (suppressReadyForAdminCommand) {
+                return;
+            }
             readyAfterTurnTimer = setTimeout(() => {
                 readyAfterTurnTimer = null;
+                if (suppressReadyForAdminCommand) {
+                    return;
+                }
                 emitReadyIfIdle({
                     pending: pending ?? (recoveryInFlight ? activeMessage : null),
                     queueSize: () => session.queue.size(),
@@ -2363,7 +2416,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         const sendGoalEvent = (event: Record<string, unknown>) => {
             const threadId = asString(event.thread_id ?? event.threadId) ?? this.currentThreadId;
             if (event.type === 'thread_goal_cleared') {
-                noteGoalCleared(threadId);
+                if (!shouldForwardGoalClear(threadId)) {
+                    return;
+                }
             } else if (event.type === 'thread_goal_updated' && !shouldForwardGoalUpdate(event, threadId)) {
                 return;
             }
@@ -2385,6 +2440,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         };
 
         const interruptActiveTurn = async () => {
+            suppressReadyForInterruptedTurn(this.currentTurnId);
             await this.interruptActiveTurns('slash command');
         };
 
@@ -2587,6 +2643,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     } else {
                         sendVisibleStatus('No goal to clear');
                     }
+                    sendGoalEvent({ type: 'thread_goal_cleared', thread_id: threadId });
                     return true;
                 }
 
@@ -2600,6 +2657,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 });
                 const goal = normalizeGoal(response.goal);
                 sendVisibleStatus(formatGoalUsage(goal));
+                sendGoalEvent({ type: 'thread_goal_updated', thread_id: threadId, goal });
             } catch (error) {
                 const detail = error instanceof Error ? error.message : String(error);
                 if (/goals feature is disabled|unsupported remote app-server request|method not found/i.test(detail)) {
@@ -2696,6 +2754,12 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 messageBuffer.addMessage(message.message, 'user');
             }
             activeMessage = message;
+            const isGoalCommand = parseGoalCommand(message.message) !== null;
+            let suppressReadyAfterMessage = isGoalCommand;
+            if (isGoalCommand) {
+                suppressReadyForAdminCommand = true;
+                clearReadyAfterTurnTimer?.();
+            }
 
             try {
                 if (await handleGoalCommand(message)) {
@@ -2855,12 +2919,17 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     childAgentRuntimeById.clear();
                     session.onThinkingChange(false);
                     clearReadyAfterTurnTimer?.();
-                    emitReadyIfIdle({
-                        pending: pending ?? (recoveryInFlight ? activeMessage : null),
-                        queueSize: () => session.queue.size(),
-                        shouldExit: this.shouldExit,
-                        sendReady
-                    });
+                    if (!suppressReadyAfterMessage) {
+                        emitReadyIfIdle({
+                            pending: pending ?? (recoveryInFlight ? activeMessage : null),
+                            queueSize: () => session.queue.size(),
+                            shouldExit: this.shouldExit,
+                            sendReady
+                        });
+                    }
+                }
+                if (suppressReadyAfterMessage) {
+                    suppressReadyForAdminCommand = false;
                 }
                 logActiveHandles('after-turn');
             }
