@@ -7,8 +7,14 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
+<<<<<<< HEAD
 import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult, type LocalResumeTarget, type ResumableSession } from '@hapi/protocol'
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
+=======
+import type { LocalResumeTarget, ResumableSession } from '@hapi/protocol'
+import type { AgentFlavor, CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
+import { unwrapRoleWrappedRecordEnvelope } from '@hapi/protocol/messages'
+>>>>>>> 856af6d8 (Show first user message in resume picker)
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant, CancelQueuedMessageResult } from '../store'
 import type { HapiSessionExportResult } from '@hapi/protocol/sessionExport'
@@ -108,6 +114,42 @@ export type LocalResumeTargetResult =
 export type LocalHandoffResult =
     | { type: 'success' }
     | { type: 'error'; message: string; code: 'session_not_found' | 'access_denied' | 'already_local' | 'handoff_failed' }
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : null
+}
+
+function normalizeUserMessageText(value: string): string | undefined {
+    const text = value.trim().replace(/\s+/g, ' ')
+    return text.length > 0 ? text : undefined
+}
+
+function extractUserMessageText(content: unknown): string | undefined {
+    if (typeof content === 'string') {
+        return normalizeUserMessageText(content)
+    }
+
+    if (Array.isArray(content)) {
+        const parts = content
+            .map((block) => {
+                const record = asRecord(block)
+                return record?.type === 'text' && typeof record.text === 'string'
+                    ? record.text
+                    : null
+            })
+            .filter((text): text is string => text !== null)
+        return normalizeUserMessageText(parts.join(' '))
+    }
+
+    const record = asRecord(content)
+    if (record?.type === 'text' && typeof record.text === 'string') {
+        return normalizeUserMessageText(record.text)
+    }
+
+    return undefined
+}
 
 export class SyncEngine {
     listScratchlistEntrys(sessionId: string): import('@hapi/protocol/schemas').ScratchlistEntry[] {
@@ -746,30 +788,6 @@ export class SyncEngine {
         )
     }
 
-<<<<<<< HEAD
-    /**
-     * Revive an archived session so the web UI can reach it again.
-     *
-     * Behaviour:
-     * - Active session: idempotent no-op (`resumed: false`).
-     * - Non-archived inactive session: forwards to `resumeSession` without touching metadata.
-     * - Archived session: validates that the agent has enough metadata to resume (Cursor
-     *   sessions require a `cursorSessionId` once they have any messages), clears the
-     *   archive metadata (`lifecycleState`, `archivedBy`, `archiveReason`), defaults the
-     *   Cursor protocol to `stream-json` for pre-#799 sessions, then forwards to
-     *   `resumeSession`. The CLI's `sessionFactory` will re-stamp `lifecycleState='running'`
-     *   when it boots, so we do not pre-write that here.
-     *
-     * Failure rollback: if `resumeSession` fails (no machine online, spawn timeout, etc.)
-     * the archive snapshot is restored so the operator can retry without losing
-     * `archiveReason`/`archivedBy`/`lifecycleState` and the UI still shows the row as
-     * archived rather than a dangling inactive non-archived ghost.
-     *
-     * Returns `incomplete` (HTTP 422 from the route layer) when the agent metadata
-     * needed to resume is missing.
-     */
-    async reopenSession(sessionId: string, namespace: string): Promise<ReopenSessionResult> {
-=======
     private resolveFlavor(session: Session): AgentFlavor {
         const flavor = session.metadata?.flavor
         return flavor === 'codex' || flavor === 'gemini' || flavor === 'opencode' || flavor === 'cursor'
@@ -792,8 +810,7 @@ export class SyncEngine {
         return metadata.claudeSessionId ?? this.recoverClaudeSessionIdFromMessages(session.id, namespace)
     }
 
-    resolveLocalResumeTarget(sessionId: string, namespace: string): LocalResumeTargetResult {
->>>>>>> 197f3275 (feat: add hapi resume command (#647))
+    async reopenSession(sessionId: string, namespace: string): Promise<ReopenSessionResult> {
         const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
         if (!access.ok) {
             return {
@@ -805,7 +822,6 @@ export class SyncEngine {
 
         const session = access.session
         const metadata = session.metadata
-<<<<<<< HEAD
 
         if (session.active) {
             return { type: 'success', sessionId: access.sessionId, resumed: false }
@@ -871,7 +887,20 @@ export class SyncEngine {
         }
 
         return { type: 'success', sessionId: resumeResult.sessionId, resumed: true }
-=======
+    }
+
+    resolveLocalResumeTarget(sessionId: string, namespace: string): LocalResumeTargetResult {
+        const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
+        if (!access.ok) {
+            return {
+                type: 'error',
+                message: access.reason === 'access-denied' ? 'Session access denied' : 'Session not found',
+                code: access.reason === 'access-denied' ? 'access_denied' : 'session_not_found'
+            }
+        }
+
+        const session = access.session
+        const metadata = session.metadata
         if (!metadata || typeof metadata.path !== 'string' || metadata.path.length === 0) {
             return { type: 'error', message: 'Session metadata missing path', code: 'resume_unavailable' }
         }
@@ -925,12 +954,25 @@ export class SyncEngine {
                     collaborationMode: target.collaborationMode,
                     updatedAt: session?.updatedAt ?? 0,
                     name: session?.metadata?.name,
-                    summary: session?.metadata?.summary?.text
+                    summary: session?.metadata?.summary?.text,
+                    firstUserMessage: this.resolveFirstUserMessage(target.sessionId)
                 }
             })
             .filter((session) => !opts?.machineId || session.machineId === opts.machineId)
             .sort((a, b) => b.updatedAt - a.updatedAt)
 >>>>>>> 197f3275 (feat: add hapi resume command (#647))
+    }
+
+    private resolveFirstUserMessage(sessionId: string): string | undefined {
+        for (const message of this.store.messages.getFirstMessages(sessionId, 50)) {
+            const roleWrapped = unwrapRoleWrappedRecordEnvelope(message.content)
+            if (roleWrapped?.role !== 'user') continue
+
+            const text = extractUserMessageText(roleWrapped.content)
+            if (text) return text
+        }
+
+        return undefined
     }
 
     async resumeSession(sessionId: string, namespace: string, opts?: { permissionMode?: PermissionMode }): Promise<ResumeSessionResult> {

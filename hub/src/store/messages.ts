@@ -115,6 +115,20 @@ export function getMessages(
     return rows.reverse().map(toStoredMessage)
 }
 
+export function getFirstMessages(
+    db: Database,
+    sessionId: string,
+    limit: number = 50
+): StoredMessage[] {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(200, limit)) : 50
+
+    const rows = db.prepare(
+        'SELECT * FROM messages WHERE session_id = ? ORDER BY seq ASC LIMIT ?'
+    ).all(sessionId, safeLimit) as DbMessageRow[]
+
+    return rows.map(toStoredMessage)
+}
+
 /** CLI reconnect backfill: returns messages above the seq cursor that are
  *  deliverable now, i.e. excludes future-scheduled rows (scheduled_at > now).
  *  Without this filter, a CLI reconnect between schedule time and release time

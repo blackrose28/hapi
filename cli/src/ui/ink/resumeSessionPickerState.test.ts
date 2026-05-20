@@ -3,6 +3,7 @@ import type { ResumableSession } from '@hapi/protocol'
 import {
     filterResumeSessions,
     formatResumeSessionRelativeTime,
+    getResumeSessionName,
     reducePickerState,
     type PickerState
 } from './resumeSessionPickerState'
@@ -23,6 +24,15 @@ function session(overrides: Partial<ResumableSession>): ResumableSession {
 }
 
 describe('resumeSessionPickerState', () => {
+    it('uses the first user message as the list label before title or summary', () => {
+        expect(getResumeSessionName(session({
+            sessionId: 'session-title',
+            name: 'Generated title',
+            summary: 'Generated summary',
+            firstUserMessage: 'First prompt'
+        }))).toBe('First prompt')
+    })
+
     it('formats updatedAt as relative time', () => {
         const now = 1_700_000_000_000
 
@@ -39,6 +49,7 @@ describe('resumeSessionPickerState', () => {
             session({
                 sessionId: 'alpha',
                 name: 'Payment Refactor',
+                firstUserMessage: 'Implement billing flow',
                 directory: '/repo/api',
                 agentSessionId: 'thread-a'
             }),
@@ -58,7 +69,7 @@ describe('resumeSessionPickerState', () => {
             })
         ]
 
-        expect(filterResumeSessions(sessions, 'payment').map((item) => item.sessionId)).toEqual(['alpha'])
+        expect(filterResumeSessions(sessions, 'billing').map((item) => item.sessionId)).toEqual(['alpha'])
         expect(filterResumeSessions(sessions, 'MOBILE').map((item) => item.sessionId)).toEqual(['beta'])
         expect(filterResumeSessions(sessions, 'thread-c').map((item) => item.sessionId)).toEqual(['gamma'])
         expect(filterResumeSessions(sessions, 'remote').map((item) => item.sessionId)).toEqual(['gamma'])

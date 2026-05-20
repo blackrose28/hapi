@@ -7,6 +7,7 @@ import {
     deleteQueuedMessageById,
     lookupQueuedMessage,
     getMessages,
+    getFirstMessages,
     getDeliverableMessagesAfter,
     getMessagesByPosition,
     getUninvokedLocalMessages,
@@ -40,6 +41,10 @@ export class MessageStore {
 
     getAllMessages(sessionId: string): StoredMessage[] {
         return getMessages(this.db, sessionId, 100000)
+    }
+
+    getFirstMessages(sessionId: string, limit: number = 50): StoredMessage[] {
+        return getFirstMessages(this.db, sessionId, limit)
     }
 
     getDeliverableMessagesAfter(sessionId: string, afterSeq: number, now: number, limit: number = 200): StoredMessage[] {

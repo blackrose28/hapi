@@ -152,6 +152,7 @@ export const ResumeSessionPicker: React.FC<ResumeSessionPickerProps> = ({
     const width = Math.max(40, terminalWidth - 4)
     const shownStart = filteredSessions.length === 0 ? 0 : scrollOffset + 1
     const shownEnd = Math.min(filteredSessions.length, scrollOffset + visibleSessions.length)
+    const selectedTitle = selectedSession?.name ?? selectedSession?.summary ?? selectedSession?.sessionId
 
     return (
         <Box flexDirection="column" width={terminalWidth}>
@@ -181,6 +182,11 @@ export const ResumeSessionPicker: React.FC<ResumeSessionPickerProps> = ({
                 })}
             </Box>
             <Box marginTop={1}>
+                <Text color="gray">
+                    Title: {selectedTitle ? truncateText(selectedTitle, Math.max(10, terminalWidth - 11)) : '-'}
+                </Text>
+            </Box>
+            <Box>
                 <Text color="gray">
                     Directory: {selectedSession ? truncateText(selectedSession.directory, Math.max(10, terminalWidth - 15)) : '-'}
                 </Text>

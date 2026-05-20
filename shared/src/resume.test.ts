@@ -36,7 +36,8 @@ describe('resume schemas', () => {
             agentSessionId: '11111111-1111-4111-8111-111111111111',
             updatedAt: 123,
             name: 'project work',
-            summary: 'finish docs'
+            summary: 'finish docs',
+            firstUserMessage: 'implement resume picker'
         })
 
         expect(parsed.success).toBe(true)

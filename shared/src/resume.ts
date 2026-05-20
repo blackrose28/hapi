@@ -25,7 +25,8 @@ export type LocalResumeTarget = z.infer<typeof LocalResumeTargetSchema>
 export const ResumableSessionSchema = LocalResumeTargetSchema.extend({
     updatedAt: z.number(),
     name: z.string().optional(),
-    summary: z.string().optional()
+    summary: z.string().optional(),
+    firstUserMessage: z.string().optional()
 })
 
 export type ResumableSession = z.infer<typeof ResumableSessionSchema>

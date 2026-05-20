@@ -17,7 +17,7 @@ export type PickerKey =
     | 'escape'
 
 export function getResumeSessionName(session: ResumableSession): string {
-    return session.name ?? session.summary ?? session.sessionId
+    return session.firstUserMessage ?? session.summary ?? session.sessionId
 }
 
 export function getResumeSessionState(session: ResumableSession): string {
@@ -55,6 +55,7 @@ export function filterResumeSessions(
         const fields = [
             session.name,
             session.summary,
+            session.firstUserMessage,
             session.sessionId,
             session.agentSessionId,
             session.directory,
