@@ -91,6 +91,7 @@ function SessionPage() {
     } = useSession(api, sessionId)
     const {
         messages,
+        pendingMessages,
         warning: messagesWarning,
         isLoading: messagesLoading,
         isLoadingMore: messagesLoadingMore,
@@ -228,6 +229,7 @@ function SessionPage() {
             session={session}
             readOnly={userCapability === 'view'}
             messages={messages}
+            pendingMessages={pendingMessages}
             messagesWarning={messagesWarning}
             hasMoreMessages={messagesHasMore}
             isLoadingMessages={messagesLoading}

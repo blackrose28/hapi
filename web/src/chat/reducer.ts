@@ -4,6 +4,7 @@ import { traceMessages, type TracedMessage } from '@/chat/tracer'
 import { dedupeAgentEvents, foldApiErrorEvents, parseMessageAsEvent } from '@/chat/reducerEvents'
 import { collectTitleChanges, collectToolIdsFromMessages, ensureToolBlock, getPermissions } from '@/chat/reducerTools'
 import { reduceTimeline } from '@/chat/reducerTimeline'
+import { isRedundantGoalStatusMessageText } from '@hapi/protocol/messages'
 
 // Model-scoped weekly rate limits (seven_day_opus, seven_day_sonnet, ...) all share the 7d window display.
 const SEVEN_DAY_LIMIT_TYPES = new Set(['seven_day', 'seven_day_opus', 'seven_day_sonnet', 'seven_day_overage_included'])
@@ -39,6 +40,10 @@ export type LatestQuota = {
     sevenDay: QuotaWindow | null
 }
 
+export type ReduceChatBlocksOptions = {
+    goalStateMessages?: NormalizedMessage[]
+}
+
 function getLatestThreadGoal(normalized: NormalizedMessage[]): ThreadGoal | null {
     let sawNewerNonGoalUserMessage = false
     for (let i = normalized.length - 1; i >= 0; i--) {
@@ -63,10 +68,43 @@ function getLatestThreadGoal(normalized: NormalizedMessage[]): ThreadGoal | null
     return null
 }
 
+function isRedundantGoalStatusMessage(event: AgentEvent): boolean {
+    if (event.type !== 'message') return false
+    return isRedundantGoalStatusMessageText(event.message)
+}
+
+function isSilentGoalEventBlock(block: ChatBlock): boolean {
+    return block.kind === 'agent-event'
+        && (
+            block.event.type === 'thread-goal-updated'
+            || block.event.type === 'thread-goal-cleared'
+            || isRedundantGoalStatusMessage(block.event)
+        )
+}
+
+function filterSilentGoalBlocks(blocks: ChatBlock[]): ChatBlock[] {
+    const filtered: ChatBlock[] = []
+
+    for (const block of blocks) {
+        if (isSilentGoalEventBlock(block)) continue
+        if (block.kind === 'tool-call' && block.children.length > 0) {
+            filtered.push({
+                ...block,
+                children: filterSilentGoalBlocks(block.children)
+            })
+            continue
+        }
+        filtered.push(block)
+    }
+
+    return filtered
+}
+
 export function reduceChatBlocks(
     normalized: NormalizedMessage[],
     agentState: AgentState | null | undefined,
-    teamMentionRequests: TeamMentionRequest[] = []
+    teamMentionRequests: TeamMentionRequest[] = [],
+    options: ReduceChatBlocksOptions = {}
 ): { blocks: ChatBlock[]; hasReadyEvent: boolean; latestUsage: LatestUsage | null; latestGoal: ThreadGoal | null; latestQuota: LatestQuota } {
     const permissionsById = getPermissions(agentState)
     const toolIdsInMessages = collectToolIdsFromMessages(normalized)
@@ -177,10 +215,10 @@ export function reduceChatBlocks(
     }
 
     return {
-        blocks: dedupeAgentEvents(foldApiErrorEvents(rootResult.blocks)),
+        blocks: filterSilentGoalBlocks(dedupeAgentEvents(foldApiErrorEvents(rootResult.blocks))),
         hasReadyEvent,
         latestUsage,
-        latestGoal: getLatestThreadGoal(normalized),
+        latestGoal: getLatestThreadGoal(options.goalStateMessages ?? normalized),
         latestQuota
     }
 }

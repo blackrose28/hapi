@@ -20,7 +20,7 @@ import { reduceChatBlocks } from '@/chat/reducer'
 import { reconcileChatBlocks } from '@/chat/reconcile'
 import { hasInFlightToolCall } from '@/chat/running'
 import { buildConversationOutline, getConversationMessageAnchorId } from '@/chat/outline'
-import { isQueuedForInvocation } from '@/lib/messages'
+import { isQueuedForInvocation, mergeMessages } from '@/lib/messages'
 import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
@@ -62,6 +62,21 @@ export function shouldAutoClearPendingSchedule(pending: PendingSchedule | null):
     return pending !== null && pending.type === 'absolute'
 }
 
+function isUninvokedScheduledMessage(message: DecryptedMessage): boolean {
+    return message.invokedAt == null && message.scheduledAt != null
+}
+
+export function buildGoalStateMessages(
+    messages: DecryptedMessage[],
+    pendingMessages: DecryptedMessage[] = []
+): DecryptedMessage[] {
+    const eligibleMessages = messages.filter((message) => !isUninvokedScheduledMessage(message))
+    const eligiblePendingMessages = pendingMessages.filter((message) => !isUninvokedScheduledMessage(message))
+    return eligiblePendingMessages.length > 0
+        ? mergeMessages(eligibleMessages, eligiblePendingMessages)
+        : eligibleMessages
+}
+
 function getOutlineTitle(session: Session): string {
     if (session.metadata?.name) {
         return session.metadata.name
@@ -97,6 +112,7 @@ export function SessionChat(props: {
     session: Session
     readOnly?: boolean
     messages: DecryptedMessage[]
+    pendingMessages?: DecryptedMessage[]
     messagesWarning: string | null
     hasMoreMessages: boolean
     isLoadingMessages: boolean
@@ -424,9 +440,25 @@ export function SessionChat(props: {
         return normalized
     }, [visibleMessages])
 
+    const goalStateSourceMessages = useMemo(
+        () => buildGoalStateMessages(props.messages, props.pendingMessages ?? []),
+        [props.messages, props.pendingMessages]
+    )
+
+    const normalizedGoalStateMessages: NormalizedMessage[] = useMemo(() => {
+        const normalized: NormalizedMessage[] = []
+        for (const message of goalStateSourceMessages) {
+            const next = normalizeDecryptedMessage(message)
+            if (next) normalized.push(next)
+        }
+        return normalized
+    }, [goalStateSourceMessages])
+
     const reduced = useMemo(
-        () => reduceChatBlocks(normalizedMessages, props.session.agentState, teamMentionRequests),
-        [normalizedMessages, props.session.agentState, teamMentionRequests]
+        () => reduceChatBlocks(normalizedMessages, props.session.agentState, teamMentionRequests, {
+            goalStateMessages: normalizedGoalStateMessages
+        }),
+        [normalizedMessages, normalizedGoalStateMessages, props.session.agentState, teamMentionRequests]
     )
     const effectiveAgentRunning = props.session.thinking
         || (props.compactComposerMode === true && hasInFlightToolCall(normalizedMessages))
