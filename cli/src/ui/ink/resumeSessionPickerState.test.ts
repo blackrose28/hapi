@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ResumableSession } from '@hapi/protocol'
 import {
     filterResumeSessions,
+    formatResumeSessionRelativeTime,
     reducePickerState,
     type PickerState
 } from './resumeSessionPickerState'
@@ -22,6 +23,17 @@ function session(overrides: Partial<ResumableSession>): ResumableSession {
 }
 
 describe('resumeSessionPickerState', () => {
+    it('formats updatedAt as relative time', () => {
+        const now = 1_700_000_000_000
+
+        expect(formatResumeSessionRelativeTime(now - 10_000, now)).toBe('now')
+        expect(formatResumeSessionRelativeTime(now - 5 * 60_000, now)).toBe('5m ago')
+        expect(formatResumeSessionRelativeTime(now - 3 * 60 * 60_000, now)).toBe('3h ago')
+        expect(formatResumeSessionRelativeTime(now - 2 * 24 * 60 * 60_000, now)).toBe('2d ago')
+        expect(formatResumeSessionRelativeTime(Math.floor((now - 5 * 60_000) / 1000), now)).toBe('5m ago')
+        expect(formatResumeSessionRelativeTime(NaN, now)).toBe('unknown')
+    })
+
     it('filters sessions by searchable fields case-insensitively', () => {
         const sessions = [
             session({

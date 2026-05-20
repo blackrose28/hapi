@@ -25,6 +25,25 @@ export function getResumeSessionState(session: ResumableSession): string {
     return session.controlledByUser ? 'local' : 'remote'
 }
 
+export function formatResumeSessionRelativeTime(value: number, now: number = Date.now()): string {
+    const ms = value < 1_000_000_000_000 ? value * 1000 : value
+    if (!Number.isFinite(ms)) return 'unknown'
+
+    const delta = Math.max(0, now - ms)
+    if (delta < 60_000) return 'now'
+
+    const minutes = Math.floor(delta / 60_000)
+    if (minutes < 60) return `${minutes}m ago`
+
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days}d ago`
+
+    return new Date(ms).toLocaleDateString()
+}
+
 export function filterResumeSessions(
     sessions: ResumableSession[],
     query: string

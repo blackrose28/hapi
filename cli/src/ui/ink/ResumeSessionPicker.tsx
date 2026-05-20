@@ -3,6 +3,7 @@ import { Box, Text, useInput, useStdout } from 'ink'
 import type { ResumableSession } from '@hapi/protocol'
 import {
     filterResumeSessions,
+    formatResumeSessionRelativeTime,
     getResumeSessionName,
     getResumeSessionState,
     normalizeScrollOffset,
@@ -41,7 +42,8 @@ function truncateText(value: string, maxLength: number): string {
 
 function formatSessionLine(session: ResumableSession, width: number): string {
     const state = getResumeSessionState(session)
-    const prefix = `${session.flavor.padEnd(8)} ${state.padEnd(8)} `
+    const time = formatResumeSessionRelativeTime(session.updatedAt).padStart(10)
+    const prefix = `${time}  ${session.flavor.padEnd(8)} ${state.padEnd(8)} `
     const directoryBudget = Math.max(16, Math.floor(width * 0.35))
     const nameBudget = Math.max(12, width - prefix.length - directoryBudget - 2)
     const name = truncateText(getResumeSessionName(session), nameBudget)
