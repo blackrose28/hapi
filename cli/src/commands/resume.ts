@@ -1,7 +1,7 @@
 import chalk from 'chalk'
+import React from 'react'
+import { render } from 'ink'
 import { existsSync } from 'node:fs'
-import * as readline from 'node:readline/promises'
-import { stdin as input, stdout as output } from 'node:process'
 import type { LocalResumeTarget, ResumableSession } from '@hapi/protocol'
 import type {
     ClaudePermissionMode,
@@ -16,6 +16,7 @@ import { authAndSetupMachineIfNeeded } from '@/ui/auth'
 import { initializeToken } from '@/ui/tokenInit'
 import { maybeAutoStartServer } from '@/utils/autoStartServer'
 import { assertCodexLocalSupported } from '@/codex/utils/codexVersion'
+import { ResumeSessionPicker } from '@/ui/ink/ResumeSessionPicker'
 import type { CommandDefinition } from './types'
 
 function formatSessionLine(session: ResumableSession, index: number): string {
@@ -27,24 +28,23 @@ function formatSessionLine(session: ResumableSession, index: number): string {
 }
 
 async function selectSession(sessions: ResumableSession[]): Promise<string> {
-    console.log(chalk.bold('Resumable sessions'))
-    console.log('')
-    sessions.forEach((session, index) => {
-        console.log(formatSessionLine(session, index))
-    })
-    console.log('')
-
-    const rl = readline.createInterface({ input, output })
-    try {
-        const answer = await rl.question(chalk.cyan('Select session: '))
-        const index = Number(answer.trim()) - 1
-        if (!Number.isInteger(index) || index < 0 || index >= sessions.length) {
-            throw new Error('Invalid selection')
+    return await new Promise<string>((resolve, reject) => {
+        let settled = false
+        const complete = (callback: () => void) => {
+            if (settled) return
+            settled = true
+            instance.unmount()
+            callback()
         }
-        return sessions[index].sessionId
-    } finally {
-        rl.close()
-    }
+        const instance = render(React.createElement(ResumeSessionPicker, {
+            sessions,
+            onSelect: (sessionId: string) => complete(() => resolve(sessionId)),
+            onCancel: () => complete(() => reject(new Error('Selection cancelled')))
+        }), {
+            patchConsole: false,
+            exitOnCtrlC: false
+        })
+    })
 }
 
 function assertTargetMachine(target: LocalResumeTarget, machineId: string): void {

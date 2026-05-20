@@ -7,6 +7,7 @@ const {
     listResumableSessionsMock,
     getLocalResumeTargetMock,
     handoffSessionToLocalMock,
+    renderMock,
     runCodexMock,
     runClaudeMock,
     assertCodexLocalSupportedMock,
@@ -18,6 +19,7 @@ const {
     listResumableSessionsMock: vi.fn(),
     getLocalResumeTargetMock: vi.fn(),
     handoffSessionToLocalMock: vi.fn(async () => {}),
+    renderMock: vi.fn(),
     runCodexMock: vi.fn(async () => {}),
     runClaudeMock: vi.fn(async () => {}),
     assertCodexLocalSupportedMock: vi.fn(),
@@ -35,6 +37,10 @@ vi.mock('@/api/api', () => ({
             handoffSessionToLocal: handoffSessionToLocalMock
         })
     }
+}))
+vi.mock('ink', () => ({ render: renderMock }))
+vi.mock('@/ui/ink/ResumeSessionPicker', () => ({
+    ResumeSessionPicker: 'ResumeSessionPicker'
 }))
 vi.mock('@/codex/runCodex', () => ({ runCodex: runCodexMock }))
 vi.mock('@/claude/runClaude', () => ({ runClaude: runClaudeMock }))
@@ -59,6 +65,11 @@ describe('resumeCommand', () => {
         listResumableSessionsMock.mockReset()
         getLocalResumeTargetMock.mockReset()
         handoffSessionToLocalMock.mockClear()
+        renderMock.mockReset()
+        renderMock.mockImplementation((element: { props?: { onSelect?: (sessionId: string) => void } }) => {
+            queueMicrotask(() => element.props?.onSelect?.('picked-session'))
+            return { unmount: vi.fn() }
+        })
         runCodexMock.mockClear()
         runClaudeMock.mockClear()
         assertCodexLocalSupportedMock.mockClear()
@@ -183,6 +194,95 @@ describe('resumeCommand', () => {
                 resumeSessionId: '11111111-1111-4111-8111-111111111111'
             }))
         } finally {
+            consoleErrorSpy.mockRestore()
+            exitSpy.mockRestore()
+        }
+    })
+
+    it('uses the interactive picker when no session id is provided on a TTY', async () => {
+        const originalIsTTY = process.stdin.isTTY
+        Object.defineProperty(process.stdin, 'isTTY', {
+            configurable: true,
+            value: true
+        })
+        listResumableSessionsMock.mockResolvedValue([
+            {
+                sessionId: 'picked-session',
+                flavor: 'codex',
+                directory: '/tmp/project',
+                machineId: 'machine-1',
+                active: false,
+                thinking: false,
+                controlledByUser: false,
+                agentSessionId: 'codex-thread-1',
+                updatedAt: 2,
+                name: 'Picked'
+            }
+        ])
+        getLocalResumeTargetMock.mockResolvedValue({
+            sessionId: 'picked-session',
+            flavor: 'codex',
+            directory: '/tmp/project',
+            machineId: 'machine-1',
+            active: false,
+            thinking: false,
+            controlledByUser: false,
+            agentSessionId: 'codex-thread-1'
+        })
+
+        try {
+            await resumeCommand.run(createContext([]))
+
+            expect(renderMock).toHaveBeenCalledOnce()
+            expect(getLocalResumeTargetMock).toHaveBeenCalledWith('picked-session')
+            expect(runCodexMock).toHaveBeenCalledWith(expect.objectContaining({
+                existingSessionId: 'picked-session',
+                resumeSessionId: 'codex-thread-1'
+            }))
+        } finally {
+            Object.defineProperty(process.stdin, 'isTTY', {
+                configurable: true,
+                value: originalIsTTY
+            })
+        }
+    })
+
+    it('keeps the non-TTY fallback and asks for an explicit session id', async () => {
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+            throw new Error(`process.exit:${code ?? 'undefined'}`)
+        }) as never)
+        const originalIsTTY = process.stdin.isTTY
+        Object.defineProperty(process.stdin, 'isTTY', {
+            configurable: true,
+            value: false
+        })
+        listResumableSessionsMock.mockResolvedValue([
+            {
+                sessionId: 'hapi-session-1',
+                flavor: 'claude',
+                directory: '/tmp/project',
+                machineId: 'machine-1',
+                active: false,
+                thinking: false,
+                controlledByUser: false,
+                agentSessionId: 'claude-session-1',
+                updatedAt: 1
+            }
+        ])
+
+        try {
+            await expect(resumeCommand.run(createContext([]))).rejects.toThrow('process.exit:1')
+            expect(renderMock).not.toHaveBeenCalled()
+            expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('hapi-session-1'))
+            expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(String), 'Run: hapi resume <session-id>')
+        } finally {
+            Object.defineProperty(process.stdin, 'isTTY', {
+                configurable: true,
+                value: originalIsTTY
+            })
+            consoleLogSpy.mockRestore()
             consoleErrorSpy.mockRestore()
             exitSpy.mockRestore()
         }

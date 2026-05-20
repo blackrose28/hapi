@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest'
+import type { ResumableSession } from '@hapi/protocol'
+import {
+    filterResumeSessions,
+    reducePickerState,
+    type PickerState
+} from './resumeSessionPickerState'
+
+function session(overrides: Partial<ResumableSession>): ResumableSession {
+    return {
+        sessionId: 'session-1',
+        flavor: 'codex',
+        directory: '/tmp/project',
+        machineId: 'machine-1',
+        active: false,
+        thinking: false,
+        controlledByUser: false,
+        agentSessionId: 'agent-1',
+        updatedAt: 1,
+        ...overrides
+    }
+}
+
+describe('resumeSessionPickerState', () => {
+    it('filters sessions by searchable fields case-insensitively', () => {
+        const sessions = [
+            session({
+                sessionId: 'alpha',
+                name: 'Payment Refactor',
+                directory: '/repo/api',
+                agentSessionId: 'thread-a'
+            }),
+            session({
+                sessionId: 'beta',
+                flavor: 'claude',
+                directory: '/repo/mobile',
+                summary: 'Fix login screen',
+                agentSessionId: 'thread-b'
+            }),
+            session({
+                sessionId: 'gamma',
+                active: true,
+                controlledByUser: false,
+                directory: '/repo/web',
+                agentSessionId: 'thread-c'
+            })
+        ]
+
+        expect(filterResumeSessions(sessions, 'payment').map((item) => item.sessionId)).toEqual(['alpha'])
+        expect(filterResumeSessions(sessions, 'MOBILE').map((item) => item.sessionId)).toEqual(['beta'])
+        expect(filterResumeSessions(sessions, 'thread-c').map((item) => item.sessionId)).toEqual(['gamma'])
+        expect(filterResumeSessions(sessions, 'remote').map((item) => item.sessionId)).toEqual(['gamma'])
+    })
+
+    it('resets selection and scroll when query changes', () => {
+        const initial: PickerState = {
+            query: 'abc',
+            selectedIndex: 5,
+            scrollOffset: 3
+        }
+
+        expect(reducePickerState(initial, {
+            type: 'char',
+            value: 'd'
+        }, {
+            itemCount: 10,
+            visibleCount: 5
+        })).toEqual({
+            query: 'abcd',
+            selectedIndex: 0,
+            scrollOffset: 0
+        })
+
+        expect(reducePickerState(initial, {
+            type: 'key',
+            key: 'backspace'
+        }, {
+            itemCount: 10,
+            visibleCount: 5
+        })).toEqual({
+            query: 'ab',
+            selectedIndex: 0,
+            scrollOffset: 0
+        })
+    })
+
+    it('keeps keyboard navigation inside list bounds and visible window', () => {
+        let state: PickerState = {
+            query: '',
+            selectedIndex: 0,
+            scrollOffset: 0
+        }
+
+        state = reducePickerState(state, { type: 'key', key: 'up' }, {
+            itemCount: 20,
+            visibleCount: 5
+        })
+        expect(state.selectedIndex).toBe(0)
+        expect(state.scrollOffset).toBe(0)
+
+        state = reducePickerState(state, { type: 'key', key: 'pageDown' }, {
+            itemCount: 20,
+            visibleCount: 5
+        })
+        expect(state.selectedIndex).toBe(5)
+        expect(state.scrollOffset).toBe(1)
+
+        state = reducePickerState(state, { type: 'key', key: 'end' }, {
+            itemCount: 20,
+            visibleCount: 5
+        })
+        expect(state.selectedIndex).toBe(19)
+        expect(state.scrollOffset).toBe(15)
+
+        state = reducePickerState(state, { type: 'key', key: 'down' }, {
+            itemCount: 20,
+            visibleCount: 5
+        })
+        expect(state.selectedIndex).toBe(19)
+        expect(state.scrollOffset).toBe(15)
+    })
+
+    it('uses null-equivalent selection when there are no items', () => {
+        const state = reducePickerState({
+            query: '',
+            selectedIndex: 0,
+            scrollOffset: 0
+        }, {
+            type: 'key',
+            key: 'down'
+        }, {
+            itemCount: 0,
+            visibleCount: 5
+        })
+
+        expect(state.selectedIndex).toBe(0)
+        expect(state.scrollOffset).toBe(0)
+    })
+})
