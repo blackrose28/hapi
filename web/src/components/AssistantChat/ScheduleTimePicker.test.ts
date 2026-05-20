@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { clampToMaxDays, parsePreset, validateSpecificDatetime, resolvePendingSchedule } from './ScheduleTimePicker'
+import {
+    clampToMaxDays,
+    computeSchedulePickerPlacement,
+    parsePreset,
+    validateSpecificDatetime,
+    resolvePendingSchedule
+} from './ScheduleTimePicker'
 import type { PendingSchedule } from './ScheduleTimePicker'
 
 /**
@@ -137,5 +143,69 @@ describe('validateSpecificDatetime', () => {
         const now = Date.now()
         const tooOld = now - 31_000 // 31 seconds ago — beyond grace
         expect(validateSpecificDatetime(tooOld, now)).toBe('scheduleErrorPast')
+    })
+})
+
+describe('computeSchedulePickerPlacement', () => {
+    const panel = { panelWidth: 288, panelHeight: 180 }
+
+    it('clamps left edge when the anchor is near the mobile viewport right side', () => {
+        const placement = computeSchedulePickerPlacement({
+            anchor: { top: 500, right: 368, bottom: 532, left: 336 },
+            ...panel,
+            viewport: { width: 375, height: 667 },
+        })
+
+        expect(placement.left).toBe(79)
+        expect(placement.left + panel.panelWidth).toBeLessThanOrEqual(375 - 8)
+    })
+
+    it('opens above the anchor when there is enough room above', () => {
+        const placement = computeSchedulePickerPlacement({
+            anchor: { top: 500, right: 132, bottom: 532, left: 100 },
+            ...panel,
+            viewport: { width: 390, height: 700 },
+        })
+
+        expect(placement.placement).toBe('above')
+        expect(placement.top).toBe(312)
+        expect(placement.maxHeight).toBe(panel.panelHeight)
+    })
+
+    it('opens below the anchor when only below has enough room', () => {
+        const placement = computeSchedulePickerPlacement({
+            anchor: { top: 80, right: 132, bottom: 112, left: 100 },
+            ...panel,
+            viewport: { width: 390, height: 700 },
+        })
+
+        expect(placement.placement).toBe('below')
+        expect(placement.top).toBe(120)
+        expect(placement.maxHeight).toBe(panel.panelHeight)
+    })
+
+    it('uses the larger side with a constrained maxHeight when neither side fully fits', () => {
+        const placement = computeSchedulePickerPlacement({
+            anchor: { top: 140, right: 132, bottom: 172, left: 100 },
+            panelWidth: 288,
+            panelHeight: 260,
+            viewport: { width: 390, height: 300 },
+        })
+
+        expect(placement.placement).toBe('above')
+        expect(placement.top).toBe(8)
+        expect(placement.maxHeight).toBe(124)
+    })
+
+    it('keeps placement inside an offset visual viewport', () => {
+        const placement = computeSchedulePickerPlacement({
+            anchor: { top: 260, right: 372, bottom: 292, left: 340 },
+            ...panel,
+            viewport: { width: 375, height: 500, offsetTop: 100, offsetLeft: 10 },
+        })
+
+        expect(placement.left).toBe(89)
+        expect(placement.top).toBeGreaterThanOrEqual(108)
+        expect(placement.top + placement.maxHeight).toBeLessThanOrEqual(600 - 8)
     })
 })

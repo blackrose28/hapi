@@ -69,6 +69,70 @@ export function validateSpecificDatetime(
     return null
 }
 
+type RectLike = Pick<DOMRect, 'top' | 'right' | 'bottom' | 'left'>
+
+export type SchedulePickerViewport = {
+    width: number
+    height: number
+    offsetTop?: number
+    offsetLeft?: number
+}
+
+export type SchedulePickerPlacement = {
+    top: number
+    left: number
+    maxHeight: number
+    placement: 'above' | 'below'
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max)
+}
+
+export function computeSchedulePickerPlacement(params: {
+    anchor: RectLike
+    panelWidth: number
+    panelHeight: number
+    viewport: SchedulePickerViewport
+    margin?: number
+    gap?: number
+}): SchedulePickerPlacement {
+    const margin = params.margin ?? 8
+    const gap = params.gap ?? 8
+    const viewportLeft = params.viewport.offsetLeft ?? 0
+    const viewportTop = params.viewport.offsetTop ?? 0
+    const viewportRight = viewportLeft + params.viewport.width
+    const viewportBottom = viewportTop + params.viewport.height
+
+    const panelWidth = Math.min(params.panelWidth, Math.max(0, params.viewport.width - margin * 2))
+    const minLeft = viewportLeft + margin
+    const maxLeft = viewportRight - panelWidth - margin
+    const left = clamp(params.anchor.left, minLeft, Math.max(minLeft, maxLeft))
+
+    const spaceAbove = params.anchor.top - gap - (viewportTop + margin)
+    const spaceBelow = viewportBottom - margin - (params.anchor.bottom + gap)
+    const fitsAbove = params.panelHeight <= spaceAbove
+    const fitsBelow = params.panelHeight <= spaceBelow
+
+    if (fitsAbove || (!fitsBelow && spaceAbove >= spaceBelow)) {
+        const maxHeight = Math.max(0, Math.min(params.panelHeight, spaceAbove))
+        return {
+            placement: 'above',
+            top: Math.max(viewportTop + margin, params.anchor.top - gap - maxHeight),
+            left,
+            maxHeight,
+        }
+    }
+
+    const maxHeight = Math.max(0, Math.min(params.panelHeight, spaceBelow))
+    return {
+        placement: 'below',
+        top: params.anchor.bottom + gap,
+        left,
+        maxHeight,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Relative presets
 // ---------------------------------------------------------------------------
@@ -100,33 +164,49 @@ export function ScheduleTimePicker({ onSchedule, onClose, anchorRef, pendingSche
     const [specificValue, setSpecificValue] = useState('')
     const [specificError, setSpecificError] = useState<string | null>(null)
     const panelRef = useRef<HTMLDivElement>(null)
-    const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+    const [pos, setPos] = useState<SchedulePickerPlacement | null>(null)
+    const [isMobilePanel, setIsMobilePanel] = useState(false)
 
-    // Compute fixed position above the anchor button, re-measure on resize/scroll
+    // Compute fixed position and keep it inside the visual viewport. On mobile,
+    // use a bottom panel instead of anchoring to the tiny toolbar button.
     useLayoutEffect(() => {
         function measure() {
             const anchor = anchorRef.current
             const panel = panelRef.current
             if (!anchor) return
+            const mobile = window.matchMedia('(max-width: 640px), (pointer: coarse)').matches
+            setIsMobilePanel(mobile)
+            if (mobile) {
+                setPos(null)
+                return
+            }
             const rect = anchor.getBoundingClientRect()
-            const panelHeight = panel ? panel.offsetHeight : 280 // fallback estimate
-            const topAbove = rect.top - panelHeight - 8
-            const topBelow = rect.bottom + 8
-            const fitsAbove = topAbove >= 8
-            setPos({
-                top: fitsAbove ? topAbove : topBelow,
-                left: rect.left,
-            })
+            const viewport = window.visualViewport
+            setPos(computeSchedulePickerPlacement({
+                anchor: rect,
+                panelWidth: panel?.offsetWidth || 288,
+                panelHeight: panel?.offsetHeight || 280,
+                viewport: {
+                    width: viewport?.width ?? window.innerWidth,
+                    height: viewport?.height ?? window.innerHeight,
+                    offsetLeft: viewport?.offsetLeft ?? 0,
+                    offsetTop: viewport?.offsetTop ?? 0,
+                },
+            }))
         }
         measure()
         window.addEventListener('resize', measure, { passive: true })
         window.addEventListener('scroll', measure, { passive: true, capture: true })
+        window.visualViewport?.addEventListener('resize', measure, { passive: true })
+        window.visualViewport?.addEventListener('scroll', measure, { passive: true })
         return () => {
             window.removeEventListener('resize', measure)
             window.removeEventListener('scroll', measure, true)
+            window.visualViewport?.removeEventListener('resize', measure)
+            window.visualViewport?.removeEventListener('scroll', measure)
         }
     // anchorRef is a useRef object — stable identity, so this effect runs once on mount.
-    }, [anchorRef])
+    }, [anchorRef, tab])
 
     // Click-outside closes the panel.
     //
@@ -197,11 +277,17 @@ export function ScheduleTimePicker({ onSchedule, onClose, anchorRef, pendingSche
             role="dialog"
             aria-label={t('composer.scheduleSend')}
             style={
-                pos
-                    ? { position: 'fixed', top: pos.top, left: pos.left }
+                isMobilePanel
+                    ? { position: 'fixed' }
+                    : pos
+                    ? { position: 'fixed', top: pos.top, left: pos.left, maxHeight: pos.maxHeight }
                     : { position: 'fixed', visibility: 'hidden' }
             }
-            className="z-50 w-72 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] shadow-lg"
+            className={
+                isMobilePanel
+                    ? 'z-50 box-border max-h-[min(60dvh,calc(var(--app-viewport-height,100dvh)-24px))] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] shadow-lg fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)]'
+                    : 'z-50 box-border w-72 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] shadow-lg'
+            }
             onPointerDown={(e) => e.stopPropagation()}
         >
             {/* Header */}
@@ -272,7 +358,7 @@ export function ScheduleTimePicker({ onSchedule, onClose, anchorRef, pendingSche
                         {specificError ? (
                             <p className="text-xs text-red-500">{specificError}</p>
                         ) : (
-                            <p className="text-xs text-[var(--app-hint)]">
+                            <p className="break-words text-xs text-[var(--app-hint)]">
                                 {t('composer.scheduleSpecificHint')}
                             </p>
                         )}
