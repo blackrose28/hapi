@@ -33,11 +33,53 @@ export type ResumeSessionPickerProps = {
     onCancel: () => void
 }
 
+function isWideCodePoint(codePoint: number): boolean {
+    return (codePoint >= 0x1100 && codePoint <= 0x115f)
+        || codePoint === 0x2329
+        || codePoint === 0x232a
+        || (codePoint >= 0x2e80 && codePoint <= 0xa4cf)
+        || (codePoint >= 0xac00 && codePoint <= 0xd7a3)
+        || (codePoint >= 0xf900 && codePoint <= 0xfaff)
+        || (codePoint >= 0xfe10 && codePoint <= 0xfe19)
+        || (codePoint >= 0xfe30 && codePoint <= 0xfe6f)
+        || (codePoint >= 0xff00 && codePoint <= 0xff60)
+        || (codePoint >= 0xffe0 && codePoint <= 0xffe6)
+        || (codePoint >= 0x1f300 && codePoint <= 0x1faff)
+        || (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+}
+
+function columnWidth(value: string): number {
+    let width = 0
+    for (const char of value) {
+        const codePoint = char.codePointAt(0) ?? 0
+        width += isWideCodePoint(codePoint) ? 2 : 1
+    }
+    return width
+}
+
+function sliceColumns(value: string, maxWidth: number): string {
+    let width = 0
+    let result = ''
+    for (const char of value) {
+        const codePoint = char.codePointAt(0) ?? 0
+        const charWidth = isWideCodePoint(codePoint) ? 2 : 1
+        if (width + charWidth > maxWidth) break
+        result += char
+        width += charWidth
+    }
+    return result
+}
+
 function truncateText(value: string, maxLength: number): string {
     if (maxLength <= 0) return ''
-    if (value.length <= maxLength) return value
+    if (columnWidth(value) <= maxLength) return value
     if (maxLength <= 3) return '.'.repeat(maxLength)
-    return `${value.slice(0, maxLength - 3)}...`
+    return `${sliceColumns(value, maxLength - 3)}...`
+}
+
+function padEndColumns(value: string, width: number): string {
+    const padding = Math.max(0, width - columnWidth(value))
+    return `${value}${' '.repeat(padding)}`
 }
 
 function formatSessionLine(session: ResumableSession, width: number): string {
@@ -46,7 +88,7 @@ function formatSessionLine(session: ResumableSession, width: number): string {
     const prefix = `${time}  ${session.flavor.padEnd(8)} ${state.padEnd(8)} `
     const nameBudget = Math.max(12, width - prefix.length)
     const name = truncateText(getResumeSessionName(session), nameBudget)
-    return `${prefix}${name}`
+    return padEndColumns(`${prefix}${name}`, width)
 }
 
 function isPrintableInput(input: string, key: ExtendedKey): boolean {
@@ -64,7 +106,7 @@ export const ResumeSessionPicker: React.FC<ResumeSessionPickerProps> = ({
     const { stdout } = useStdout()
     const terminalWidth = stdout.columns || 80
     const terminalHeight = stdout.rows || 24
-    const visibleCount = Math.max(5, terminalHeight - 8)
+    const visibleCount = Math.min(12, Math.max(5, terminalHeight - 8))
     const [state, setState] = useState<PickerState>({
         query: '',
         selectedIndex: 0,
@@ -173,7 +215,6 @@ export const ResumeSessionPicker: React.FC<ResumeSessionPickerProps> = ({
                         <Text
                             key={session.sessionId}
                             color={selected ? 'cyan' : undefined}
-                            inverse={selected}
                         >
                             {selected ? '> ' : '  '}
                             {formatSessionLine(session, width - 2)}
