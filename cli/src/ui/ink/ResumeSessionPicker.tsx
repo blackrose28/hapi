@@ -44,11 +44,9 @@ function formatSessionLine(session: ResumableSession, width: number): string {
     const state = getResumeSessionState(session)
     const time = formatResumeSessionRelativeTime(session.updatedAt).padStart(10)
     const prefix = `${time}  ${session.flavor.padEnd(8)} ${state.padEnd(8)} `
-    const directoryBudget = Math.max(16, Math.floor(width * 0.35))
-    const nameBudget = Math.max(12, width - prefix.length - directoryBudget - 2)
+    const nameBudget = Math.max(12, width - prefix.length)
     const name = truncateText(getResumeSessionName(session), nameBudget)
-    const directory = truncateText(session.directory, directoryBudget)
-    return `${prefix}${name.padEnd(nameBudget)}  ${directory}`
+    return `${prefix}${name}`
 }
 
 function isPrintableInput(input: string, key: ExtendedKey): boolean {
@@ -87,6 +85,7 @@ export const ResumeSessionPicker: React.FC<ResumeSessionPickerProps> = ({
         filteredSessions.length
     )
     const visibleSessions = filteredSessions.slice(scrollOffset, scrollOffset + visibleCount)
+    const selectedSession = filteredSessions[selectedIndex]
 
     useInput((input, key: ExtendedKey) => {
         if (key.ctrl && input === 'c') {
@@ -182,6 +181,11 @@ export const ResumeSessionPicker: React.FC<ResumeSessionPickerProps> = ({
                 })}
             </Box>
             <Box marginTop={1}>
+                <Text color="gray">
+                    Directory: {selectedSession ? truncateText(selectedSession.directory, Math.max(10, terminalWidth - 15)) : '-'}
+                </Text>
+            </Box>
+            <Box>
                 <Text color="gray">Up/Down move | PageUp/PageDown scroll | type search | Enter resume | Esc clear/cancel | Ctrl-C cancel</Text>
             </Box>
         </Box>
