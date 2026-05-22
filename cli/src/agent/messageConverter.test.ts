@@ -41,7 +41,7 @@ describe('convertAgentMessage', () => {
             type: 'reasoning',
             text: 'thinking',
             id: 'reasoning-stream-1'
-        } as any);
+        });
 
         expect(converted).toEqual({
             type: 'reasoning',

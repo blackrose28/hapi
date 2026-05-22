@@ -52,6 +52,7 @@ export function reduceTimeline(
 ): { blocks: ChatBlock[]; toolBlocksById: Map<string, ToolCallBlock>; hasReadyEvent: boolean } {
     const blocks: ChatBlock[] = []
     const toolBlocksById = new Map<string, ToolCallBlock>()
+    const reasoningBlocksByStreamId = new Map<string, AgentReasoningBlock>()
     let hasReadyEvent = false
 
     // Pre-scan: collect UUIDs of system-injected user turns (sidechain
@@ -210,14 +211,31 @@ export function reduceTimeline(
                 }
 
                 if (c.type === 'reasoning') {
-                    blocks.push({
+                    const streamId = asString(c.streamId)
+                    if (streamId) {
+                        const existing = reasoningBlocksByStreamId.get(streamId)
+                        if (existing) {
+                            existing.text = c.text
+                            existing.usage = msg.usage
+                            existing.model = msg.model
+                            existing.meta = msg.meta
+                            existing.invokedAt = msg.invokedAt
+                            continue
+                        }
+                    }
+
+                    const block: AgentReasoningBlock = {
                         kind: 'agent-reasoning',
                         id: `${msg.id}:${idx}`,
                         localId: msg.localId,
                         createdAt: msg.createdAt,
                         text: c.text,
                         meta: msg.meta
-                    })
+                    }
+                    blocks.push(block)
+                    if (streamId) {
+                        reasoningBlocksByStreamId.set(streamId, block)
+                    }
                     continue
                 }
 

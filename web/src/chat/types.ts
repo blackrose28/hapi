@@ -80,6 +80,7 @@ export type NormalizedAgentContent =
         text: string
         streamId?: string
         uuid: string
+        streamId?: string
         parentUUID: string | null
     }
     | ToolUse

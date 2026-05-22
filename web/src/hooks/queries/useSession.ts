@@ -3,11 +3,17 @@ import type { ApiClient } from '@/api/client'
 import type { Session } from '@/types/api'
 import { queryKeys } from '@/lib/query-keys'
 
+export function isSessionNotFoundError(error: unknown): boolean {
+    return error instanceof Error
+        && (error.message.includes('HTTP 404') || error.message.includes('Session not found'))
+}
+
 export function useSession(api: ApiClient | null, sessionId: string | null): {
     session: Session | null
     userCapability: 'view' | 'interact' | 'operate' | 'manage'
     isLoading: boolean
     error: string | null
+    notFound: boolean
     refetch: () => Promise<unknown>
 } {
     const resolvedSessionId = sessionId ?? 'unknown'
@@ -20,6 +26,12 @@ export function useSession(api: ApiClient | null, sessionId: string | null): {
             return await api.getSession(sessionId)
         },
         enabled: Boolean(api && sessionId),
+        retry: (failureCount, error) => {
+            if (isSessionNotFoundError(error)) {
+                return false
+            }
+            return failureCount < 2
+        },
     })
 
     return {
@@ -27,6 +39,7 @@ export function useSession(api: ApiClient | null, sessionId: string | null): {
         userCapability: query.data?.userCapability ?? 'interact',
         isLoading: query.isLoading,
         error: query.error instanceof Error ? query.error.message : query.error ? 'Failed to load session' : null,
+        notFound: isSessionNotFoundError(query.error) && !query.isFetching,
         refetch: query.refetch,
     }
 }

@@ -527,7 +527,7 @@ export function normalizeAgentRecord(
         }
 
         if (data.type === 'reasoning' && typeof data.message === 'string') {
-            const streamId = typeof data.id === 'string' && data.id.trim() ? data.id.trim() : undefined
+            const streamId = typeof data.id === 'string' && data.id.trim() ? data.id.trim() : messageId
             return {
                 id: messageId,
                 localId,
@@ -537,10 +537,26 @@ export function normalizeAgentRecord(
                 content: [{
                     type: 'reasoning',
                     text: data.message,
-                    ...(streamId ? { streamId } : {}),
+                    streamId,
                     uuid: messageId,
                     parentUUID: null
                 }],
+                meta
+            }
+        }
+
+        if (data.type === 'context_compacted') {
+            return {
+                id: messageId,
+                localId,
+                createdAt,
+                role: 'event',
+                content: {
+                    type: 'compact',
+                    trigger: asString(data.trigger) ?? 'auto',
+                    preTokens: asNumber(data.preTokens ?? data.pre_tokens) ?? 0
+                },
+                isSidechain: false,
                 meta
             }
         }
