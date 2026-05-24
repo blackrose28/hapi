@@ -287,8 +287,26 @@ export function expandSelectedSessionCollapseOverrides(
     }
 
     const next = new Map(overrides)
+<<<<<<< HEAD
     next.set(group.key, false)
     return next
+=======
+    let changed = false
+
+    // Expand project group if collapsed. Project and machine keys use true = collapsed.
+    if (overrides.has(group.key) && overrides.get(group.key)) {
+        next.delete(group.key)
+        changed = true
+    }
+
+    const machineKey = `machine::${group.machineId ?? UNKNOWN_MACHINE_ID}`
+    if (overrides.has(machineKey) && overrides.get(machineKey)) {
+        next.delete(machineKey)
+        changed = true
+    }
+
+    return changed ? next : overrides
+>>>>>>> 0fa21a12 (fix(web): preserve session preview folding (#666))
 }
 
 function groupByMachine(
@@ -1153,7 +1171,6 @@ export function SessionList(props: {
         })
     }
 
-<<<<<<< HEAD
     // Per-group reveal cap for paginated "Show N more". Absent = collapsed to the
     // preview limit; each "Show more" bumps it by one batch (step = preview limit).
     const [sessionVisibleCounts, setSessionVisibleCounts] = useState<Map<string, number>>(
@@ -1162,14 +1179,6 @@ export function SessionList(props: {
 
     const getGroupVisibleCount = (group: SessionGroup): number => {
         return sessionVisibleCounts.get(group.key) ?? sessionPreviewLimit
-=======
-    const isSessionGroupExpanded = (group: SessionGroup): boolean => {
-        if (isSearching || group.sessions.length <= sessionPreviewLimit) return true
-        const key = `sessions::${group.key}`
-        const override = collapseOverrides.get(key)
-        if (override !== undefined) return !override
-        return false
->>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
     }
 
     const showMoreSessions = (group: SessionGroup) => {
@@ -1194,14 +1203,8 @@ export function SessionList(props: {
         return getVisibleSessionPreview(
             group.sessions,
             {
-<<<<<<< HEAD
                 selectedSessionId,
                 limit: getGroupVisibleCount(group)
-=======
-                expanded: isSessionGroupExpanded(group),
-                selectedSessionId,
-                limit: sessionPreviewLimit
->>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
             }
         )
     }
