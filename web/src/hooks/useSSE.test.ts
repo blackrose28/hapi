@@ -3,8 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { createElement, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { deriveApiCacheScope } from '@/api/client'
-import { shouldReconnectOnVisibilityRestore } from './useSSE'
-import { useSSE } from './useSSE'
+import { isGlobalScopedMessageStreamEvent, shouldReconnectOnVisibilityRestore, useSSE } from './useSSE'
 
 class MockEventSource {
     static instances: MockEventSource[] = []
@@ -141,5 +140,23 @@ describe('SSE terminal snippet invalidation', () => {
 
         expect(invalidate).not.toHaveBeenCalled()
         expect(onEvent).toHaveBeenCalledWith(event)
+    })
+})
+
+describe('useSSE scope handling', () => {
+    it('treats message stream events as global-scoped skips', () => {
+        expect(isGlobalScopedMessageStreamEvent('global', 'message-received')).toBe(true)
+        expect(isGlobalScopedMessageStreamEvent('global', 'messages-consumed')).toBe(true)
+        expect(isGlobalScopedMessageStreamEvent('global', 'message-cancelled')).toBe(true)
+    })
+
+    it('does not skip session lifecycle events on the global connection', () => {
+        expect(isGlobalScopedMessageStreamEvent('global', 'session-updated')).toBe(false)
+        expect(isGlobalScopedMessageStreamEvent('global', 'session-added')).toBe(false)
+        expect(isGlobalScopedMessageStreamEvent('global', 'session-removed')).toBe(false)
+    })
+
+    it('processes message stream events on full-scoped connections', () => {
+        expect(isGlobalScopedMessageStreamEvent('full', 'message-received')).toBe(false)
     })
 })

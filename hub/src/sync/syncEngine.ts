@@ -678,6 +678,7 @@ export class SyncEngine {
         if (payload.text.trim()) {
             this.sessionCache.updateLastUserRequest(sessionId, payload.text.trim())
         }
+        this.sessionCache.recordSessionActivity(sessionId, Date.now())
     }
 
     async cancelQueuedMessage(
