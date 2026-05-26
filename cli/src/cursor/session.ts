@@ -15,7 +15,7 @@ type CursorPermissionModeChangedHandler = (mode: PermissionMode) => void;
 
 export class CursorSession extends AgentSessionBase<EnhancedMode> {
     readonly cursorArgs?: string[];
-    readonly model?: string;
+    model?: string;
     readonly startedBy: 'runner' | 'terminal';
     readonly startingMode: 'local' | 'remote';
     localLaunchFailure: LocalLaunchFailure | null = null;
@@ -68,6 +68,10 @@ export class CursorSession extends AgentSessionBase<EnhancedMode> {
         this.permissionMode = mode;
         // Keep runCursor's enqueue source of truth in sync (CreatePlan accept, ACP mode sync).
         this.permissionModeChangedHandler?.(mode);
+    };
+
+    setModel = (model: string | null | undefined): void => {
+        this.model = model ?? undefined;
     };
 
     recordLocalLaunchFailure = (message: string, exitReason: LocalLaunchExitReason): void => {

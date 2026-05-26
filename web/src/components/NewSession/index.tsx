@@ -7,6 +7,7 @@ import { useMachinePathsExists } from '@/hooks/useMachinePathsExists'
 import { useSpawnSession } from '@/hooks/mutations/useSpawnSession'
 import { useCodexModels } from '@/hooks/queries/useCodexModels'
 import { useAgentModels } from '@/hooks/queries/useAgentModels'
+import { useCursorModelsForMachine } from '@/hooks/queries/useCursorModelsForMachine'
 import { useOpencodeModelsForCwd } from '@/hooks/queries/useOpencodeModelsForCwd'
 import { useGrokModelsForCwd } from '@/hooks/queries/useGrokModelsForCwd'
 import { useSessions } from '@/hooks/queries/useSessions'
@@ -229,6 +230,28 @@ export function NewSession(props: {
         }
         return options
     }, [claudeModelsState.models, model])
+
+    const cursorModelsState = useCursorModelsForMachine({
+        api: props.api,
+        machineId,
+        enabled: agent === 'cursor' && Boolean(machineId)
+    })
+    const cursorModelOptions = useMemo(() => {
+        const options = [{ value: 'auto', label: 'Default' }]
+        for (const cursorModel of cursorModelsState.availableModels) {
+            if (cursorModel.modelId === 'auto') {
+                continue
+            }
+            options.push({
+                value: cursorModel.modelId,
+                label: cursorModel.name ?? cursorModel.modelId
+            })
+        }
+        if (model !== 'auto' && !options.some((option) => option.value === model)) {
+            options.splice(1, 0, { value: model, label: model })
+        }
+        return options
+    }, [cursorModelsState.availableModels, model])
 
     const recentPaths = useMemo(
         () => getRecentPaths(machineId),
@@ -616,21 +639,27 @@ export function NewSession(props: {
                             ? claudeModelOptions
                             : agent === 'grok'
                                 ? grokModelOptions
-                                : undefined}
+                                : agent === 'cursor'
+                                    ? cursorModelOptions
+                                    : undefined}
                     isDisabled={isFormDisabled
                         || (agent === 'codex' && Boolean(codexModelsState.error))
                         || (agent === 'claude' && claudeModelsState.isLoading)
-                        || (agent === 'grok' && Boolean(grokModelsState.error))}
+                        || (agent === 'grok' && Boolean(grokModelsState.error))
+                        || (agent === 'cursor' && Boolean(cursorModelsState.error))}
                     isLoading={(agent === 'codex' && codexModelsState.isLoading)
                         || (agent === 'claude' && claudeModelsState.isLoading)
-                        || (agent === 'grok' && grokModelsState.isLoading)}
+                        || (agent === 'grok' && grokModelsState.isLoading)
+                        || (agent === 'cursor' && cursorModelsState.isLoading)}
                     error={agent === 'codex' && codexModelsState.error
                         ? `${t('newSession.model.loadFailed')}: ${codexModelsState.error}`
                         : agent === 'claude' && claudeModelsState.error
                             ? `${t('newSession.agentModelsLoadFailed')}: ${claudeModelsState.error}`
                             : agent === 'grok' && grokModelsState.error
                                 ? `${t('newSession.model.loadFailed')}: ${grokModelsState.error}`
-                                : null}
+                                : agent === 'cursor' && cursorModelsState.error
+                                    ? `${t('newSession.model.loadFailed')}: ${cursorModelsState.error}`
+                                    : null}
                     onModelChange={setModel}
                 />
             )}

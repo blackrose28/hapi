@@ -3,6 +3,7 @@ import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { registerAgentModelHandlers } from './handlers/agentModels'
 import { registerBashHandlers } from './handlers/bash'
 import { registerCodexModelHandlers } from './handlers/codexModels'
+import { registerCursorModelHandlers } from './handlers/cursorModels'
 import { registerOpencodeModelHandlers } from './handlers/opencodeModels'
 import { registerGrokModelHandlers } from './handlers/grokModels'
 import { registerDirectoryHandlers } from './handlers/directories'
@@ -18,6 +19,7 @@ export function registerCommonHandlers(rpcHandlerManager: RpcHandlerManager, wor
     registerBashHandlers(rpcHandlerManager, workingDirectory)
     registerAgentModelHandlers(rpcHandlerManager, workingDirectory)
     registerCodexModelHandlers(rpcHandlerManager)
+    registerCursorModelHandlers(rpcHandlerManager)
     registerOpencodeModelHandlers(rpcHandlerManager)
     registerGrokModelHandlers(rpcHandlerManager)
     registerFileHandlers(rpcHandlerManager, workingDirectory)

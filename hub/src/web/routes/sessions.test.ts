@@ -106,6 +106,14 @@ function createApp(session: Session, opts?: {
         ],
         currentValue: 'high'
     })
+    const listCursorModelsForSession = async () => ({
+        success: true,
+        availableModels: [
+            { modelId: 'composer-2.5', name: 'Composer 2.5' },
+            { modelId: 'gpt-5.5-high-fast', name: 'GPT-5.5 High Fast' }
+        ],
+        currentModelId: 'composer-2.5'
+    })
     const listAgentModelsForSession = opts?.listAgentModelsForSession ?? (async () => ({
         status: 'dynamic' as const,
         models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
@@ -137,6 +145,7 @@ function createApp(session: Session, opts?: {
         resolveSessionAccess: () => ({ ok: true, sessionId: session.id, session }),
         applySessionConfig,
         listCodexModelsForSession,
+        listCursorModelsForSession,
         listOpencodeModelsForSession,
         listPiModelsForSession,
         listGrokModelsForSession,
@@ -745,7 +754,7 @@ describe('sessions routes', () => {
         ])
     })
 
-    it('rejects model changes for Cursor sessions', async () => {
+    it('applies model changes for Cursor sessions', async () => {
         const session = createSession({
             metadata: {
                 path: '/tmp/project',
@@ -761,8 +770,10 @@ describe('sessions routes', () => {
             body: JSON.stringify({ model: 'sonnet' })
         })
 
-        expect(response.status).toBe(400)
-        expect(applySessionConfigCalls).toEqual([])
+        expect(response.status).toBe(200)
+        expect(applySessionConfigCalls).toEqual([
+            ['session-1', { model: 'sonnet' }]
+        ])
     })
 
     it('rejects effort changes for sessions whose flavor does not support effort', async () => {
@@ -1013,6 +1024,33 @@ describe('sessions routes', () => {
             success: false,
             error: 'No cached OpenCode models available for this session'
         })
+    })
+
+    it('returns Cursor models for active Cursor sessions', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'cursor' }
+        })
+        const { app } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/cursor-models')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            availableModels: [
+                { modelId: 'composer-2.5', name: 'Composer 2.5' },
+                { modelId: 'gpt-5.5-high-fast', name: 'GPT-5.5 High Fast' }
+            ],
+            currentModelId: 'composer-2.5'
+        })
+    })
+
+    it('rejects cursor-models for non-Cursor sessions', async () => {
+        const { app } = createApp(createSession())
+
+        const response = await app.request('/api/sessions/session-1/cursor-models')
+
+        expect(response.status).toBe(400)
     })
 
     it('rejects opencode-models for non-OpenCode sessions', async () => {

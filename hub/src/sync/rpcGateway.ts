@@ -9,6 +9,8 @@ import type {
     CodexModelSummary,
     CodexModelsResponse,
     CommandResponse,
+    CursorModelSummary,
+    CursorModelsResponse,
     DeleteUploadResponse,
     DirectoryEntry,
     FileReadResponse,
@@ -45,6 +47,8 @@ export type RpcListDirectoryResponse = ListDirectoryResponse
 export type RpcPathExistsResponse = PathExistsResponse
 export type RpcCodexModel = CodexModelSummary
 export type RpcListCodexModelsResponse = CodexModelsResponse
+export type RpcCursorModel = CursorModelSummary
+export type RpcListCursorModelsResponse = CursorModelsResponse
 export type RpcOpencodeModel = OpencodeModelSummary
 export type RpcListOpencodeModelsResponse = OpencodeModelsResponse
 
@@ -596,6 +600,14 @@ export class RpcGateway {
         return this.parseAgentModelCatalog(
             await this.machineRpc(machineId, 'listAgentModels', { agent, cwd })
         )
+    }
+
+    async listCursorModelsForSession(sessionId: string): Promise<RpcListCursorModelsResponse> {
+        return await this.sessionRpc(sessionId, RPC_METHODS.ListCursorModels, {}, MODEL_LIST_RPC_TIMEOUT_MS) as RpcListCursorModelsResponse
+    }
+
+    async listCursorModelsForMachine(machineId: string): Promise<RpcListCursorModelsResponse> {
+        return await this.machineRpc(machineId, RPC_METHODS.ListCursorModels, {}, MODEL_LIST_RPC_TIMEOUT_MS) as RpcListCursorModelsResponse
     }
 
     async listOpencodeModelsForSession(sessionId: string): Promise<RpcListOpencodeModelsResponse> {

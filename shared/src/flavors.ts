@@ -15,7 +15,7 @@ const FLAVOR_CAPS: Record<AgentFlavor, ReadonlySet<Capability>> = {
     kimi: new Set([Capabilities.ModelChange]),
     grok: new Set([Capabilities.ModelChange, Capabilities.Effort]),
     codex: new Set([Capabilities.ModelChange]),
-    cursor: new Set([]),
+    cursor: new Set([Capabilities.ModelChange]),
     opencode: new Set([Capabilities.ModelChange]),
     pi: new Set([Capabilities.ModelChange, Capabilities.Effort]),
 }

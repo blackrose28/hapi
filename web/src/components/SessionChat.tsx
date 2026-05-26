@@ -38,6 +38,7 @@ import { usePlatform } from '@/hooks/usePlatform'
 import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { useCodexModels } from '@/hooks/queries/useCodexModels'
 import { useAgentModels } from '@/hooks/queries/useAgentModels'
+import { useCursorModels } from '@/hooks/queries/useCursorModels'
 import { useOpencodeModels } from '@/hooks/queries/useOpencodeModels'
 import { useGrokModels } from '@/hooks/queries/useGrokModels'
 import { useGrokReasoningEffortOptions } from '@/hooks/queries/useGrokReasoningEffortOptions'
@@ -191,6 +192,22 @@ export function SessionChat(props: {
             label: effort.name ?? effort.effortId
         }))
     }, [agentFlavor, opencodeModelsState.availableEfforts])
+
+    const cursorModelsState = useCursorModels({
+        api: props.api,
+        sessionId: props.session.id,
+        enabled: agentFlavor === 'cursor' && props.session.active
+    })
+    const cursorModelOptions = useMemo(() => {
+        if (agentFlavor !== 'cursor') {
+            return undefined
+        }
+
+        return cursorModelsState.availableModels.map((cursorModel) => ({
+            value: cursorModel.modelId,
+            label: cursorModel.name ?? cursorModel.modelId
+        }))
+    }, [agentFlavor, cursorModelsState.availableModels])
     const grokModelsState = useGrokModels({
         api: props.api,
         sessionId: props.session.id,
@@ -225,6 +242,28 @@ export function SessionChat(props: {
     // share a modelId (hub persists this alongside the legacy modelId string).
     const piSelectedModel = piMetadata?.piSelectedModel as { provider: string; modelId: string } | null | undefined
     const codexModelsError = props.session.active ? codexModelsState.error : null
+=======
+    const cursorModelsState = useCursorModels({
+        api: props.api,
+        sessionId: props.session.id,
+        enabled: agentFlavor === 'cursor' && props.session.active
+    })
+    const cursorModelOptions = useMemo(() => {
+        if (agentFlavor !== 'cursor') {
+            return undefined
+        }
+
+        return [
+            { value: null, label: 'Default' },
+            ...cursorModelsState.availableModels
+                .filter((cursorModel) => cursorModel.modelId !== 'auto')
+                .map((cursorModel) => ({
+                    value: cursorModel.modelId,
+                    label: cursorModel.name ?? cursorModel.modelId
+                }))
+        ]
+    }, [agentFlavor, cursorModelsState.availableModels])
+>>>>>>> 1d03f186 (feat(cursor): support model selection (#684))
     const {
         abortSession,
         switchSession,
@@ -804,11 +843,13 @@ export function SessionChat(props: {
                                 ? codexModelOptions
                                 : agentFlavor === 'claude'
                                     ? claudeModelOptions
-                                : agentFlavor === 'opencode'
-                                    ? opencodeModelOptions
-                                    : agentFlavor === 'grok'
-                                        ? grokModelOptions
-                                        : undefined
+                                    : agentFlavor === 'cursor'
+                                        ? cursorModelOptions
+                                        : agentFlavor === 'opencode'
+                                            ? opencodeModelOptions
+                                            : agentFlavor === 'grok'
+                                                ? grokModelOptions
+                                                : undefined
                         }
                         piModels={agentFlavor === 'pi' ? (piModelsState.availableModels.length > 0 ? piModelsState.availableModels : piCachedModels) : undefined}
                         piSelectedModel={agentFlavor === 'pi' ? piSelectedModel : undefined}
@@ -835,7 +876,13 @@ export function SessionChat(props: {
                                 : undefined
                         }
                         onPermissionModeChange={readOnly ? undefined : handlePermissionModeChange}
-                        onModelChange={readOnly ? undefined : handleModelChange}
+                        onModelChange={readOnly ? undefined : (
+                            agentFlavor === 'codex'
+                                ? (props.session.active && !controlledByUser && !codexModelsState.error ? handleModelChange : undefined)
+                                : agentFlavor === 'cursor'
+                                    ? (props.session.active && !cursorModelsState.error ? handleModelChange : undefined)
+                                    : handleModelChange
+                        )}
                         onModelReasoningEffortChange={
                             (agentFlavor === 'codex' || agentFlavor === 'opencode') && !controlledByUser && !readOnly
                                 ? handleModelReasoningEffortChange

@@ -2,6 +2,8 @@ export type {
     CodexModelsResponse,
     CodexModelSummary,
     CommandResponse,
+    CursorModelsResponse,
+    CursorModelSummary,
     DeleteUploadResponse,
     DirectoryEntry,
     FileReadResponse,

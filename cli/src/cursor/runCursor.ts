@@ -69,7 +69,7 @@ export async function runCursor(opts: {
     const sessionWrapperRef: { current: CursorSession | null } = { current: null };
 
     let currentPermissionMode: PermissionMode = opts.permissionMode ?? 'default';
-    const currentModel = opts.model;
+    let currentModel = opts.model;
 
     const lifecycle = createRunnerLifecycle({
         session,
@@ -87,7 +87,9 @@ export async function runCursor(opts: {
             return;
         }
         sessionInstance.setPermissionMode(currentPermissionMode);
-        logger.debug(`[cursor] Synced session permission mode: ${currentPermissionMode}`);
+        sessionInstance.setModel(currentModel);
+        sessionInstance.pushKeepAlive();
+        logger.debug(`[cursor] Synced session mode: permissionMode=${currentPermissionMode}, model=${currentModel}`);
     };
 
     session.onUserMessage((message, localId) => {
@@ -108,9 +110,15 @@ export async function runCursor(opts: {
     registerSessionConfigRpc({
         rpcHandlerManager: session.rpcHandlerManager,
         flavor: 'cursor',
-        modelMode: 'ignore',
+        modelMode: 'nullable',
+        appliedFallback: () => ({ permissionMode: currentPermissionMode }),
         onApply: (config) => {
-            if (config.permissionMode !== undefined) currentPermissionMode = config.permissionMode as any;
+            if (config.permissionMode !== undefined) {
+                currentPermissionMode = config.permissionMode as any;
+            }
+            if (config.model !== undefined) {
+                currentModel = config.model ?? undefined;
+            }
         },
         onAfterApply: syncSessionMode
     });

@@ -728,6 +728,20 @@ export type OpencodeModelsResponse = {
 
 export type ListOpencodeModelsResponse = OpencodeModelsResponse
 
+export type CursorModelSummary = {
+    modelId: string
+    name?: string
+}
+
+export type CursorModelsResponse = {
+    success: boolean
+    availableModels?: CursorModelSummary[]
+    currentModelId?: string | null
+    error?: string
+}
+
+export type ListCursorModelsResponse = CursorModelsResponse
+
 export type SlashCommand = {
     name: string
     description?: string

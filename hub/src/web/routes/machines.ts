@@ -208,6 +208,29 @@ export function createMachinesRoutes(
         }
     })
 
+    app.get('/machines/:id/cursor-models', async (c) => {
+        const engine = getSyncEngine()
+        if (!engine) {
+            return c.json({ success: false, error: 'Not connected' }, 503)
+        }
+
+        const machineId = c.req.param('id')
+        const machine = requireMachine(c, engine, machineId, { capabilityResolver, requiredCapability: 'view' })
+        if (machine instanceof Response) {
+            return machine
+        }
+
+        try {
+            const result = await engine.listCursorModelsForMachine(machineId)
+            return c.json(result)
+        } catch (error) {
+            return c.json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list Cursor models'
+            }, 500)
+        }
+    })
+
     app.get('/machines/:id/grok-models', async (c) => {
         const engine = getSyncEngine()
         if (!engine) {

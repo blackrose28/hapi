@@ -31,10 +31,12 @@ import {
     type RpcEditorProjectsResponse,
     type RpcListDirectoryResponse,
     type RpcListCodexModelsResponse,
+    type RpcListCursorModelsResponse,
     type RpcListOpencodeModelsResponse,
     type RpcListPiModelsResponse,
     type RpcListGrokModelsResponse,
     type RpcListGrokReasoningEffortOptionsResponse,
+    type RpcCursorModel,
     type RpcOpencodeModel,
     type RpcPiModel,
     type RpcGrokModel,
@@ -60,10 +62,12 @@ export type {
     RpcEditorProjectsResponse,
     RpcListDirectoryResponse,
     RpcListCodexModelsResponse,
+    RpcListCursorModelsResponse,
     RpcListOpencodeModelsResponse,
     RpcListPiModelsResponse,
     RpcListGrokModelsResponse,
     RpcListGrokReasoningEffortOptionsResponse,
+    RpcCursorModel,
     RpcOpencodeModel,
     RpcPiModel,
     RpcGrokModel,
@@ -1924,6 +1928,7 @@ export class SyncEngine {
         return await this.rpcGateway.listCodexModelsForMachine(machineId)
     }
 
+<<<<<<< HEAD
     async listAgentModelsForSession(
         sessionId: string,
         agent: AgentFlavor
@@ -2018,6 +2023,14 @@ export class SyncEngine {
 
     resetAutoResumeAttempts(sessionId: string): void {
         this.resumeAttempts.delete(sessionId)
+    }
+
+    async listCursorModelsForSession(sessionId: string): Promise<RpcListCursorModelsResponse> {
+        return await this.rpcGateway.listCursorModelsForSession(sessionId)
+    }
+
+    async listCursorModelsForMachine(machineId: string): Promise<RpcListCursorModelsResponse> {
+        return await this.rpcGateway.listCursorModelsForMachine(machineId)
     }
 
     async listOpencodeModelsForSession(sessionId: string): Promise<RpcListOpencodeModelsResponse> {

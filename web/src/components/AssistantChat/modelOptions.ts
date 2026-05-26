@@ -56,6 +56,9 @@ export function getModelOptionsForFlavor(
     if (flavor === 'gemini') {
         return getGeminiModelOptions(currentModel)
     }
+    if (flavor === 'cursor') {
+        return withCurrentModelOption([{ value: null, label: 'Default' }], currentModel)
+    }
     // Codex/OpenCode/Pi discover models dynamically via RPC. Until those
     // options arrive, avoid falling through to Claude presets; show only the
     // current persisted model when one exists. Pi's real model list is
@@ -82,6 +85,9 @@ export function getNextModelForFlavor(
     }
     if (flavor === 'gemini') {
         return getNextGeminiModel(currentModel)
+    }
+    if (flavor === 'cursor') {
+        return normalizeCurrentModel(currentModel)
     }
     // Codex/OpenCode/Pi discover models dynamically via RPC. Until those
     // options arrive, pressing Ctrl/Cmd+M must not fall through to the Claude
