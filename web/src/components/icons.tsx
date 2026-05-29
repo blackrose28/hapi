@@ -85,3 +85,14 @@ export function ExitFullscreenIcon(props: IconProps) {
     return createIcon(<path d="M3 8h5V3m13 5h-5V3M3 16h5v5m13-5h-5v5" />, props, 2)
 }
 
+/** Composer schedule-send clock — circle + hands (matches ComposerButtons). */
+export function ScheduleIcon(props: IconProps) {
+    return createIcon(
+        <>
+            <circle cx="12" cy="12" r="9" />
+            <polyline points="12 7 12 12 15.5 14" />
+        </>,
+        props,
+        2
+    )
+}

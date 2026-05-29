@@ -322,7 +322,6 @@ export function countMessages(db: Database, sessionId: string): number {
     ).get(sessionId) as { count: number } | undefined
     return row?.count ?? 0
 }
-
 /** Count uninvoked local messages scheduled for a future time (session list indicator). */
 export function countFutureScheduledLocalMessages(
     db: Database,
@@ -398,7 +397,6 @@ export function minFutureScheduledAtBySessionIds(
     }
     return nextAt
 }
-
 export function getMaxSeq(db: Database, sessionId: string): number {
     const row = db.prepare(
         'SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM messages WHERE session_id = ?'

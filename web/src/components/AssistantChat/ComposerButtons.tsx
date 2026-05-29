@@ -1,33 +1,14 @@
 import { ComposerPrimitive } from '@assistant-ui/react'
 import type { ConversationStatus } from '@/realtime/types'
 import { useTranslation } from '@/lib/use-translation'
+import { ScheduleIcon } from '@/components/icons'
 import { ScheduleTimePicker } from './ScheduleTimePicker'
 import type { PendingSchedule } from './ScheduleTimePicker'
 import { useRef, useState } from 'react'
 
-function ScheduleIcon() {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <circle cx="12" cy="12" r="9" />
-            <polyline points="12 7 12 12 15.5 14" />
-        </svg>
-    )
-}
-
 function ChevronIcon() {
     return <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 3.75L5 6.25L7.5 3.75" /></svg>
 }
-
 function VoiceAssistantIcon() {
     return (
         <svg
@@ -509,7 +490,7 @@ export function ComposerButtons(props: {
                                     : 'text-[var(--app-fg)]/60 hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
                             }`}
                         >
-                            <ScheduleIcon />
+                            <ScheduleIcon className="h-[18px] w-[18px]" />
                         </button>
                         {showSchedulePicker && (
                             <ScheduleTimePicker

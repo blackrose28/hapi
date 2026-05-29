@@ -91,7 +91,6 @@ export class MessageStore {
     countMessages(sessionId: string): number {
         return countMessages(this.db, sessionId)
     }
-
     cancelQueuedMessage(sessionId: string, messageId: string): CancelQueuedMessageResult {
         return cancelQueuedMessage(this.db, sessionId, messageId)
     }

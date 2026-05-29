@@ -14,6 +14,7 @@ import { queryKeys } from '@/lib/query-keys'
 import { AppContextProvider } from '@/lib/app-context'
 import { clearMessageWindow, fetchLatestMessages } from '@/lib/message-window-store'
 import { clearToolProgressEntries, recordToolProgress } from '@/chat/toolProgressStore'
+import { markSessionSeen } from '@/lib/sessionLastSeen'
 import { useAppGoBack } from '@/hooks/useAppGoBack'
 import { useTranslation } from '@/lib/use-translation'
 import { VoiceProvider } from '@/lib/voice-context'
@@ -122,6 +123,12 @@ function AppInner() {
     const queryClient = useQueryClient()
     const sessionMatch = matchRoute({ to: '/sessions/$sessionId' })
     const selectedSessionId = sessionMatch && sessionMatch.sessionId !== 'new' ? sessionMatch.sessionId : null
+    useEffect(() => {
+        if (!selectedSessionId) {
+            return
+        }
+        markSessionSeen(selectedSessionId, Date.now())
+    }, [selectedSessionId])
     const [activeEditorSessionId, setActiveEditorSessionId] = useState<string | null>(null)
     const [activeOverlaySessionId, setActiveOverlaySessionId] = useState<string | null>(null)
     const activeChatSessionId = selectedSessionId ?? activeOverlaySessionId ?? (pathname === '/editor' ? activeEditorSessionId : null)

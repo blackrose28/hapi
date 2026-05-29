@@ -8,7 +8,7 @@ import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionExportDialog } from '@/components/SessionExportDialog'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { CopyIcon, CheckIcon } from '@/components/icons'
+import { CopyIcon, CheckIcon, ScheduleIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
 import { classifySessionAttention } from '@/lib/sessionAttention'
@@ -20,6 +20,9 @@ import { getCodexImportedAt, subscribeCodexImportedSessions } from '@/lib/codexI
 import { formatReopenError } from '@/lib/reopenError'
 import type { Machine } from '@/types/api'
 import { DEFAULT_SESSION_PREVIEW_LIMIT, useSessionPreviewLimit } from '@/hooks/useSessionPreviewLimit'
+import { useSessionListStatusMode } from '@/hooks/useSessionListStatusMode'
+import { classifySessionAttention } from '@/lib/sessionAttention'
+import { getSessionLastSeenAt } from '@/lib/sessionLastSeen'
 
 type SessionGroup = {
     key: string
@@ -132,7 +135,6 @@ function getGroupDisplayName(directory: string): string {
 }
 
 export const UNKNOWN_MACHINE_ID = '__unknown__'
-<<<<<<< HEAD
 export const GROUP_SESSION_PREVIEW_LIMIT = 5
 
 export function getSessionTitle(session: SessionSummary): string {
@@ -146,9 +148,6 @@ export function getSessionDedupKey(session: SessionSummary): string | null {
     // stale cross-flavor value (codexSessionId ?? claudeSessionId ?? ...).
     return `${session.metadata?.flavor ?? 'unknown'}:${agentId}`
 }
-=======
-export const GROUP_SESSION_PREVIEW_LIMIT = DEFAULT_SESSION_PREVIEW_LIMIT
->>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
 
 export function deduplicateSessionsByAgentId(sessions: SessionSummary[], selectedSessionId?: string | null): SessionSummary[] {
     const byAgentId = new Map<string, SessionSummary[]>()
@@ -287,26 +286,8 @@ export function expandSelectedSessionCollapseOverrides(
     }
 
     const next = new Map(overrides)
-<<<<<<< HEAD
     next.set(group.key, false)
     return next
-=======
-    let changed = false
-
-    // Expand project group if collapsed. Project and machine keys use true = collapsed.
-    if (overrides.has(group.key) && overrides.get(group.key)) {
-        next.delete(group.key)
-        changed = true
-    }
-
-    const machineKey = `machine::${group.machineId ?? UNKNOWN_MACHINE_ID}`
-    if (overrides.has(machineKey) && overrides.get(machineKey)) {
-        next.delete(machineKey)
-        changed = true
-    }
-
-    return changed ? next : overrides
->>>>>>> 0fa21a12 (fix(web): preserve session preview folding (#666))
 }
 
 function groupByMachine(
@@ -898,7 +879,7 @@ function SessionItem(props: {
         () => showDetailedStatus
             ? classifySessionAttention(s, {
                 selected,
-                lastSeenAt: undefined
+                lastSeenAt: getSessionLastSeenAt(s.id)
             })
             : null,
         [s, selected, showDetailedStatus]
@@ -941,7 +922,7 @@ function SessionItem(props: {
                         {hasScheduleTooltip ? (
                             <HoverTooltip
                                 id={scheduleId!}
-                                target={<span className="h-3.5 w-3.5 text-[var(--app-hint)]" aria-hidden="true">📅</span>}
+                                target={<span className="h-3.5 w-3.5 text-[var(--app-hint)]" aria-hidden="true"><ScheduleIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" /></span>}
                                 side="bottom"
                                 align="start"
                                 className="shrink-0"
@@ -1071,10 +1052,8 @@ export function SessionList(props: {
     const { t } = useTranslation()
     const { renderHeader = true, api, selectedSessionId, machineLabelsById = {}, machinesById = {}, onNewSessionInDirectory } = props
     const { sessionPreviewLimit } = useSessionPreviewLimit()
-    const showDetailedStatus = true
-    const showActiveSessionsOnly = false
-    const machineFilter = null
-    const setMachineFilter = () => {}
+    const { sessionListStatusMode } = useSessionListStatusMode()
+    const showDetailedStatus = sessionListStatusMode === 'detailed'
     const [searchQuery, setSearchQuery] = useState('')
     const [customStart, setCustomStart] = useState('')
     const [customEnd, setCustomEnd] = useState('')
@@ -1365,7 +1344,6 @@ export function SessionList(props: {
                             {/* Sessions */}
                             <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
                                 <div className="collapsible-inner">
-<<<<<<< HEAD
                                 <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
                                     {visibleGroupSessions.map((s) => (
                                         <SessionItem
@@ -1393,84 +1371,6 @@ export function SessionList(props: {
                                                 ? t('sessions.group.showMore', { n: showMoreCount })
                                                 : t('sessions.group.showLess')}
                                         </button>
-                                    ) : null}
-=======
-                                <div className="flex flex-col ml-3.5 pl-1 mt-0.5">
-                                    {mg.projectGroups.map((group) => {
-                                        const isCollapsed = isGroupCollapsed(group)
-                                        const visibleGroupSessions = getVisibleGroupSessions(group)
-                                        const hiddenSessionCount = group.sessions.length - visibleGroupSessions.length
-                                        const sessionGroupExpanded = isSessionGroupExpanded(group)
-                                        const canStartInGroupDirectory = group.directory !== 'Other'
-                                        return (
-                                            <div key={group.key}>
-                                                <div
-                                                    className="group/project sticky top-0 z-10 flex items-center gap-2 px-1 py-1.5 text-left rounded-lg transition-colors hover:bg-[var(--app-subtle-bg)] cursor-pointer min-w-0 w-full select-none"
-                                                    onClick={() => toggleGroup(group.key, isCollapsed)}
-                                                    title={group.directory}
-                                                >
-                                                    <ChevronIcon className="h-3.5 w-3.5 text-[var(--app-hint)] shrink-0" collapsed={isCollapsed} />
-                                                    <span className="font-medium text-sm truncate flex-1">
-                                                        {group.displayName}
-                                                    </span>
-                                                    <CopyPathButton path={group.directory} className="opacity-0 group-hover/project:opacity-100 transition-opacity duration-150" />
-                                                    {onNewSessionInDirectory && canStartInGroupDirectory ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(event) => {
-                                                                event.stopPropagation()
-                                                                onNewSessionInDirectory({
-                                                                    machineId: group.machineId,
-                                                                    directory: group.directory
-                                                                })
-                                                            }}
-                                                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--app-hint)] opacity-70 transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-link)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
-                                                            title={t('sessions.group.new')}
-                                                            aria-label={t('sessions.group.new')}
-                                                        >
-                                                            <PlusIcon className="h-3.5 w-3.5" />
-                                                        </button>
-                                                    ) : null}
-                                                    <span className="text-[11px] tabular-nums text-[var(--app-hint)] shrink-0">
-                                                        ({group.sessions.length})
-                                                    </span>
-                                                </div>
-
-                                                {/* Level 3: Sessions */}
-                                                <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
-                                                    <div className="collapsible-inner">
-                                                    <div className="flex flex-col gap-0.5 ml-3 pl-1 pr-1 py-1">
-                                                        {visibleGroupSessions.map((s) => (
-                                                            <SessionItem
-                                                                key={s.id}
-                                                                session={s}
-                                                                onSelect={props.onSelect}
-                                                                showPath={false}
-                                                                api={api}
-                                                                selected={s.id === selectedSessionId}
-                                                            />
-                                                        ))}
-                                                        {!isSearching && group.sessions.length > sessionPreviewLimit && (sessionGroupExpanded || hiddenSessionCount > 0) ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => toggleSessionGroup(group)}
-                                                                className={cn(
-                                                                    'mx-2 my-1 rounded-md px-2 py-1 text-left text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]',
-                                                                    hiddenSessionCount > 0 && 'border border-dashed border-[var(--app-border)]'
-                                                                )}
-                                                            >
-                                                                {sessionGroupExpanded
-                                                                    ? t('sessions.group.showLess')
-                                                                    : t('sessions.group.showMore', { n: hiddenSessionCount })}
-                                                            </button>
-                                                        ) : null}
-                                                    </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
->>>>>>> 7bb7c7d9 (feat(web): configure session preview limit (#629))
                                 </div>
                                 </div>
                             </div>
