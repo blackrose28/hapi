@@ -55,6 +55,7 @@ describe('classifySessionAttention', () => {
 
         expect(attention).toEqual({ kind: 'unread' })
     })
+
     it('shows unread activity when the session has updated since last seen', () => {
         const attention = classifySessionAttention(
             makeSummary({ id: 'a', updatedAt: 5000 }),
