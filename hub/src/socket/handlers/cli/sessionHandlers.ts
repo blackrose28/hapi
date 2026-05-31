@@ -83,6 +83,9 @@ export type SessionHandlersDeps = {
     onAgentTextMessage?: (input: { namespace: string; sessionId: string; text: string; requestId?: string | null }) => void
     /** Delegates session-end immediate-queue sweep to the MessageService layer. */
     onSweepImmediateQueued?: (sessionId: string, now: number) => void
+    /** Drops the queued-thinking grace so synchronous CLI handlers (e.g. slash
+     *  commands) don't leave the spinner stuck for the full grace window. */
+    onMessagesConsumed?: (sessionId: string) => void
 }
 
 function getTeamMentionRequestId(content: unknown): string | null {
@@ -130,7 +133,7 @@ function extractAgentTextMessage(content: unknown): string | null {
 }
 
 export function registerSessionHandlers(socket: CliSocketWithData, deps: SessionHandlersDeps): void {
-    const { store, resolveSessionAccess, emitAccessError, onSessionAlive, onSessionReady, onSessionEnd, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, onSweepImmediateQueued } = deps
+    const { store, resolveSessionAccess, emitAccessError, onSessionAlive, onSessionReady, onSessionEnd, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, onSweepImmediateQueued, onMessagesConsumed } = deps
 
     socket.on('message', (data: unknown) => {
         const parsed = messageSchema.safeParse(data)
@@ -418,9 +421,6 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
             emitAccessError('session', parsed.data.sid, sessionAccess.reason)
             return
         }
-        // Relayed straight to viewers — never persisted and never used to mark the
-        // session alive: the 2s session-alive keepalive already owns liveness, and
-        // a heartbeat that outlived its 30s window must not extend anything.
         onWebappEvent?.({
             type: 'tool-progress',
             sessionId: parsed.data.sid,
@@ -431,7 +431,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
         })
     })
 
-    socket.on('messages-consumed', (data: { sid: string; localIds: string[] }) => {
+    socket.on('messages-consumed', (data: { sid: string; localIds: string[]; clearQueuedThinkingGrace?: boolean }) => {
         if (!data || typeof data.sid !== 'string' || !Array.isArray(data.localIds)) {
             return
         }
@@ -448,6 +448,14 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
         try {
             store.messages.markMessagesInvoked(data.sid, localIds, invokedAt)
             onSessionActivity?.(data.sid, invokedAt)
+            // Only drop the queued-thinking grace when the CLI explicitly opts in
+            // (synchronous handlers like slash commands that will never send
+            // their own `thinking=true` keepalive). Normal queue drains still
+            // need the grace so the spinner doesn't flicker between the queue
+            // shift and `backend.prompt` start.
+            if (data.clearQueuedThinkingGrace === true) {
+                onMessagesConsumed?.(data.sid)
+            }
             // Emit only after the DB write succeeds. Otherwise a transient SQLite
             // failure would broadcast an `invokedAt` that was never persisted —
             // live clients would hide the queued rows while a refresh / secondary

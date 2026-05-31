@@ -118,6 +118,10 @@ function getUserCommandsDir(agent: string): string | null {
         }
         case 'grok':
             return join(homedir(), '.agents', 'commands');
+        case 'opencode': {
+            const xdgConfigHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
+            return join(xdgConfigHome, 'opencode', 'command');
+        }
         default:
             // Gemini and other agents don't have user commands
             return null;
@@ -136,6 +140,8 @@ function getProjectCommandsDir(agent: string, projectDir: string): string | null
             return join(projectDir, '.codex', 'prompts');
         case 'grok':
             return join(projectDir, '.grok', 'commands');
+        case 'opencode':
+            return join(projectDir, '.opencode', 'command');
         default:
             // Gemini and other agents don't have project commands
             return null;

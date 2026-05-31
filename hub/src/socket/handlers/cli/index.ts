@@ -59,6 +59,7 @@ export type CliHandlersDeps = {
     onSessionCrashed?: (sessionId: string, error?: string) => void
     onAgentTextMessage?: (input: { namespace: string; sessionId: string; text: string; requestId?: string | null }) => void
     onSweepImmediateQueued?: (sessionId: string, now: number) => void
+    onMessagesConsumed?: (sessionId: string, localIds: string[], options?: { clearQueuedThinkingGrace?: boolean }) => void
     resolveCapability: ResourceCapabilityResolver
 }
 
@@ -96,6 +97,13 @@ export function broadcastLostTerminalLists(
 
 export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlersDeps): void {
     const { io, store, rpcRegistry, terminalRegistry, terminalHistoryRequests, terminalSessionState, onSessionAlive, onSessionReady, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, onSweepImmediateQueued, resolveCapability } = deps
+=======
+    onMessagesConsumed?: (sessionId: string) => void
+}
+
+export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlersDeps): void {
+    const { io, store, rpcRegistry, terminalRegistry, onSessionAlive, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSweepImmediateQueued, onMessagesConsumed } = deps
+>>>>>>> 5b797bb9 (feat(opencode): slash command support (#671) (#753))
     const terminalNamespace = io.of('/terminal')
     const namespace = typeof socket.data.namespace === 'string' ? socket.data.namespace : null
 
@@ -201,7 +209,8 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
         onSessionActivity,
         onSessionCrashed,
         onAgentTextMessage,
-        onSweepImmediateQueued
+        onSweepImmediateQueued,
+        onMessagesConsumed
     })
     registerMachineHandlers(socket, {
         store,

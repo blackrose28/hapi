@@ -515,6 +515,10 @@ export class SyncEngine {
         this.triggerDedupIfNeeded(payload.sid)
     }
 
+    clearQueuedThinkingGrace(sessionId: string): void {
+        this.sessionCache.clearQueuedThinkingGrace(sessionId)
+    }
+
     handleSessionEnd(payload: { sid: string; time: number; reason?: 'completed' | 'terminated' | 'error' }): void {
         const before = this.sessionCache.getSession(payload.sid)
         const isCursorAcp = before?.metadata?.flavor === 'cursor'

@@ -30,6 +30,7 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
     private recoveryContextConsumed = false
     private instructionsSent = false;
     private currentBackendModel: string | null = null;
+    private defaultBackendModel: string | null = null;
     private currentBackendEffort: string | null = null;
     private setModelSupported: boolean | undefined = undefined;
 
@@ -124,7 +125,10 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
         // does not trigger a redundant setModel on the very first turn.
         const initialMetadata = backend.getSessionModelsMetadata?.(acpSessionId);
         this.currentBackendModel = initialMetadata?.currentModelId ?? null;
-        this.currentBackendEffort = initialMetadata?.currentEffortId ?? null;
+        this.defaultBackendModel = this.currentBackendModel;
+        const thoughtLevelOption = backend.getThoughtLevelConfigOption?.(acpSessionId);
+        this.currentBackendEffort = initialMetadata?.currentEffortId ?? thoughtLevelOption?.currentValue ?? null;
+        this.defaultBackendEffort = this.currentBackendEffort;
 
         // Expose the cached models metadata via per-session RPC so the hub can
         // forward it to the web UI's model selector without round-tripping ACP.
@@ -186,15 +190,29 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
             // RPC, we learn that from the first method-not-found response and stop
             // attempting it for the rest of this session.
             //
-            if (batch.mode.model && batch.mode.model !== this.currentBackendModel) {
+            // `batch.mode.model` semantics: a string is a specific model id;
+            // `null` means "reset to whatever model the backend launched with"
+            // (emitted by `/model default`); `undefined` means "no change".
+            const requestedModel = batch.mode.model === null
+                ? this.defaultBackendModel
+                : batch.mode.model;
+            // The very first batch seeds currentBackendModel — the OpenCode CLI was
+            // launched with that model via --model and there is nothing to switch yet.
+            if (requestedModel && this.currentBackendModel === null) {
+                this.currentBackendModel = requestedModel;
+            } else if (requestedModel && requestedModel !== this.currentBackendModel) {
                 if (!backend.setModel || this.setModelSupported === false) {
                     batch.mode.model = this.currentBackendModel ?? undefined;
                 } else {
-                    logger.debug(`[opencode-remote] Switching model inline: ${this.currentBackendModel} -> ${batch.mode.model}`);
+                    logger.debug(`[opencode-remote] Switching model inline: ${this.currentBackendModel} -> ${requestedModel}`);
                     try {
-                        await backend.setModel(acpSessionId, batch.mode.model, { flavor: 'opencode' });
-                        this.currentBackendModel = batch.mode.model;
+                        await backend.setModel(acpSessionId, requestedModel, { flavor: 'opencode' });
+                        this.currentBackendModel = requestedModel;
                         this.setModelSupported = true;
+                        // Reflect the resolved model back into the batch so
+                        // downstream display logic sees the concrete id rather
+                        // than a `null` placeholder.
+                        batch.mode.model = requestedModel;
                     } catch (error) {
                         const message = error instanceof Error ? error.message : String(error);
                         const methodNotFound = /method not found/i.test(message);
@@ -209,7 +227,7 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
                             logger.warn('[opencode-remote] Inline model switch failed', error);
                             session.sendSessionEvent({
                                 type: 'message',
-                                message: `Failed to switch model to ${batch.mode.model}. Continuing with ${this.currentBackendModel ?? '(default)'}.`
+                                message: `Failed to switch model to ${requestedModel}. Continuing with ${this.currentBackendModel ?? '(default)'}.`
                             });
                         }
                         batch.mode.model = this.currentBackendModel ?? undefined;

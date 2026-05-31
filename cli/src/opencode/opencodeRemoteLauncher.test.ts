@@ -115,6 +115,13 @@ function createModeWithEffort(model: string | undefined, modelReasoningEffort: s
     };
 }
 
+function createResetMode(): OpencodeMode {
+    return {
+        permissionMode: 'default' as PermissionMode,
+        model: null
+    };
+}
+
 function createSessionStub(items: Array<{ message: string; mode: OpencodeMode }>) {
     const queue = new MessageQueue2<OpencodeMode>((mode) => JSON.stringify(mode));
     items.forEach(({ message, mode }, index) => {
@@ -370,6 +377,108 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         expect(failureMessages[1]?.message).toContain('ollama/b');
         expect(harness.promptCount).toBe(2);
     });
+
+    it('resets to the backend launch-time default model when the queued mode.model is null', async () => {
+        // Seed the backend with a launch-time default model so the launcher
+        // captures it as `defaultBackendModel`. Without that, `/model default`
+        // resolves to null and the launcher has nothing to switch back to.
+        const opencodeBackendModule = await import('./utils/opencodeBackend');
+        const factory = (opencodeBackendModule as unknown as { createOpencodeBackend: ReturnType<typeof vi.fn> }).createOpencodeBackend;
+        const originalImpl = factory.getMockImplementation();
+        factory.mockImplementationOnce(() => {
+            const backend = (originalImpl as () => Record<string, unknown>)();
+            backend.getSessionModelsMetadata = vi.fn(() => ({
+                currentModelId: 'ollama/launch-default',
+                availableModels: []
+            }));
+            return backend;
+        });
+
+        const { session } = createSessionStub([
+            { message: 'first', mode: createMode('ollama/custom') },
+            { message: 'second', mode: createResetMode() }
+        ]);
+
+        await opencodeRemoteLauncher(session as never);
+
+        // Switch to custom on turn 1, then back to the launch-time default on turn 2.
+        expect(harness.setModelArgs).toEqual([
+            { sessionId: 'acp-session-1', modelId: 'ollama/custom', flavor: 'opencode' },
+            { sessionId: 'acp-session-1', modelId: 'ollama/launch-default', flavor: 'opencode' }
+        ]);
+        expect(harness.promptCount).toBe(2);
+    });
+
+    it('calls setConfigOption for OpenCode reasoning effort changes', async () => {
+        harness.thoughtLevelOption = {
+            id: 'effort',
+            currentValue: 'low',
+            options: [
+                { value: 'low', name: 'Low' },
+                { value: 'high', name: 'High' }
+            ]
+        };
+        const { session } = createSessionStub([
+            { message: 'first', mode: createModeWithEffort(undefined, 'high') }
+        ]);
+
+        await opencodeRemoteLauncher(session as never);
+
+        expect(harness.setConfigOptionArgs).toEqual([
+            { sessionId: 'acp-session-1', configId: 'effort', value: 'high' }
+        ]);
+        expect(harness.promptCount).toBe(1);
+    });
+
+    it('rolls back session reasoning effort when OpenCode rejects the switch', async () => {
+        harness.thoughtLevelOption = {
+            id: 'effort',
+            currentValue: 'low',
+            options: [
+                { value: 'low', name: 'Low' },
+                { value: 'high', name: 'High' }
+            ]
+        };
+        harness.setConfigOptionImpl = async () => {
+            throw new Error('Transient backend failure');
+        };
+        const { session, sessionEvents, setModelReasoningEffort, pushKeepAlive } = createSessionStub([
+            { message: 'first', mode: createModeWithEffort(undefined, 'high') }
+        ]);
+        const rollbacks: Array<string | null> = [];
+
+        await opencodeRemoteLauncher(session as never, {
+            onReasoningEffortRollback: (effort) => rollbacks.push(effort)
+        });
+
+        expect(harness.setConfigOptionArgs).toEqual([
+            { sessionId: 'acp-session-1', configId: 'effort', value: 'high' }
+        ]);
+        expect(setModelReasoningEffort).toHaveBeenCalledWith('low');
+        expect(pushKeepAlive).toHaveBeenCalledTimes(1);
+        expect(rollbacks).toEqual(['low']);
+        expect(sessionEvents.some(
+            (event) => event.type === 'message'
+                && typeof event.message === 'string'
+                && event.message.includes('Failed to switch reasoning effort')
+        )).toBe(true);
+        expect(harness.promptCount).toBe(1);
+    });
+
+    it('injects plan-mode instructions into plan turns', async () => {
+        const { session } = createSessionStub([
+            { message: 'design the fix', mode: createPlanMode() }
+        ]);
+
+        await opencodeRemoteLauncher(session as never);
+
+        const content = harness.promptContents[0] as Array<{ type: string; text: string }>;
+        expect(content[0]?.text).toContain('You are in plan mode');
+        expect(content[0]?.text).toContain('Do not execute tools');
+        expect(content[0]?.text).toContain('design the fix');
+    });
+
+>>>>>>> 5b797bb9 (feat(opencode): slash command support (#671) (#753))
     it('registers a listOpencodeModels RPC handler that returns the backend cache', async () => {
         // Override getSessionModelsMetadata for this run only.
         const fixtureModels = [

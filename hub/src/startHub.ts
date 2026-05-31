@@ -228,7 +228,8 @@ export async function startHub(options?: { args?: string[] }) {
         onSessionActivity: (sessionId, updatedAt) => syncEngine?.recordSessionActivity(sessionId, updatedAt),
         onSessionCrashed: (sessionId, error) => syncEngine?.handleSessionCrashed(sessionId, error),
         onAgentTextMessage: (input) => syncEngine?.autoReportSessionReply(input),
-        onSweepImmediateQueued: (sessionId, now) => syncEngine?.sweepImmediateQueuedOnSessionEnd(sessionId, now)
+        onSweepImmediateQueued: (sessionId, now) => syncEngine?.sweepImmediateQueuedOnSessionEnd(sessionId, now),
+        onMessagesConsumed: (sessionId) => syncEngine?.clearQueuedThinkingGrace(sessionId)
     })
     const runnerLifecycle = new RunnerLifecycleService(
         sharedStore,
