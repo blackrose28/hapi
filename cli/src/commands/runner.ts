@@ -110,6 +110,17 @@ async function promptForWorkspaceRoot(): Promise<string | undefined> {
     )
 }
 
+async function waitForRunnerToStop(maxAttempts = 50): Promise<boolean> {
+    for (let i = 0; i < maxAttempts; i++) {
+        if (!(await checkIfRunnerRunningAndCleanupStaleState())) {
+            return true
+        }
+        await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
+    return false
+}
+
 export const runnerCommand: CommandDefinition = {
     name: 'runner',
     requiresRuntimeAssets: true,
@@ -163,6 +174,16 @@ export const runnerCommand: CommandDefinition = {
         }
 
         if (runnerSubcommand === 'start') {
+            if (await checkIfRunnerRunningAndCleanupStaleState()) {
+                console.log('Existing runner detected, stopping it before starting a new one...')
+                await stopRunner()
+
+                if (!(await waitForRunnerToStop())) {
+                    console.error('Failed to stop existing runner')
+                    process.exit(1)
+                }
+            }
+
             let profile=option(mutableArgs,'--profile')
             if(!profile)profile=await promptForProfile()
             if(!profile){console.error('--profile is required');process.exitCode=1;return}
@@ -340,7 +361,7 @@ ${argv}
 ${chalk.bold('hapi runner')} - Runner management
 
 ${chalk.bold('Usage:')}
-  hapi runner start              Start the runner (detached)
+  hapi runner start              Start the runner (replaces existing runner)
   hapi runner start --foreground Start the runner in foreground (for systemd)
   hapi runner enroll --hub <url> --code <code> --profile <name>
   hapi runner install            Install as OS service (systemd/launchd)
@@ -363,6 +384,7 @@ ${chalk.bold('Options:')}
   ${chalk.cyan('hapi doctor clean')}
 
 ${chalk.bold('Note:')} The runner runs in the background and manages Claude sessions.
+Running ${chalk.cyan('hapi runner start')} stops any existing runner first so new flags and environment variables take effect.
 
 ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('hapi doctor clean')}
 `)
