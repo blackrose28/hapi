@@ -725,6 +725,59 @@ describe('AcpSdkBackend', () => {
         expect(turnCompleteIdx).toBeGreaterThan(stragglerIdx);
     });
 
+    it('emits a context-only usage mid-turn so the status bar updates live', async () => {
+        backendStatics.UPDATE_QUIET_PERIOD_MS = 25;
+        backendStatics.UPDATE_DRAIN_TIMEOUT_MS = 200;
+        backendStatics.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS = 1;
+        backendStatics.PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS = 50;
+        backendStatics.LATE_FLUSH_INTERVAL_MS = 5;
+        backendStatics.LATE_FLUSH_QUIET_PERIOD_MS = 10;
+        backendStatics.LATE_FLUSH_WINDOW_MS = 50;
+
+        const backend = new AcpSdkBackend({ command: 'opencode' });
+        const backendInternal = backend as unknown as {
+            transport: {
+                sendRequest: (...args: unknown[]) => Promise<unknown>;
+                close: () => Promise<void>;
+            } | null;
+            handleSessionUpdate: (params: unknown) => void;
+        };
+
+        const messages: AgentMessage[] = [];
+        backendInternal.transport = {
+            sendRequest: async () => {
+                backendInternal.handleSessionUpdate({
+                    sessionId: 'session-1',
+                    update: { sessionUpdate: 'usage_update', used: 1_000, size: 200_000 }
+                });
+                backendInternal.handleSessionUpdate({
+                    sessionId: 'session-1',
+                    update: { sessionUpdate: 'usage_update', used: 1_000, size: 200_000 }
+                });
+                backendInternal.handleSessionUpdate({
+                    sessionId: 'session-1',
+                    update: { sessionUpdate: 'usage_update', used: 2_500, size: 200_000 }
+                });
+                await sleep(5);
+                return {
+                    stopReason: 'end_turn',
+                    usage: { inputTokens: 100, outputTokens: 50 }
+                };
+            },
+            close: async () => {}
+        };
+
+        await backend.prompt('session-1', [{ type: 'text', text: 'hello' }], (m) => messages.push(m));
+
+        const usageMessages = messages.filter((m): m is Extract<AgentMessage, { type: 'usage' }> => m.type === 'usage');
+        // Two mid-turn ticks (deduped second 1_000) + one final emit with the
+        // prompt-level input/output totals.
+        expect(usageMessages.length).toBe(3);
+        expect(usageMessages[0]).toMatchObject({ inputTokens: 0, outputTokens: 0, contextTokens: 1_000, contextWindow: 200_000 });
+        expect(usageMessages[1]).toMatchObject({ inputTokens: 0, outputTokens: 0, contextTokens: 2_500, contextWindow: 200_000 });
+        expect(usageMessages[2]).toMatchObject({ inputTokens: 100, outputTokens: 50, contextTokens: 2_500, contextWindow: 200_000 });
+    });
+
     it('captures the initial available-commands snapshot (as seen from the initialize response)', () => {
         // initialize() always constructs its own AcpStdioTransport (guarded by
         // `if (this.transport) return`), so it cannot be exercised through the
@@ -802,10 +855,53 @@ describe('AcpSdkBackend', () => {
                     };
                 }
                 return null;
+=======
+        await backend.prompt('session-1', [{ type: 'text', text: 'hello' }], (m) => messages.push(m));
+
+        const usageMessages = messages.filter((m): m is Extract<AgentMessage, { type: 'usage' }> => m.type === 'usage');
+        // Two mid-turn ticks (deduped second 1_000) + one final emit with the
+        // prompt-level input/output totals.
+        expect(usageMessages.length).toBe(3);
+        expect(usageMessages[0]).toMatchObject({ inputTokens: 0, outputTokens: 0, contextTokens: 1_000, contextWindow: 200_000 });
+        expect(usageMessages[1]).toMatchObject({ inputTokens: 0, outputTokens: 0, contextTokens: 2_500, contextWindow: 200_000 });
+        expect(usageMessages[2]).toMatchObject({ inputTokens: 100, outputTokens: 50, contextTokens: 2_500, contextWindow: 200_000 });
+    });
+
+    it('emits a context-only usage on finalize when the prompt response carries no usage', async () => {
+        backendStatics.UPDATE_QUIET_PERIOD_MS = 25;
+        backendStatics.UPDATE_DRAIN_TIMEOUT_MS = 200;
+        backendStatics.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS = 1;
+        backendStatics.PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS = 50;
+        backendStatics.LATE_FLUSH_INTERVAL_MS = 5;
+        backendStatics.LATE_FLUSH_QUIET_PERIOD_MS = 10;
+        backendStatics.LATE_FLUSH_WINDOW_MS = 50;
+
+        const backend = new AcpSdkBackend({ command: 'opencode' });
+        const backendInternal = backend as unknown as {
+            transport: {
+                sendRequest: (...args: unknown[]) => Promise<unknown>;
+                close: () => Promise<void>;
+            } | null;
+            handleSessionUpdate: (params: unknown) => void;
+        };
+
+        const messages: AgentMessage[] = [];
+        backendInternal.transport = {
+            sendRequest: async () => {
+                backendInternal.handleSessionUpdate({
+                    sessionId: 'session-1',
+                    update: { sessionUpdate: 'usage_update', used: 4_200, size: 200_000 }
+                });
+                await sleep(5);
+                // No `usage` field on the response: simulates slash-handled
+                // turns or errored turns that skip the model.
+                return { stopReason: 'end_turn' };
+>>>>>>> 994a820e (fix(opencode): surface ACP context usage live to web status bar (#756))
             },
             close: async () => {}
         };
 
+<<<<<<< HEAD
         const sessionId = await backend.newSession({ cwd: '/tmp/x', mcpServers: [] });
 
         expect(backend.getThoughtLevelConfigOption(sessionId)).toEqual({
@@ -898,5 +994,20 @@ describe('AcpSdkBackend', () => {
             ],
             currentModelId: 'grok-4.5'
         });
+=======
+        await backend.prompt('session-1', [{ type: 'text', text: 'hi' }], (m) => messages.push(m));
+
+        const usageMessages = messages.filter((m): m is Extract<AgentMessage, { type: 'usage' }> => m.type === 'usage');
+        // One mid-turn emit and one finalize fallback — both context-only.
+        expect(usageMessages.length).toBe(2);
+        for (const usage of usageMessages) {
+            expect(usage).toMatchObject({
+                inputTokens: 0,
+                outputTokens: 0,
+                contextTokens: 4_200,
+                contextWindow: 200_000
+            });
+        }
+>>>>>>> 994a820e (fix(opencode): surface ACP context usage live to web status bar (#756))
     });
 });
