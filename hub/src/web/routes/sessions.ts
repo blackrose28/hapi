@@ -292,7 +292,8 @@ export function createSessionsRoutes(
             const status = result.code === 'no_machine_online' ? 503
                 : result.code === 'access_denied' ? 403
                     : result.code === 'session_not_found' ? 404
-                        : 500
+                        : result.code === 'resume_unavailable' ? 409
+                            : 500
             return c.json({ error: result.message, code: result.code }, status)
         }
 

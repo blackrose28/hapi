@@ -1262,4 +1262,93 @@ describe('sessions routes', () => {
         expect(response.status).toBe(200)
         expect(capturedResumeOpts).toEqual({ permissionMode: 'bypassPermissions' })
     })
+
+    it('returns 409 when resume token is unavailable', async () => {
+        const session = createSession({
+            active: false,
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'cursor' }
+        })
+        const { app } = createApp(session, {
+            resumeSession: async () => ({
+                type: 'error',
+                message: 'Resume session ID unavailable. Start a new session in this directory, or retry after the agent has initialized.',
+                code: 'resume_unavailable'
+            })
+        })
+
+        const response = await app.request('/api/sessions/session-1/resume', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({})
+        })
+
+        expect(response.status).toBe(409)
+        expect(await response.json()).toEqual({
+            error: 'Resume session ID unavailable. Start a new session in this directory, or retry after the agent has initialized.',
+            code: 'resume_unavailable'
+        })
+    })
+
+    it('falls back to metadata slash commands when RPC listing fails', async () => {
+        const session = createSession({
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'claude',
+                slashCommands: ['help', 'memory', 'status']
+            }
+        })
+        const { app } = createApp(session, {
+            listSlashCommands: async () => {
+                throw new Error('RPC unavailable')
+            }
+        })
+
+        const response = await app.request('/api/sessions/session-1/slash-commands')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            commands: [
+                { name: 'help', source: 'builtin' },
+                { name: 'memory', source: 'builtin' },
+                { name: 'status', source: 'builtin' }
+            ]
+        })
+    })
+
+    it('merges RPC and metadata slash commands without hiding built-ins', async () => {
+        const session = createSession({
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'claude',
+                slashCommands: ['help', 'memory']
+            }
+        })
+        const { app } = createApp(session, {
+            listSlashCommands: async () => ({
+                success: true,
+                commands: [
+                    { name: 'clear', source: 'builtin' },
+                    { name: 'project-only', source: 'project', content: 'Project prompt' }
+                ]
+            })
+        })
+
+        const response = await app.request('/api/sessions/session-1/slash-commands')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            commands: [
+                { name: 'help', source: 'builtin' },
+                { name: 'memory', source: 'builtin' },
+                { name: 'clear', source: 'builtin' },
+                { name: 'project-only', source: 'project', content: 'Project prompt' }
+            ]
+        })
+    })
+
+>>>>>>> c58e8cea (fix(cursor): persist resume id early and return 409 for resume_unavailable (#745))
 })

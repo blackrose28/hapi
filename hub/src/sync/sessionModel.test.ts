@@ -1296,6 +1296,134 @@ describe('session model', () => {
 
             expect(result).toEqual({ type: 'success', sessionId: session.id })
             expect(capturedResumeSessionId).toBe('grok-session-1')
+            expect(store.sessions.getSession(session.id)?.metadata).toMatchObject({
+                grokSessionId: 'grok-session-1'
+            })
+        } finally {
+            engine.stop()
+        }
+    })
+
+
+    it('recovers the newest claude session ID when stored messages contain multiple IDs', async () => {
+        const store = new Store(':memory:')
+        const engine = new SyncEngine(
+            store,
+            {} as never,
+            new RpcRegistry(),
+            { broadcast() {} } as never
+        )
+
+        try {
+            const session = engine.getOrCreateSession(
+                'session-claude-resume-newest-message',
+                {
+                    path: '/tmp/project',
+                    host: 'localhost',
+                    machineId: 'machine-1',
+                    flavor: 'claude'
+                },
+                null,
+                'default',
+                'sonnet'
+            )
+            store.messages.addMessage(session.id, {
+                role: 'agent',
+                content: {
+                    type: 'output',
+                    data: {
+                        type: 'assistant',
+                        sessionId: '11111111-1111-4111-8111-111111111111'
+                    }
+                }
+            })
+            store.messages.addMessage(session.id, {
+                role: 'agent',
+                content: {
+                    type: 'output',
+                    data: {
+                        type: 'assistant',
+                        sessionId: '22222222-2222-4222-8222-222222222222'
+                    }
+                }
+            })
+            engine.getOrCreateMachine(
+                'machine-1',
+                { host: 'localhost', platform: 'linux', happyCliVersion: '0.1.0' },
+                null,
+                'default'
+            )
+            engine.handleMachineAlive({ machineId: 'machine-1', time: Date.now() })
+
+            let capturedResumeSessionId: string | undefined
+            ;(engine as any).rpcGateway.spawnSession = async (
+                _machineId: string,
+                _directory: string,
+                _agent: string,
+                _model?: string,
+                _modelReasoningEffort?: string,
+                _yolo?: boolean,
+                _sessionType?: 'simple' | 'worktree',
+                _worktreeName?: string,
+                resumeSessionId?: string
+            ) => {
+                capturedResumeSessionId = resumeSessionId
+                return { type: 'success', sessionId: session.id }
+            }
+            ;(engine as any).waitForSessionActive = async () => true
+
+            const result = await engine.resumeSession(session.id, 'default')
+
+            expect(result).toEqual({ type: 'success', sessionId: session.id })
+            expect(capturedResumeSessionId).toBe('22222222-2222-4222-8222-222222222222')
+            expect(store.sessions.getSession(session.id)?.metadata).toMatchObject({
+                claudeSessionId: '22222222-2222-4222-8222-222222222222'
+            })
+        } finally {
+            engine.stop()
+        }
+    })
+
+    it('does not recover a non-UUID sessionId from stored messages', async () => {
+        const store = new Store(':memory:')
+        const engine = new SyncEngine(
+            store,
+            {} as never,
+            new RpcRegistry(),
+            { broadcast() {} } as never
+        )
+
+        try {
+            const session = engine.getOrCreateSession(
+                'session-claude-resume-no-token',
+                {
+                    path: '/tmp/project',
+                    host: 'localhost',
+                    machineId: 'machine-1',
+                    flavor: 'claude'
+                },
+                null,
+                'default',
+                'sonnet'
+            )
+            store.messages.addMessage(session.id, {
+                role: 'agent',
+                content: {
+                    type: 'output',
+                    data: {
+                        sessionId: 'hapi-session-id-not-claude-uuid'
+                    }
+                }
+            })
+
+            const result = await engine.resumeSession(session.id, 'default')
+
+            expect(result).toEqual({
+                type: 'error',
+                message: 'Resume session ID unavailable. Start a new session in this directory, or retry after the agent has initialized.',
+                code: 'resume_unavailable'
+            })
+>>>>>>> c58e8cea (fix(cursor): persist resume id early and return 409 for resume_unavailable (#745))
         } finally {
             engine.stop()
         }
@@ -1486,7 +1614,39 @@ describe('session model', () => {
 
             expect(engine.resolveLocalResumeTarget(session.id, 'default')).toEqual({
                 type: 'error',
-                message: 'Resume session ID unavailable',
+                message: 'Resume session ID unavailable. Start a new session in this directory, or retry after the agent has initialized.',
+                code: 'resume_unavailable'
+            })
+        } finally {
+            engine.stop()
+        }
+    })
+
+    it('returns resume_unavailable when a cursor session lacks cursorSessionId', () => {
+        const store = new Store(':memory:')
+        const engine = new SyncEngine(
+            store,
+            {} as never,
+            new RpcRegistry(),
+            { broadcast() {} } as never
+        )
+
+        try {
+            const session = engine.getOrCreateSession(
+                'local-resume-cursor-no-id',
+                {
+                    path: '/tmp/project',
+                    host: 'localhost',
+                    machineId: 'machine-1',
+                    flavor: 'cursor'
+                },
+                null,
+                'default'
+            )
+
+            expect(engine.resolveLocalResumeTarget(session.id, 'default')).toEqual({
+                type: 'error',
+                message: 'Resume session ID unavailable. Start a new session in this directory, or retry after the agent has initialized.',
                 code: 'resume_unavailable'
             })
         } finally {
