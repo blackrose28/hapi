@@ -165,14 +165,22 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
     private allowedTools = new Set<string>();
     private allowedBashLiterals = new Set<string>();
     private allowedBashPrefixes = new Set<string>();
-    private permissionMode: PermissionMode = 'default';
     private onPermissionRequestCallback?: (toolCallId: string) => void;
 
     constructor(session: Session) {
         super(session.client);
         this.session = session;
     }
-    
+
+    // Read from the session so mid-turn updates via SetSessionConfig RPC
+    // (which writes through session.setPermissionMode) are picked up by the
+    // next canCallTool check. Previously this was a stored field updated
+    // only on batch boundaries, so web dropdown changes during a turn were
+    // silently ignored — see issue #735.
+    private get permissionMode(): PermissionMode {
+        return this.session.getPermissionMode() ?? 'default';
+    }
+
     /**
      * Set callback to trigger when permission request is made
      */
@@ -181,7 +189,6 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
     }
 
     handleModeChange(mode: PermissionMode) {
-        this.permissionMode = mode;
         this.session.setPermissionMode(mode);
     }
 
@@ -216,7 +223,6 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
 
         // Update permission mode
         if (response.mode) {
-            this.permissionMode = response.mode;
             this.session.setPermissionMode(response.mode);
         }
 
