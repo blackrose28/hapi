@@ -13,6 +13,7 @@ import { PermissionModeSchema } from '@hapi/protocol/schemas';
 import { registerSessionConfigRpc } from '@/agent/sessionConfigRpc';
 import { formatMessageWithAttachments } from '@/utils/attachmentFormatter';
 import { getInvokedCwd } from '@/utils/invokedCwd';
+import { enqueueCursorUserMessage } from './cursorUserMessageQueue';
 
 const formatFailureReason = (message: string): string => {
     const maxLength = 200;
@@ -98,7 +99,7 @@ export async function runCursor(opts: {
             model: currentModel
         };
         const formattedText = formatMessageWithAttachments(message.content.text, message.content.attachments);
-        messageQueue.push(formattedText, enhancedMode, localId);
+        enqueueCursorUserMessage(messageQueue, formattedText, enhancedMode, localId);
     });
 
     session.onCancelQueuedMessage((localId) => {
