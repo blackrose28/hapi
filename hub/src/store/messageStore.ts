@@ -19,6 +19,8 @@ import {
     countMessages,
     markMessagesInvoked,
     mergeSessionMessages,
+    copyMessageToSession as copyStoredMessageToSession,
+    getAllMessages,
     type AddMessageResult,
     type CancelQueuedMessageResult,
     type LookupQueuedMessageResult
@@ -35,12 +37,21 @@ export class MessageStore {
         return addMessage(this.db, sessionId, content, localId, scheduledAt)
     }
 
-    getMessages(sessionId: string, limit: number = 200, beforeSeq?: number): StoredMessage[] {
-        return getMessages(this.db, sessionId, limit, beforeSeq)
+    copyMessageToSession(
+        sessionId: string,
+        message: Pick<StoredMessage, 'content' | 'createdAt' | 'localId' | 'invokedAt' | 'scheduledAt'>
+    ): StoredMessage {
+        // 中文注释：重复会话合并时需要保留源消息的时间戳和排队信息，因此走专门的复制入口而不是普通 addMessage。
+        return copyStoredMessageToSession(this.db, sessionId, message)
     }
 
     getAllMessages(sessionId: string): StoredMessage[] {
-        return getMessages(this.db, sessionId, 100000)
+        return getAllMessages(this.db, sessionId)
+    }
+
+    getMessages(sessionId: string, limit: number = 200, beforeSeq?: number): StoredMessage[] {
+        return getMessages(this.db, sessionId, limit, beforeSeq)
+    }
     }
 
     getFirstMessages(sessionId: string, limit: number = 50): StoredMessage[] {
