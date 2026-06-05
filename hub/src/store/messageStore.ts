@@ -18,6 +18,10 @@ export class MessageStore {
         return getMessages(this.db, sessionId, limit, beforeSeq)
     }
 
+    getAllMessages(sessionId: string): StoredMessage[] {
+        return getMessages(this.db, sessionId, 100000)
+    }
+
     getDeliverableMessagesAfter(sessionId: string, afterSeq: number, now: number, limit: number = 200): StoredMessage[] {
         return getDeliverableMessagesAfter(this.db, sessionId, afterSeq, now, limit)
     }

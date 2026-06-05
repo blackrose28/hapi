@@ -33,6 +33,7 @@ import type {
     SpawnResponse,
     UploadFileResponse,
     VisibilityPayload,
+    HapiSessionExport,
     SessionResponse,
     SessionTeamMembershipsResponse,
     SessionsResponse,
@@ -304,6 +305,7 @@ export class ApiClient {
         return await this.request<SessionResponse>(`/api/sessions/${encodeURIComponent(sessionId)}`)
     }
 
+<<<<<<< HEAD
     async getTeamMessages(teamChatId: string, opts?: { limit?: number; beforeSeq?: number | null }): Promise<TeamMessagesResponse> {
         const params = new URLSearchParams()
         if (opts?.limit) params.set('limit', String(opts.limit))
@@ -382,6 +384,13 @@ export class ApiClient {
             method: 'PATCH',
             body: JSON.stringify({ status })
         })
+    }
+
+    async getSessionExport(sessionId: string, options?: { signal?: AbortSignal }): Promise<HapiSessionExport> {
+        return await this.request<HapiSessionExport>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/export`,
+            { signal: options?.signal }
+        )
     }
 
     async getMessages(

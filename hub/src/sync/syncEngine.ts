@@ -11,6 +11,7 @@ import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult } from '@
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant, CancelQueuedMessageResult } from '../store'
+import type { HapiSessionExportResult } from '@hapi/protocol/sessionExport'
 import type { RpcRegistry } from '../socket/rpcRegistry'
 import type { SSEManager } from '../sse/sseManager'
 import { EventPublisher, type SyncEventListener } from './eventPublisher'
@@ -271,6 +272,10 @@ export class SyncEngine {
         }
     } {
         return this.messageService.getMessagesPageByPosition(sessionId, options)
+    }
+
+    getSessionExport(sessionId: string, session: Session): HapiSessionExportResult {
+        return this.messageService.getSessionExport(sessionId, session)
     }
 
     getDeliverableMessagesAfter(sessionId: string, options: { afterSeq: number; limit: number; now: number }): DecryptedMessage[] {

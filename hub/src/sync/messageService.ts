@@ -1,9 +1,70 @@
-import type { AttachmentMetadata, DecryptedMessage } from '@hapi/protocol/types'
+import {
+    HAPI_SESSION_EXPORT_SCHEMA_VERSION,
+    SESSION_EXPORT_MESSAGE_LIMIT,
+    type HapiSessionExportResult
+} from '@hapi/protocol/sessionExport'
+import type { AttachmentMetadata, DecryptedMessage, Session } from '@hapi/protocol/types'
+import {
+    isClaudeChatVisibleMessage,
+    isRedundantGoalStatusEventContent,
+    unwrapRoleWrappedRecordEnvelope
+} from '@hapi/protocol/messages'
+import { isObject } from '@hapi/protocol'
 import type { Server } from 'socket.io'
 import { randomUUID } from 'node:crypto'
 import type { Store, CancelQueuedMessageResult } from '../store'
 import type { StoredMessage } from '../store/types'
 import { EventPublisher } from './eventPublisher'
+
+type StoredMessageForDelivery = ReturnType<Store['messages']['getMessages']>[number]
+
+function isWebVisibleStoredMessage(message: StoredMessageForDelivery): boolean {
+    return !isRedundantGoalStatusEventContent(message.content)
+}
+
+function toDecryptedMessage(message: StoredMessageForDelivery): DecryptedMessage {
+    return {
+        id: message.id,
+        seq: message.seq,
+        localId: message.localId,
+        content: message.content,
+        createdAt: message.createdAt,
+        invokedAt: message.invokedAt,
+        scheduledAt: message.scheduledAt
+    }
+}
+
+function toVisibleDecryptedMessages(messages: StoredMessageForDelivery[]): DecryptedMessage[] {
+    return messages.filter(isWebVisibleStoredMessage).map(toDecryptedMessage)
+}
+
+function isQueuedUserMessage(message: StoredMessageForDelivery): boolean {
+    const record = unwrapRoleWrappedRecordEnvelope(message.content)
+    return record?.role === 'user' && message.invokedAt === null
+}
+
+function isExportVisibleStoredMessage(message: StoredMessageForDelivery): boolean {
+    if (!isWebVisibleStoredMessage(message) || isQueuedUserMessage(message)) {
+        return false
+    }
+
+    const record = unwrapRoleWrappedRecordEnvelope(message.content)
+    if (record?.role !== 'agent') {
+        return true
+    }
+
+    const inner = record.content
+    if (!isObject(inner)) {
+        return false
+    }
+    const type = (inner as { type?: unknown }).type
+    if (type !== 'claude') {
+        return true
+    }
+
+    const data = (inner as { data?: unknown }).data
+    return isClaudeChatVisibleMessage(data)
+}
 
 export class MessageService {
     constructor(
@@ -53,6 +114,39 @@ export class MessageService {
                 beforeSeq: options.beforeSeq,
                 nextBeforeSeq,
                 hasMore
+            }
+        }
+    }
+
+    getSessionExport(
+        sessionId: string,
+        session: Session,
+        limit: number = SESSION_EXPORT_MESSAGE_LIMIT
+    ): HapiSessionExportResult {
+        const messages = this.store.messages.getAllMessages(sessionId)
+            .filter(isExportVisibleStoredMessage)
+            .sort((a, b) => {
+                const aAt = a.invokedAt ?? a.createdAt
+                const bAt = b.invokedAt ?? b.createdAt
+                return aAt !== bAt ? aAt - bAt : a.seq - b.seq
+            })
+            .map(toDecryptedMessage)
+
+        if (messages.length > limit) {
+            return {
+                type: 'too-large',
+                count: messages.length,
+                limit
+            }
+        }
+
+        return {
+            type: 'success',
+            payload: {
+                schemaVersion: HAPI_SESSION_EXPORT_SCHEMA_VERSION,
+                exportedAt: Date.now(),
+                session,
+                messages
             }
         }
     }

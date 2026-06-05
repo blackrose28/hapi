@@ -12,6 +12,7 @@ import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionGoalControl } from '@/components/SessionGoalControl'
 import { SessionTaskListControl } from '@/components/SessionTaskListControl'
+import { SessionExportDialog } from '@/components/SessionExportDialog'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatReopenError } from '@/lib/reopenError'
@@ -202,6 +203,7 @@ export function SessionHeader(props: {
     const menuId = useId()
     const menuAnchorRef = useRef<HTMLButtonElement | null>(null)
     const [renameOpen, setRenameOpen] = useState(false)
+    const [exportOpen, setExportOpen] = useState(false)
     const [archiveOpen, setArchiveOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [creatingTeamChat, setCreatingTeamChat] = useState(false)
@@ -511,6 +513,7 @@ export function SessionHeader(props: {
                     onClose={() => setMenuOpen(false)}
                     sessionActive={session.active}
                     onRename={() => setRenameOpen(true)}
+                    onExport={() => setExportOpen(true)}
                     onArchive={() => setArchiveOpen(true)}
                     onDelete={() => setDeleteOpen(true)}
                     onOpenFiles={handleOpenCompactFiles}
@@ -521,6 +524,7 @@ export function SessionHeader(props: {
                 />
 
                 <RenameSessionDialog isOpen={renameOpen} onClose={() => setRenameOpen(false)} currentName={title} onRename={renameSession} isPending={isPending} />
+                <SessionExportDialog isOpen={exportOpen} onClose={() => setExportOpen(false)} session={session} api={api} />
                 <ConfirmDialog isOpen={archiveOpen} onClose={() => setArchiveOpen(false)} title={t('dialog.archive.title')} description={getArchiveSessionDescription(t, { name: title, terminalLiveCount: session.terminalLiveCount })} confirmLabel={t('dialog.archive.confirm')} confirmingLabel={t('dialog.archive.confirming')} onConfirm={archiveSession} isPending={isPending} destructive />
                 <ConfirmDialog isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} title={t('dialog.delete.title')} description={t('dialog.delete.description', { name: title })} confirmLabel={t('dialog.delete.confirm')} confirmingLabel={t('dialog.delete.confirming')} onConfirm={handleDelete} isPending={isPending} destructive />
             </>
@@ -767,6 +771,7 @@ export function SessionHeader(props: {
                 onClose={() => setMenuOpen(false)}
                 sessionActive={session.active}
                 onRename={() => setRenameOpen(true)}
+                onExport={() => setExportOpen(true)}
                 onArchive={() => setArchiveOpen(true)}
                 onReopen={handleReopen}
                 onDelete={() => setDeleteOpen(true)}
@@ -793,6 +798,13 @@ export function SessionHeader(props: {
                 currentName={title}
                 onRename={renameSession}
                 isPending={isPending}
+            />
+
+            <SessionExportDialog
+                isOpen={exportOpen}
+                onClose={() => setExportOpen(false)}
+                session={session}
+                api={api}
             />
 
             <ConfirmDialog

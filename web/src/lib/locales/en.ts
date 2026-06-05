@@ -85,6 +85,7 @@ const en = {
 
   // Session actions
   'session.action.rename': 'Rename',
+  'session.action.export': 'Export conversation',
   'session.action.archive': 'Archive',
   'session.action.reopen': 'Reopen',
   'session.action.delete': 'Delete',
@@ -119,6 +120,21 @@ const en = {
   'dialog.deleteArchived.confirm': 'Delete All',
   'dialog.deleteArchived.confirming': 'Deleting…',
   'dialog.error.default': 'Operation failed. Please try again.',
+
+  // Session export
+  'session.export.title': 'Export conversation',
+  'session.export.description': 'Choose a format, then download the full visible conversation.',
+  'session.export.format.json': 'JSON',
+  'session.export.format.json.description': 'Lossless payload with session metadata and messages.',
+  'session.export.format.markdown': 'Markdown',
+  'session.export.format.markdown.description': 'Readable view generated from the same export payload.',
+  'session.export.download': 'Download',
+  'session.export.downloading': 'Exporting…',
+  'session.export.error.noApi': 'Not connected to server',
+  'session.export.error.default': 'Failed to export conversation',
+  'session.export.toast.success.title': 'Conversation exported',
+  'session.export.toast.success.body': 'Downloaded {filename}',
+  'session.export.toast.error.title': 'Export failed',
 
   // Common buttons
   'button.cancel': 'Cancel',
