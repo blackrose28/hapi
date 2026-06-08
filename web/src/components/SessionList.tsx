@@ -149,6 +149,14 @@ export function getSessionDedupKey(session: SessionSummary): string | null {
     return `${session.metadata?.flavor ?? 'unknown'}:${agentId}`
 }
 
+export function getSessionDedupKey(session: SessionSummary): string | null {
+    const agentId = session.metadata?.agentSessionId?.trim()
+    if (!agentId) return null
+    // Scope by flavor: agentSessionId is flattened from native ids and can retain a
+    // stale cross-flavor value (codexSessionId ?? claudeSessionId ?? ...).
+    return `${session.metadata?.flavor ?? 'unknown'}:${agentId}`
+}
+
 export function deduplicateSessionsByAgentId(sessions: SessionSummary[], selectedSessionId?: string | null): SessionSummary[] {
     const byAgentId = new Map<string, SessionSummary[]>()
     const result: SessionSummary[] = []
@@ -223,7 +231,6 @@ export function filterActiveSessionsOnly(sessions: SessionSummary[], selectedSes
 export function getNextSessionVisibleCount(current: number, step: number, total: number): number {
     return Math.min(current + Math.max(1, step), total)
 }
-
 function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
     const groups = new Map<string, { directory: string; machineId: string | null; sessions: SessionSummary[] }>()
 

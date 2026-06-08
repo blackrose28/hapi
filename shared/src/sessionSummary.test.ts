@@ -179,4 +179,16 @@ describe('getPendingRequestKinds', () => {
         const kinds = getPendingRequestKinds(makeSession({ agentState: { requests } }))
         expect(kinds).toEqual(['permission', 'input'])
     })
+
+    it('includes lifecycleState in summary metadata', () => {
+        const summary = toSessionSummary(makeSession({
+            metadata: {
+                path: '/proj',
+                host: 'local',
+                lifecycleState: 'archived'
+            }
+        }))
+
+        expect(summary.metadata?.lifecycleState).toBe('archived')
+    })
 })
