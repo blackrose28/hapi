@@ -222,7 +222,9 @@ export class MessageQueue2<T> {
     }
 
     /**
-     * Push an isolated message to the beginning of the queue with a mode.
+    /**
+     * Push a message to the beginning of the queue with isolation preserved.
+     * Mirrors `pushIsolated` but inserts at the head.
      */
     unshiftIsolate(message: string, mode: T, localId?: string): void {
         if (this.closed) {
@@ -252,6 +254,10 @@ export class MessageQueue2<T> {
         }
 
         logger.debug(`[MessageQueue2] unshiftIsolate() completed. Queue size: ${this.queue.length}`);
+    }
+
+    unshiftIsolated(message: string, mode: T, localId?: string): void {
+        this.unshiftIsolate(message, mode, localId);
     }
 
     /**
