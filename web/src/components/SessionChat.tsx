@@ -37,6 +37,22 @@ import { usePlatform } from '@/hooks/usePlatform'
 import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { useCodexModels } from '@/hooks/queries/useCodexModels'
 import { useAgentModels } from '@/hooks/queries/useAgentModels'
+import { useCursorModels } from '@/hooks/queries/useCursorModels'
+import { useCursorModelsForMachine } from '@/hooks/queries/useCursorModelsForMachine'
+import {
+    mergeCursorCliModelSkus,
+    resolveCursorBaseFromWire
+} from '@/lib/cursorPickerState'
+import {
+    buildSessionCursorPickerState,
+    isSessionCursorCatalogAwaitingSkus,
+    isSessionCursorCatalogPendingWithTimeout,
+    SESSION_CURSOR_CATALOG_SKU_TIMEOUT_MS,
+    resolveSessionCursorBaseSelectValue,
+    resolveSessionCursorModelChange,
+    resolveSessionCursorVariantSelectValue
+} from '@/lib/sessionChatCursorModel'
+import { buildCursorEffortPickerOptions, resolveCursorVariantOptions } from '@/lib/cursorModelOptions'
 import { useOpencodeModels } from '@/hooks/queries/useOpencodeModels'
 import { useGrokModels } from '@/hooks/queries/useGrokModels'
 import { useGrokReasoningEffortOptions } from '@/hooks/queries/useGrokReasoningEffortOptions'
@@ -190,6 +206,121 @@ export function SessionChat(props: {
             label: effort.name ?? effort.effortId
         }))
     }, [agentFlavor, opencodeModelsState.availableEfforts])
+    const cursorModelsState = useCursorModels({
+        api: props.api,
+        sessionId: props.session.id,
+        enabled: agentFlavor === 'cursor' && props.session.active
+    })
+    const sessionMachineId = props.session.metadata?.machineId ?? null
+    const machineCursorModelsState = useCursorModelsForMachine({
+        api: props.api,
+        machineId: sessionMachineId,
+        enabled: agentFlavor === 'cursor' && props.session.active && Boolean(sessionMachineId)
+    })
+    const sessionCliModelSkus = useMemo(() => (
+        mergeCursorCliModelSkus(
+            machineCursorModelsState.cliModelSkus,
+            cursorModelsState.cliModelSkus
+        )
+    ), [cursorModelsState.cliModelSkus, machineCursorModelsState.cliModelSkus])
+    const cursorPicker = useMemo(() => {
+        if (agentFlavor !== 'cursor') {
+            return null
+        }
+
+        return buildSessionCursorPickerState({
+            sessionModels: cursorModelsState.availableModels,
+            machineModels: machineCursorModelsState.availableModels,
+            cliModelSkus: sessionCliModelSkus,
+            sessionModel: props.session.model,
+            sessionCurrentModelId: cursorModelsState.currentModelId
+        })
+    }, [
+        agentFlavor,
+        cursorModelsState.availableModels,
+        cursorModelsState.currentModelId,
+        machineCursorModelsState.availableModels,
+        sessionCliModelSkus,
+        props.session.model
+    ])
+    const cursorCatalogReadinessArgs = useMemo(() => ({
+        sessionLoading: cursorModelsState.isLoading,
+        machineLoading: machineCursorModelsState.isLoading,
+        hasMachineId: Boolean(sessionMachineId),
+        sessionError: cursorModelsState.error,
+        machineError: machineCursorModelsState.error,
+        mergedSkus: sessionCliModelSkus,
+        picker: cursorPicker
+    }), [
+        cursorModelsState.isLoading,
+        cursorModelsState.error,
+        machineCursorModelsState.isLoading,
+        machineCursorModelsState.error,
+        sessionMachineId,
+        sessionCliModelSkus,
+        cursorPicker
+    ])
+    const cursorCatalogAwaitingSkus = useMemo(
+        () => isSessionCursorCatalogAwaitingSkus(cursorCatalogReadinessArgs),
+        [cursorCatalogReadinessArgs]
+    )
+    const [cursorSkuAwaitingSince, setCursorSkuAwaitingSince] = useState<number | null>(null)
+    const [cursorCatalogNowMs, setCursorCatalogNowMs] = useState(() => Date.now())
+    useEffect(() => {
+        if (cursorCatalogAwaitingSkus) {
+            setCursorSkuAwaitingSince((previous) => previous ?? Date.now())
+            const timer = setTimeout(
+                () => setCursorCatalogNowMs(Date.now()),
+                SESSION_CURSOR_CATALOG_SKU_TIMEOUT_MS
+            )
+            return () => clearTimeout(timer)
+        }
+        setCursorSkuAwaitingSince(null)
+        setCursorCatalogNowMs(Date.now())
+        return undefined
+    }, [cursorCatalogAwaitingSkus])
+    const cursorCatalogPending = isSessionCursorCatalogPendingWithTimeout({
+        ...cursorCatalogReadinessArgs,
+        awaitingStartedAtMs: cursorSkuAwaitingSince,
+        nowMs: cursorCatalogNowMs
+    })
+
+    const lastSyncedCursorModelRef = useRef<string | undefined>()
+    const [cursorSelectedBase, setCursorSelectedBase] = useState<'auto' | string>('auto')
+
+    useEffect(() => {
+        if (agentFlavor !== 'cursor' || !cursorPicker) {
+            lastSyncedCursorModelRef.current = undefined
+            return
+        }
+        const sessionModel = props.session.model ?? null
+        const baseFromSession = sessionModel
+            ? resolveCursorBaseFromWire(sessionModel, cursorPicker.catalog)
+            : 'auto'
+        if (lastSyncedCursorModelRef.current === sessionModel) {
+            if (!sessionModel) {
+                return
+            }
+            setCursorSelectedBase((prev) => (prev === 'auto' ? baseFromSession : prev))
+            return
+        }
+        lastSyncedCursorModelRef.current = sessionModel
+        setCursorSelectedBase(baseFromSession)
+    }, [agentFlavor, props.session.model, cursorPicker])
+
+    const cursorSelectedBaseValue = useMemo(() => (
+        agentFlavor === 'cursor' && cursorPicker?.mode === 'dual'
+            ? resolveSessionCursorBaseSelectValue(cursorPicker, cursorSelectedBase)
+            : undefined
+    ), [agentFlavor, cursorPicker, cursorSelectedBase])
+
+    const cursorModelEffortOptions = useMemo(() => {
+        if (agentFlavor !== 'cursor' || !cursorPicker) {
+            return undefined
+        }
+        return buildCursorEffortPickerOptions(cursorPicker, cursorSelectedBase)
+    }, [agentFlavor, cursorPicker, cursorSelectedBase])
+
     const grokModelsState = useGrokModels({
         api: props.api,
         sessionId: props.session.id,
@@ -799,12 +930,25 @@ export function SessionChat(props: {
                         availableModelOptions={
                             agentFlavor === 'codex'
                                 ? codexModelOptions
+<<<<<<< HEAD
                                 : agentFlavor === 'claude'
                                     ? claudeModelOptions
                                 : agentFlavor === 'opencode'
                                     ? opencodeModelOptions
                                     : agentFlavor === 'grok'
                                         ? grokModelOptions
+=======
+                                : agentFlavor === 'cursor'
+                                    ? (
+                                        cursorCatalogPending
+                                        || !cursorPicker
+                                        || cursorPicker.modelOptions.length === 0
+                                            ? undefined
+                                            : cursorPicker.modelOptions
+                                    )
+                                    : agentFlavor === 'opencode'
+                                        ? opencodeModelOptions
+>>>>>>> ad038bbf (fix(cursor): merge SKU catalog under ACP lock and refcount agent guard (#835))
                                         : undefined
                         }
                         piModels={agentFlavor === 'pi' ? (piModelsState.availableModels.length > 0 ? piModelsState.availableModels : piCachedModels) : undefined}
@@ -831,6 +975,7 @@ export function SessionChat(props: {
                                 ? handleCollaborationModeChange
                                 : undefined
                         }
+<<<<<<< HEAD
                         onPermissionModeChange={readOnly ? undefined : handlePermissionModeChange}
                         onModelChange={
                             agentFlavor === 'codex'
@@ -846,6 +991,50 @@ export function SessionChat(props: {
                                                     ? handleModelChange
                                                     : undefined)
                                                 : handleModelChange
+=======
+                        onPermissionModeChange={handlePermissionModeChange}
+                        selectedModelBase={
+                            agentFlavor === 'cursor' && cursorPicker?.mode === 'dual'
+                                ? cursorSelectedBaseValue
+                                : undefined
+                        }
+                        selectedModelVariant={
+                            agentFlavor === 'cursor' && !cursorCatalogPending
+                                ? cursorVariantSelectValue
+                                : undefined
+                        }
+                        modelEffortOptions={
+                            agentFlavor === 'cursor'
+                                && !cursorCatalogPending
+                                && cursorPicker?.mode === 'dual'
+                                && cursorModelEffortOptions
+                                && cursorModelEffortOptions.length > 1
+                                ? cursorModelEffortOptions
+                                : undefined
+                        }
+                        onModelChange={
+                            agentFlavor === 'codex'
+                                ? (props.session.active && !controlledByUser && !codexModelsState.error ? handleModelChange : undefined)
+                                : agentFlavor === 'cursor'
+                                    ? (props.session.active
+                                        && !controlledByUser
+                                        && !cursorCatalogPending
+                                        && !cursorModelsState.error
+                                        && cursorPicker
+                                        && cursorPicker.modelOptions.length > 0
+                                        ? handleCursorBaseModelChange
+                                        : undefined)
+                                    : handleModelChange
+                        }
+                        onModelEffortChange={
+                            agentFlavor === 'cursor'
+                                && props.session.active
+                                && !controlledByUser
+                                && !cursorCatalogPending
+                                && !cursorModelsState.error
+                                ? handleCursorEffortChange
+                                : undefined
+>>>>>>> ad038bbf (fix(cursor): merge SKU catalog under ACP lock and refcount agent guard (#835))
                         }
                         onModelReasoningEffortChange={
                             (agentFlavor === 'codex' || agentFlavor === 'opencode') && !controlledByUser && !readOnly
