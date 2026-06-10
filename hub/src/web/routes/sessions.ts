@@ -1017,6 +1017,36 @@ export function createSessionsRoutes(
         }
     })
 
+    app.get('/sessions/:id/opencode-reasoning-effort-options', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine, { requireActive: true })
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
+        if (flavor !== 'opencode') {
+            return c.json({
+                success: false,
+                error: 'OpenCode reasoning effort options are only available for OpenCode sessions'
+            }, 400)
+        }
+
+        try {
+            const result = await engine.listOpencodeReasoningEffortOptionsForSession(sessionResult.sessionId)
+            return c.json(result)
+        } catch (error) {
+            return c.json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list OpenCode reasoning effort options'
+            }, 500)
+        }
+    })
+
     app.get('/sessions/:id/cursor-models', async (c) => {
         const engine = requireSyncEngine(c, getSyncEngine)
         if (engine instanceof Response) {

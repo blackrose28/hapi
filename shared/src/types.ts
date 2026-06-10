@@ -22,6 +22,12 @@ export type {
     TeamSharedContextSnapshot,
     TeamState,
     TeamTask,
+    OpencodeEffortSummary,
+    OpencodeModelSummary,
+    OpencodeModelsResponse,
+    OpencodeReasoningEffortOption,
+    ListOpencodeModelsResponse,
+    ListOpencodeReasoningEffortOptionsResponse,
     TodoItem,
     WorktreeMetadata
 } from './schemas'

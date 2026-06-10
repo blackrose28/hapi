@@ -44,6 +44,7 @@ import { useGrokModels } from '@/hooks/queries/useGrokModels'
 import { useGrokReasoningEffortOptions } from '@/hooks/queries/useGrokReasoningEffortOptions'
 import { usePiModels } from '@/hooks/queries/usePiModels'
 import { useSessionTeamMentions } from '@/hooks/queries/useSessionTeamMentions'
+import { useOpencodeReasoningEffortOptions } from '@/hooks/queries/useOpencodeReasoningEffortOptions'
 import { useVoiceOptional } from '@/lib/voice-context'
 import { RealtimeVoiceSession, registerSessionStore, registerVoiceHooksStore, voiceHooks } from '@/realtime'
 import { isRemoteTerminalSupported } from '@/utils/terminalSupport'
@@ -171,6 +172,11 @@ export function SessionChat(props: {
         api: props.api,
         sessionId: props.session.id,
         enabled: agentFlavor === 'opencode'
+    })
+    const opencodeReasoningEffortState = useOpencodeReasoningEffortOptions({
+        api: props.api,
+        sessionId: props.session.id,
+        enabled: agentFlavor === 'opencode' && props.session.active
     })
     const opencodeModelOptions = useMemo(() => {
         if (agentFlavor !== 'opencode') {
@@ -842,6 +848,11 @@ export function SessionChat(props: {
                                 ? grokEffortState.options
                                 : undefined
                         }
+                        availableModelReasoningEffortOptions={
+                            agentFlavor === 'opencode' && opencodeReasoningEffortState.options.length > 0
+                                ? opencodeReasoningEffortState.options
+                                : undefined
+                        }
                         active={props.session.active}
                         allowSendWhenInactive
                         thinking={effectiveAgentRunning}
@@ -867,7 +878,11 @@ export function SessionChat(props: {
                                     : handleModelChange
                         )}
                         onModelReasoningEffortChange={
-                            (agentFlavor === 'codex' || agentFlavor === 'opencode') && !controlledByUser && !readOnly
+                            (agentFlavor === 'codex' || agentFlavor === 'opencode')
+                                && props.session.active
+                                && !controlledByUser
+                                && !readOnly
+                                && (agentFlavor !== 'opencode' || opencodeReasoningEffortState.options.length > 0)
                                 ? handleModelReasoningEffortChange
                                 : undefined
                         }

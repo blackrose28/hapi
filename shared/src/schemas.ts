@@ -717,6 +717,18 @@ export type OpencodeModelSummary = {
 
 export type OpencodeEffortSummary = { effortId: string; name?: string }
 
+export type OpencodeReasoningEffortOption = {
+    effortId: string
+    name?: string
+}
+
+export type ListOpencodeReasoningEffortOptionsResponse = {
+    success: boolean
+    options?: OpencodeReasoningEffortOption[]
+    currentEffortId?: string | null
+    error?: string
+}
+
 export type OpencodeModelsResponse = {
     success: boolean
     availableModels?: OpencodeModelSummary[]

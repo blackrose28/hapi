@@ -29,6 +29,7 @@ export const RPC_METHODS = {
     ListCursorModels: 'listCursorModels',
     ListOpencodeModels: 'listOpencodeModels',
     ListOpencodeModelsForCwd: "listOpencodeModelsForCwd",
+    ListOpencodeReasoningEffortOptions: "listOpencodeReasoningEffortOptions",
     ReadFileRaw: "readFileRaw",
     EditorFileMutation: "editorFileMutation",
     EditorGitStatus: "editorGitStatus",

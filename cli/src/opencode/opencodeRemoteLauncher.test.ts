@@ -367,7 +367,6 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         expect(failureMessages[1]?.message).toContain('ollama/b');
         expect(harness.promptCount).toBe(2);
     });
-
     it('registers a listOpencodeModels RPC handler that returns the backend cache', async () => {
         // Override getSessionModelsMetadata for this run only.
         const fixtureModels = [
@@ -435,6 +434,48 @@ describe('opencodeRemoteLauncher inline model switch', () => {
             currentModelId: null,
             availableEfforts: [],
             currentEffortId: null
+        });
+    });
+
+    it('registers a listOpencodeReasoningEffortOptions RPC handler that returns ACP options', async () => {
+        harness.thoughtLevelOption = {
+            id: 'effort',
+            currentValue: 'low',
+            options: [
+                { value: 'low', name: 'Low' },
+                { value: 'medium', name: 'Medium' }
+            ]
+        };
+        const { session, rpcHandlers } = createSessionStub([
+            { message: 'first', mode: createMode() }
+        ]);
+        await opencodeRemoteLauncher(session as never);
+
+        const handler = rpcHandlers.get('listOpencodeReasoningEffortOptions');
+        expect(handler).toBeDefined();
+        const result = await handler!(undefined) as Record<string, unknown>;
+        expect(result).toEqual({
+            success: true,
+            options: [
+                { value: 'low', name: 'Low' },
+                { value: 'medium', name: 'Medium' }
+            ],
+            currentValue: 'low'
+        });
+    });
+
+    it('listOpencodeReasoningEffortOptions handler returns unavailable when backend has no thought level option', async () => {
+        const { session, rpcHandlers } = createSessionStub([
+            { message: 'first', mode: createMode() }
+        ]);
+        await opencodeRemoteLauncher(session as never);
+
+        const handler = rpcHandlers.get('listOpencodeReasoningEffortOptions');
+        expect(handler).toBeDefined();
+        const result = await handler!(undefined) as Record<string, unknown>;
+        expect(result).toEqual({
+            success: false,
+            error: 'OpenCode reasoning effort options are not available'
         });
     });
 

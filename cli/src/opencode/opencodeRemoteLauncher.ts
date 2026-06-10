@@ -13,6 +13,11 @@ import { createOpencodeBackend } from './utils/opencodeBackend';
 import { OpencodePermissionHandler } from './utils/permissionHandler';
 import { OPENCODE_NATIVE_TOOL_INSTRUCTION } from './utils/systemPrompt';
 import { registerAcpSessionTitleSync } from '@/agent/acpSessionTitle';
+import { resolveThoughtLevelEffort } from './thoughtLevelEffort';
+
+type OpencodeRemoteLauncherOptions = {
+    onReasoningEffortRollback?: (effort: string | null) => void;
+};
 
 class OpencodeRemoteLauncher extends RemoteLauncherBase {
     private readonly session: OpencodeSession;
@@ -137,6 +142,18 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
             };
         });
 
+        session.client.rpcHandlerManager.registerHandler(RPC_METHODS.ListOpencodeReasoningEffortOptions, async () => {
+            const effortOption = backend.getThoughtLevelConfigOption?.(acpSessionId);
+            if (!effortOption) {
+                return { success: false, error: 'OpenCode reasoning effort options are not available' };
+            }
+            return {
+                success: true,
+                options: effortOption.options,
+                currentValue: effortOption.currentValue ?? null
+            };
+        });
+
         this.permissionHandler = new OpencodePermissionHandler(
             session.client,
             backend,
@@ -217,6 +234,7 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
                             message: `Failed to switch effort to ${requestedEffort ?? 'default'}. Continuing with ${this.currentBackendEffort ?? '(default)'}.`
                         });
                         batch.mode.modelReasoningEffort = this.currentBackendEffort;
+                    }
                     }
                 }
             }

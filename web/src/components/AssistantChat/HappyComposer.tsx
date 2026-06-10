@@ -181,9 +181,15 @@ export function HappyComposer(props: {
     /** Pi: provider-qualified selected model from metadata (survives reload;
      *  disambiguates when two providers share a modelId). */
     piSelectedModel?: { provider: string; modelId: string } | null
-    availableModelReasoningEffortOptions?: Array<{ value: string | null; label: string }>
+    availableModelReasoningEffortOptions?: Array<{ value: string; name?: string }>
     /** Grok: ACP-reported reasoning effort options for the current/selected model. */
     availableEffortOptions?: Array<{ value: string; name?: string }>
+    /** Cursor: selected base model key (not wire id). */
+    selectedModelBase?: string | null
+    /** Cursor: selected variant sku/wire for highlight when session stores an ACP wire id. */
+    selectedModelVariant?: string | null
+    /** Cursor: effort/variant wire ids for the selected base model. */
+    modelEffortOptions?: Array<{ value: string; label: string }>
     onCollaborationModeChange?: (mode: CodexCollaborationMode) => void
     onPermissionModeChange?: (mode: PermissionMode) => void
     onModelChange?: (model: { provider: string; modelId: string } | string | null) => void
@@ -236,6 +242,9 @@ export function HappyComposer(props: {
         piSelectedModel,
         availableModelReasoningEffortOptions,
         availableEffortOptions,
+        selectedModelBase,
+        selectedModelVariant,
+        modelEffortOptions,
         onCollaborationModeChange,
         onPermissionModeChange,
         onModelChange,
@@ -564,10 +573,14 @@ export function HappyComposer(props: {
         () => getModelOptionsForFlavor(agentFlavor, model, availableModelOptions),
         [agentFlavor, model, availableModelOptions]
     )
-    const modelReasoningEffortOptions = useMemo(
-        () => agentFlavor === 'codex'
-            ? getCodexComposerReasoningEffortOptions(modelReasoningEffort)
-            : availableModelReasoningEffortOptions ?? [],
+    const codexReasoningEffortOptions = useMemo(
+        () => agentFlavor === 'codex' || agentFlavor === 'opencode'
+            ? getCodexComposerReasoningEffortOptions(
+                modelReasoningEffort,
+                agentFlavor,
+                agentFlavor === 'opencode' ? availableModelReasoningEffortOptions : undefined
+            )
+            : [],
         [agentFlavor, modelReasoningEffort, availableModelReasoningEffortOptions]
     )
     // Pi: group models by provider for hierarchical display

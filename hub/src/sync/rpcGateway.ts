@@ -18,6 +18,7 @@ import type {
     ListDirectoryResponse,
     OpencodeModelsResponse,
     OpencodeModelSummary,
+    OpencodeReasoningEffortResponse,
     PathExistsResponse,
     UploadFileResponse
 } from '@hapi/protocol/schemas'
@@ -51,6 +52,7 @@ export type RpcCursorModel = CursorModelSummary
 export type RpcListCursorModelsResponse = CursorModelsResponse
 export type RpcOpencodeModel = OpencodeModelSummary
 export type RpcListOpencodeModelsResponse = OpencodeModelsResponse
+export type RpcListOpencodeReasoningEffortOptionsResponse = OpencodeReasoningEffortResponse
 
 export type RpcEditorProject = {
     path: string
@@ -620,6 +622,11 @@ export class RpcGateway {
 
     async listPiModelsForSession(sessionId: string): Promise<RpcListPiModelsResponse> {
         return await this.sessionRpc(sessionId, 'listPiModels', {}) as RpcListPiModelsResponse
+    }
+
+    async listOpencodeReasoningEffortOptionsForSession(sessionId: string): Promise<RpcListOpencodeReasoningEffortOptionsResponse> {
+        return await this.sessionRpc(sessionId, RPC_METHODS.ListOpencodeReasoningEffortOptions, {}) as RpcListOpencodeReasoningEffortOptionsResponse
+    }
     }
 
     async listGrokModelsForSession(sessionId: string): Promise<RpcListGrokModelsResponse> {

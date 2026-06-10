@@ -44,7 +44,14 @@ import type {
     TeamMentionRequest,
     TeamChatMessage
 } from '@/types/api'
-import type { CancelMessageResponse, CursorMigrateOutcome, CursorMigrateToAcpRequest, CursorModelsResponse, ReopenSessionResponse } from '@hapi/protocol/schemas'
+import type {
+    CancelMessageResponse,
+    CursorMigrateOutcome,
+    CursorMigrateToAcpRequest,
+    CursorModelsResponse,
+    ListOpencodeReasoningEffortOptionsResponse as OpencodeReasoningEffortResponse,
+    ReopenSessionResponse
+} from '@hapi/protocol/schemas'
 import {
     TerminalSnippetResponseSchema,
     TerminalSnippetsResponseSchema,
@@ -768,6 +775,12 @@ export class ApiClient {
     async getSessionOpencodeModels(sessionId: string): Promise<OpencodeModelsResponse> {
         return await this.request<OpencodeModelsResponse>(
             `/api/sessions/${encodeURIComponent(sessionId)}/opencode-models`
+        )
+    }
+
+    async getSessionOpencodeReasoningEffortOptions(sessionId: string): Promise<OpencodeReasoningEffortResponse> {
+        return await this.request<OpencodeReasoningEffortResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/opencode-reasoning-effort-options`
         )
     }
 

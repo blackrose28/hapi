@@ -36,6 +36,7 @@ import {
     type RpcListPiModelsResponse,
     type RpcListGrokModelsResponse,
     type RpcListGrokReasoningEffortOptionsResponse,
+    type RpcListOpencodeReasoningEffortOptionsResponse,
     type RpcCursorModel,
     type RpcOpencodeModel,
     type RpcPiModel,
@@ -67,6 +68,7 @@ export type {
     RpcListPiModelsResponse,
     RpcListGrokModelsResponse,
     RpcListGrokReasoningEffortOptionsResponse,
+    RpcListOpencodeReasoningEffortOptionsResponse,
     RpcCursorModel,
     RpcOpencodeModel,
     RpcPiModel,
@@ -2067,6 +2069,7 @@ export class SyncEngine {
         return await this.rpcGateway.listOpencodeModelsForCwd(machineId, cwd)
     }
 
+<<<<<<< HEAD
     async listGrokModelsForSession(sessionId: string): Promise<RpcListGrokModelsResponse> {
         return await this.rpcGateway.listGrokModelsForSession(sessionId)
     }
@@ -2089,5 +2092,9 @@ export class SyncEngine {
 
     async listGrokReasoningEffortOptionsForSession(sessionId: string): Promise<RpcListGrokReasoningEffortOptionsResponse> {
         return await this.rpcGateway.listGrokReasoningEffortOptionsForSession(sessionId)
+    }
+
+    async listOpencodeReasoningEffortOptionsForSession(sessionId: string): Promise<RpcListOpencodeReasoningEffortOptionsResponse> {
+        return await this.rpcGateway.listOpencodeReasoningEffortOptionsForSession(sessionId)
     }
 }
