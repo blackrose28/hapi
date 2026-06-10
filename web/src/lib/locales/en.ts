@@ -143,6 +143,10 @@ const en = {
   'session.inactive.autoResume': 'This session is inactive. Send a message to resume.',
   'session.inactive.cannotResume': 'This session is inactive and cannot be resumed.',
 
+  // Session inactive
+  'session.inactive.autoResume': 'This session is inactive. Send a message to resume.',
+  'session.inactive.cannotResume': 'This session is inactive and cannot be resumed.',
+
   // Session header
   'session.title': 'Files',
   'session.more': 'More actions',
