@@ -79,6 +79,7 @@ export const MetadataSchema = z.object({
     grokSessionId: z.string().optional(),
     cursorSessionId: z.string().optional(),
     cursorSessionProtocol: z.enum(['acp', 'stream-json']).optional(),
+    cursorMigrationState: z.enum(['in_progress']).optional(),
     kimiSessionId: z.string().optional(),
     piSessionId: z.string().optional(),
     tools: z.array(z.string()).optional(),
@@ -829,4 +830,38 @@ export const CancelMessageResponseSchema = z.discriminatedUnion('status', [
 ])
 
 export type CancelMessageResponse = z.infer<typeof CancelMessageResponseSchema>
+
+/** Per-session legacy stream-json → ACP migrator request. See tiann/hapi#824. */
+export const CursorMigrateToAcpRequestSchema = z.object({
+    /** Skip removing the legacy ~/.cursor/chats source store.db even after verify passes. */
+    keepSource: z.boolean().optional(),
+    /** Allow migrating a session whose lifecycleState === 'running' by archiving it first. */
+    forceArchiveRunning: z.boolean().optional(),
+    /** Skip the verify-by-prompt step (session/load alone is run). */
+    skipVerify: z.boolean().optional()
+})
+
+export type CursorMigrateToAcpRequest = z.infer<typeof CursorMigrateToAcpRequestSchema>
+
+export type CursorMigrateOutcome =
+    | { ok: true; sessionId: string; acpSessionId: string; replayNotifications: number; durationMs: number; lastUsedModelPreserved: string | null; sourceRemoved: boolean }
+    | { ok: false; sessionId: string; reason: CursorMigrateRefusalReason; message: string; durationMs: number }
+
+export type CursorMigrateRefusalReason =
+    | 'not_cursor_session'
+    | 'already_acp'
+    | 'running_refused'
+    | 'no_cursor_session_id'
+    | 'no_legacy_store_on_disk'
+    | 'target_already_exists'
+    | 'verify_load_failed'
+    | 'verify_prompt_failed'
+    | 'metadata_write_failed'
+    | 'archive_failed'
+    | 'lock_release_timeout'
+    | 'acp_transport_active'
+    | 'session_resumed_during_migrate'
+    | 'legacy_store_modified_during_migrate'
+    | 'cross_host_session'
+    | 'internal_error'
 

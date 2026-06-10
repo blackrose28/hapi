@@ -1,5 +1,5 @@
 import { getPermissionModesForFlavor, isPermissionModeAllowedForFlavor, supportsEffort, supportsModelChange, toSessionSummary } from '@hapi/protocol'
-import { CodexCollaborationModeSchema, PermissionModeSchema } from '@hapi/protocol/schemas'
+import { CodexCollaborationModeSchema, CursorMigrateToAcpRequestSchema, PermissionModeSchema } from '@hapi/protocol/schemas'
 import { Hono } from 'hono'
 import { isKnownFlavor } from '@hapi/protocol'
 import { z } from 'zod'
@@ -434,6 +434,48 @@ export function createSessionsRoutes(
             resumed: result.resumed,
             ...(result.cursorSessionProtocol ? { cursorSessionProtocol: result.cursorSessionProtocol } : {})
         })
+    })
+
+    app.post('/sessions/:id/migrate-to-acp', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'operate'
+        })
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const rawBody = await c.req.text()
+        let body: unknown = {}
+        if (rawBody.trim().length > 0) {
+            try {
+                body = JSON.parse(rawBody)
+            } catch {
+                return c.json({ error: 'Invalid JSON body' }, 400)
+            }
+        }
+        const parsed = CursorMigrateToAcpRequestSchema.safeParse(body ?? {})
+        if (!parsed.success) {
+            return c.json({ error: 'Invalid body', issues: parsed.error.issues }, 400)
+        }
+
+        const namespace = c.get('namespace')
+        const outcome = await engine.migrateLegacyCursorSession(
+            sessionResult.sessionId,
+            namespace,
+            parsed.data
+        )
+        const status = outcome.ok ? 200
+            : outcome.reason === 'already_acp' || outcome.reason === 'not_cursor_session' || outcome.reason === 'no_cursor_session_id' ? 409
+                : outcome.reason === 'running_refused' ? 409
+                    : outcome.reason === 'target_already_exists' ? 409
+                        : outcome.reason === 'no_legacy_store_on_disk' ? 404
+                            : 500
+        return c.json(outcome, status)
     })
 
     app.post('/sessions/:id/switch', async (c) => {

@@ -35,6 +35,7 @@ export type {
     AgentState,
     AttachmentMetadata,
     CodexCollaborationMode,
+    Metadata,
     PermissionMode,
     PendingRequest,
     PendingRequestKind,

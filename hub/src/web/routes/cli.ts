@@ -1,8 +1,7 @@
 import { PROTOCOL_VERSION } from "@hapi/protocol";
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { CreateOrLoadMachineRequestSchema, CreateOrLoadSessionRequestSchema } from '@hapi/protocol/schemas'
-import { MarkTeamMentionNoActionInputSchema, ReportToTeamInputSchema } from '@hapi/protocol/schemas'
+import { CreateOrLoadMachineRequestSchema, CreateOrLoadSessionRequestSchema, CursorMigrateToAcpRequestSchema, MarkTeamMentionNoActionInputSchema, ReportToTeamInputSchema } from '@hapi/protocol/schemas'
 import type { Machine, Session, SyncEngine } from '../../sync/syncEngine'
 import type { RunnerAuthenticator } from '../../auth/runnerAuthenticator'
 
@@ -272,6 +271,40 @@ export function createCliRoutes(
             }
             throw error
         }
+    })
+
+    app.post('/sessions/:id/migrate-to-acp', async (c) => {
+        const engine = getSyncEngine()
+        if (!engine) {
+            return c.json({ error: 'Not ready' }, 503)
+        }
+        const sessionId = c.req.param('id')
+        const namespace = c.get('namespace')
+        const resolved = resolveSessionForNamespace(engine, sessionId, namespace, c.get('authenticatedRunnerId'), authorizeRunnerSession)
+        if (!resolved.ok) {
+            return c.json({ error: resolved.error }, resolved.status)
+        }
+        const rawBody = await c.req.text()
+        let body: unknown = {}
+        if (rawBody.trim().length > 0) {
+            try {
+                body = JSON.parse(rawBody)
+            } catch {
+                return c.json({ error: 'Invalid JSON body' }, 400)
+            }
+        }
+        const parsed = CursorMigrateToAcpRequestSchema.safeParse(body ?? {})
+        if (!parsed.success) {
+            return c.json({ error: 'Invalid body', issues: parsed.error.issues }, 400)
+        }
+        const outcome = await engine.migrateLegacyCursorSession(resolved.sessionId, namespace, parsed.data)
+        const status = outcome.ok ? 200
+            : outcome.reason === 'already_acp' || outcome.reason === 'not_cursor_session' || outcome.reason === 'no_cursor_session_id' ? 409
+                : outcome.reason === 'running_refused' ? 409
+                    : outcome.reason === 'target_already_exists' ? 409
+                        : outcome.reason === 'no_legacy_store_on_disk' ? 404
+                            : 500
+        return c.json(outcome, status)
     })
 
     app.post('/machines', async (c) => {
