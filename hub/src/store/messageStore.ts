@@ -78,7 +78,6 @@ export class MessageStore {
     minFutureScheduledAtBySessionIds(sessionIds: string[], now: number = Date.now()): Map<string, number> {
         return minFutureScheduledAtBySessionIds(this.db, sessionIds, now)
     }
-
     countMessages(sessionId: string): number {
         return countMessages(this.db, sessionId)
     }

@@ -242,6 +242,14 @@ export function getImmediateQueuedLocalMessages(
     return rows.map(toStoredMessage)
 }
 
+/**
+ * Total messages persisted for a session - any role, any state (including
+ * future-scheduled and never-invoked queued rows). Used as the
+ * "is this session non-trivial?" signal for the cursor migrator's size
+ * sanity check; intentionally broad so a session with 6 000 unread agent
+ * outputs and zero invoked user turns still counts as non-trivial.
+ * tiann/hapi#872.
+ */
 export function countMessages(db: Database, sessionId: string): number {
     const row = db.prepare(
         'SELECT COUNT(*) AS count FROM messages WHERE session_id = ?'
