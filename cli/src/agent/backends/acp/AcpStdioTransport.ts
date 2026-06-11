@@ -51,6 +51,9 @@ export class AcpStdioTransport {
     private protocolError: Error | null = null;
     private terminalError: Error | null = null;
     private activityTracker: ReturnType<typeof setInterval> | null = null;
+    private guardReleased = false;
+    private closed = false;
+    private closeError: Error | null = null;
 
     // === Activity watchdog: detects ACP hung-but-not-crashed ===
     private lastActivityAt: number = Date.now();
@@ -93,6 +96,7 @@ export class AcpStdioTransport {
             logger.debug(message);
             const terminalError = new Error(message);
             this.terminalError = terminalError;
+            this.markClosed(terminalError);
             // Kill remaining processes in the group (subagents).
             // SIGKILL because the parent already exited — no graceful shutdown needed.
             this.killProcessGroup('SIGKILL');
@@ -107,6 +111,7 @@ export class AcpStdioTransport {
                 { cause: error }
             );
             this.terminalError = terminalError;
+            this.markClosed(terminalError);
             this.rejectAllPending(terminalError);
         });
 
@@ -176,6 +181,9 @@ export class AcpStdioTransport {
     static readonly DEFAULT_TIMEOUT_MS = 120_000;
 
     async sendRequest(method: string, params?: unknown, options?: { timeoutMs?: number }): Promise<unknown> {
+        if (this.closed) {
+            return Promise.reject(this.closeError ?? new Error('ACP transport is closed'));
+        }
         if (this.terminalError) {
             return Promise.reject(this.terminalError);
         }
@@ -226,6 +234,10 @@ export class AcpStdioTransport {
     }
 
     sendNotification(method: string, params?: unknown): void {
+        if (this.closed) {
+            return;
+        }
+
         const payload: JsonRpcNotification = {
             jsonrpc: '2.0',
             method,
@@ -236,9 +248,11 @@ export class AcpStdioTransport {
 
     async close(): Promise<void> {
         this.clearActivityTracker();
+        const err = this.terminalError ?? new Error('ACP transport closed');
         if (!this.terminalError) {
-            this.terminalError = new Error('ACP transport closed');
+            this.terminalError = err;
         }
+        this.markClosed(err);
         // Graceful: SIGTERM to entire process group first
         this.killProcessGroup('SIGTERM');
         // Wait for graceful shutdown
@@ -365,6 +379,9 @@ export class AcpStdioTransport {
     }
 
     private writePayload(payload: JsonRpcRequest | JsonRpcNotification | JsonRpcResponse): void {
+        if (this.closed) {
+            return;
+        }
         if (this.terminalError) {
             throw this.terminalError;
         }
@@ -376,9 +393,19 @@ export class AcpStdioTransport {
                 ? new Error(`ACP write failed: ${error.message}`, { cause: error })
                 : new Error(`ACP write failed: ${String(error)}`);
             this.terminalError = terminalError;
-            this.rejectAllPending(terminalError);
+            this.markClosed(terminalError);
             throw terminalError;
         }
+    }
+
+    private markClosed(error: Error): void {
+        if (this.closed) {
+            return;
+        }
+
+        this.closed = true;
+        this.closeError = error;
+        this.rejectAllPending(error);
     }
 
     private rejectAllPending(error: Error): void {
