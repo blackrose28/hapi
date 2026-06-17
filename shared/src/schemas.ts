@@ -153,6 +153,16 @@ export const AgentStateCompletedRequestSchema = z.object({
 
 export type AgentStateCompletedRequest = z.infer<typeof AgentStateCompletedRequestSchema>
 
+// Fast mode is an explicit two-way choice. `'standard'` (not `null`) is the
+// stored sentinel for an explicit Fast-off so it stays distinct from
+// "untouched" and survives restart/resume. Reject anything else so stray tier
+// strings are never forwarded to the Codex app-server.
+export const SessionServiceTierRequestSchema = z.object({
+    serviceTier: z.enum(['fast', 'standard'])
+})
+
+export type SessionServiceTierRequest = z.infer<typeof SessionServiceTierRequestSchema>
+
 export const AgentStateSchema = z.object({
     controlledByUser: z.boolean().nullish(),
     requests: z.record(z.string(), AgentStateRequestSchema).nullish(),
@@ -406,7 +416,7 @@ export const SessionSchema = z.object({
     model: z.string().nullable().optional().default(null),
     modelReasoningEffort: z.string().nullable().optional().default(null),
     effort: z.string().nullable().optional().default(null),
-    serviceTier: z.string().nullable().optional(),
+    serviceTier: z.string().nullable().optional().default(null),
     permissionMode: PermissionModeSchema.optional(),
     collaborationMode: CodexCollaborationModeSchema.optional(),
     terminalLiveCount: z.number().int().nonnegative().optional()
@@ -422,6 +432,7 @@ export const SessionPatchSchema = z.object({
     model: z.string().nullable().optional(),
     modelReasoningEffort: z.string().nullable().optional(),
     effort: z.string().nullable().optional(),
+    serviceTier: z.string().nullable().optional(),
     permissionMode: PermissionModeSchema.optional(),
     collaborationMode: CodexCollaborationModeSchema.optional(),
     backgroundTaskCount: z.number().optional(),
@@ -720,6 +731,8 @@ export type CodexModelSummary = {
     isDefault: boolean
     defaultReasoningEffort?: string | null
     supportedReasoningEfforts?: string[]
+    /** Service tier ids advertised for this model in the current auth/plan context (e.g. 'fast'). */
+    serviceTiers?: string[]
 }
 
 export type CodexModelsResponse = {

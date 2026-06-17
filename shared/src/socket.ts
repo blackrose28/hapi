@@ -496,6 +496,7 @@ export interface ClientToServerEvents {
         model?: string | null
         modelReasoningEffort?: string | null
         effort?: string | null
+        serviceTier?: string | null
         collaborationMode?: CodexCollaborationMode
     }) => void
     /** CLI agent finished session/load (or equivalent) and can accept prompts. */

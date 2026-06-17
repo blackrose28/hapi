@@ -967,6 +967,7 @@ export class ApiSessionClient extends EventEmitter {
             model?: SessionModel
             modelReasoningEffort?: string | null
             effort?: string | null
+            serviceTier?: string | null
             collaborationMode?: SessionCollaborationMode
         }
     ): void {

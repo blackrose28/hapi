@@ -23,6 +23,7 @@ import { buildConversationOutline, getConversationMessageAnchorId } from '@/chat
 import { isQueuedForInvocation, mergeMessages } from '@/lib/messages'
 import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
+import { codexModelAdvertisesFastTier } from '@/components/AssistantChat/codexFastMode'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { HappyThread } from '@/components/AssistantChat/HappyThread'
@@ -293,7 +294,8 @@ export function SessionChat(props: {
         setCollaborationMode,
         setModel,
         setModelReasoningEffort,
-        setEffort
+        setEffort,
+        setServiceTier
     } = useSessionActions(
         props.api,
         props.session.id,
@@ -594,6 +596,17 @@ export function SessionChat(props: {
         setModelReasoningEffort,
         setPermissionMode
     ])
+
+    const handleServiceTierChange = useCallback(async (serviceTier: string | null) => {
+        try {
+            await setServiceTier(serviceTier)
+            haptic.notification('success')
+            props.onRefresh()
+        } catch (e) {
+            haptic.notification('error')
+            console.error('Failed to set service tier:', e)
+        }
+    }, [setServiceTier, props.onRefresh, haptic])
 
     // Abort handler
     const handleAbort = useCallback(async () => {
@@ -942,6 +955,17 @@ export function SessionChat(props: {
                         }
                         onEffortChange={readOnly ? undefined : handleEffortChange}
                         onCompactRuntimeChange={props.compactComposerMode && !readOnly ? handleCompactRuntimeChange : undefined}
+                        serviceTier={agentFlavor === 'codex' ? props.session.serviceTier : undefined}
+                        onServiceTierChange={
+                            agentFlavor === 'codex'
+                                && props.session.active
+                                && !controlledByUser
+                                && !readOnly
+                                && !codexModelsState.error
+                                && codexModelAdvertisesFastTier(props.session.model, codexModelsState.models)
+                                ? handleServiceTierChange
+                                : undefined
+                        }
                         onSwitchToRemote={readOnly ? undefined : handleSwitchToRemote}
                         onTerminal={props.session.active && terminalSupported ? handleViewTerminal : undefined}
                         terminalUnsupported={props.session.active && !terminalSupported}

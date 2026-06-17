@@ -381,6 +381,7 @@ export class ApiMachineClient {
                 modelReasoningEffort,
                 yolo,
                 permissionMode,
+                serviceTier,
                 token,
                 sessionType,
                 worktreeName,

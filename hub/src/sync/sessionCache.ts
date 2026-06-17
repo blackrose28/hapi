@@ -9,6 +9,7 @@ import { extractBackgroundTaskDelta } from './backgroundTasks'
 
 const QUEUED_MESSAGE_THINKING_GRACE_MS = 15_000
 const METADATA_RETRY_ATTEMPTS = 5
+type RuntimeConfigKey = 'permissionMode' | 'model' | 'modelReasoningEffort' | 'effort' | 'serviceTier' | 'collaborationMode'
 
 export class SessionCache {
     private readonly sessions: Map<string, Session> = new Map()
@@ -159,6 +160,7 @@ export class SessionCache {
             model: stored.model,
             modelReasoningEffort: stored.modelReasoningEffort,
             effort: stored.effort,
+            serviceTier: stored.serviceTier,
             permissionMode: existing?.permissionMode ?? metadata?.preferredPermissionMode,
             collaborationMode: existing?.collaborationMode
         }
@@ -210,6 +212,7 @@ export class SessionCache {
         model?: string | null
         modelReasoningEffort?: string | null
         effort?: string | null
+        serviceTier?: string | null
         collaborationMode?: CodexCollaborationMode
     }): void {
         const t = clampAliveTime(payload.time)
@@ -224,6 +227,7 @@ export class SessionCache {
         const previousModel = session.model
         const previousModelReasoningEffort = session.modelReasoningEffort
         const previousEffort = session.effort
+        const previousServiceTier = session.serviceTier
         const previousCollaborationMode = session.collaborationMode
         const pendingThinkingUntil = this.pendingThinkingUntilBySessionId.get(session.id) ?? 0
         const requestedThinking = Boolean(payload.thinking)
@@ -265,7 +269,15 @@ export class SessionCache {
             }
             session.effort = payload.effort
         }
-        if (payload.collaborationMode !== undefined) {
+        if (payload.serviceTier !== undefined && !this.isStaleRuntimeKeepAlive(session.id, 'serviceTier', t)) {
+            if (payload.serviceTier !== session.serviceTier) {
+                this.store.sessions.setSessionServiceTier(payload.sid, payload.serviceTier, session.namespace, {
+                    touchUpdatedAt: false
+                })
+            }
+            session.serviceTier = payload.serviceTier
+        }
+        if (payload.collaborationMode !== undefined && !this.isStaleRuntimeKeepAlive(session.id, 'collaborationMode', t)) {
             session.collaborationMode = payload.collaborationMode
         }
 
@@ -275,6 +287,7 @@ export class SessionCache {
             || previousModel !== session.model
             || previousModelReasoningEffort !== session.modelReasoningEffort
             || previousEffort !== session.effort
+            || previousServiceTier !== session.serviceTier
             || previousCollaborationMode !== session.collaborationMode
         const shouldBroadcast = (!wasActive && session.active)
             || (wasThinking !== session.thinking)
@@ -294,6 +307,7 @@ export class SessionCache {
                     model: session.model,
                     modelReasoningEffort: session.modelReasoningEffort,
                     effort: session.effort,
+                    serviceTier: session.serviceTier,
                     collaborationMode: session.collaborationMode
                 } satisfies SessionPatch
             })
@@ -472,6 +486,7 @@ export class SessionCache {
             model?: { provider: string; modelId: string } | string | null
             modelReasoningEffort?: string | null
             effort?: string | null
+            serviceTier?: string | null
             collaborationMode?: CodexCollaborationMode
         }
     ): void {
@@ -531,6 +546,18 @@ export class SessionCache {
                 }
             }
             session.effort = config.effort
+        }
+        if (config.serviceTier !== undefined) {
+            if (config.serviceTier !== session.serviceTier) {
+                const updated = this.store.sessions.setSessionServiceTier(sessionId, config.serviceTier, session.namespace, {
+                    touchUpdatedAt: false
+                })
+                if (!updated) {
+                    throw new Error('Failed to update session service tier')
+                }
+            }
+            session.serviceTier = config.serviceTier
+            this.markRuntimeConfigUpdated(sessionId, 'serviceTier', appliedAt)
         }
         if (config.collaborationMode !== undefined) {
             session.collaborationMode = config.collaborationMode
@@ -956,6 +983,15 @@ export class SessionCache {
             })
             if (!updated) {
                 throw new Error('Failed to preserve session effort during merge')
+            }
+        }
+
+        if (newStored.serviceTier === null && oldStored.serviceTier !== null) {
+            const updated = this.store.sessions.setSessionServiceTier(newSessionId, oldStored.serviceTier, namespace, {
+                touchUpdatedAt: false
+            })
+            if (!updated) {
+                throw new Error('Failed to preserve session service tier during merge')
             }
         }
 

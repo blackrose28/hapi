@@ -33,6 +33,7 @@ export type CodexSlashResolution =
             permissionMode?: CodexPermissionMode;
             model?: string | null;
             modelReasoningEffort?: ReasoningEffort | null;
+            serviceTier?: string | null;
         };
     }
     | {
@@ -44,6 +45,7 @@ export type CodexSlashResolution =
             permissionMode?: CodexPermissionMode;
             model?: string | null;
             modelReasoningEffort?: ReasoningEffort | null;
+            serviceTier?: string | null;
         };
     }
     | {
@@ -61,6 +63,7 @@ export function resolveCodexSlashCommand(
         collaborationMode: EnhancedMode['collaborationMode'];
         model?: string;
         modelReasoningEffort?: ReasoningEffort;
+        serviceTier?: string | null;
     }
 ): CodexSlashResolution {
     const match = /^\s*\/([a-z0-9:_-]+)(?:\s+([\s\S]*))?$/i.exec(text);
@@ -196,6 +199,35 @@ export function resolveCodexSlashCommand(
         };
     }
 
+    if (command === 'fast') {
+        const arg = rest.toLowerCase();
+        if (arg === '' || arg === 'on') {
+            return {
+                kind: 'handled',
+                message: 'Codex Fast mode enabled',
+                updates: { serviceTier: 'fast' }
+            };
+        }
+        if (arg === 'off') {
+            return {
+                kind: 'handled',
+                message: 'Codex Fast mode disabled',
+                updates: { serviceTier: 'standard' }
+            };
+        }
+        if (arg === 'status') {
+            const on = state.serviceTier === 'fast';
+            return {
+                kind: 'handled',
+                message: `Codex Fast mode: ${on ? 'on' : 'off'}`
+            };
+        }
+        return {
+            kind: 'handled',
+            message: 'Usage: /fast [on|off|status]'
+        };
+    }
+
     if (command === 'permissions' || command === 'permission') {
         if (!rest) {
             return { kind: 'handled', message: `Codex permission mode: ${state.permissionMode}` };
@@ -217,18 +249,21 @@ export function resolveCodexSlashCommand(
         return {
             kind: 'handled',
             message: [
-                'Supported Codex slash commands:',
-                '/plan [prompt] — enable plan mode, optionally send prompt',
-                '/plan off — return to default mode',
-                '/goal [objective] — set or view the persistent goal',
-                '/goal pause|resume|clear — update the current goal',
-                '/clear — reset current Codex thread context',
-                '/compact — compact current Codex thread context',
-                '/status — show current Codex session config',
-                '/model [name|auto] — show or set model',
-                '/reasoning [low|medium|high|xhigh|default] — show or set reasoning effort',
-                '/permissions [default|read-only|safe-yolo|yolo] — show or set permission mode',
-                'Custom /commands from .codex/prompts are expanded before sending.'
+                '**Supported Codex slash commands**',
+                '',
+                '- `/plan [prompt]` — enable plan mode, optionally send prompt',
+                '- `/plan off` — return to default mode',
+                '- `/goal [objective]` — set or view the persistent goal',
+                '- `/goal pause|resume|clear` — update the current goal',
+                '- `/clear` — reset current Codex thread context',
+                '- `/compact` — compact current Codex thread context',
+                '- `/status` — show current Codex session config',
+                '- `/model [name|auto]` — show or set model',
+                '- `/reasoning [low|medium|high|xhigh|default]` — show or set reasoning effort',
+                '- `/fast [on|off|status]` — toggle Fast mode (GPT-5.5 / GPT-5.4, ChatGPT login)',
+                '- `/permissions [default|read-only|safe-yolo|yolo]` — show or set permission mode',
+                '',
+                'Custom `/commands` from `.codex/prompts` are expanded before sending.'
             ].join('\n')
         };
     }

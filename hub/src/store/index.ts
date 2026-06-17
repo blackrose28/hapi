@@ -212,6 +212,7 @@ export class Store {
                 model TEXT,
                 model_reasoning_effort TEXT,
                 effort TEXT,
+                service_tier TEXT,
                 todos TEXT,
                 todos_updated_at INTEGER,
                 team_state TEXT,
@@ -610,6 +611,14 @@ export class Store {
                     ON messages(scheduled_at)
                     WHERE scheduled_at IS NOT NULL AND invoked_at IS NULL
             `)
+        }
+    }
+
+    private migrateFromV9ToV10(): void {
+        const columns = this.getSessionColumnNames()
+        if (columns.size === 0) return
+        if (!columns.has('service_tier')) {
+            this.db.exec('ALTER TABLE sessions ADD COLUMN service_tier TEXT')
         }
     }
 

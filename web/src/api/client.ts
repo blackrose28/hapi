@@ -712,6 +712,13 @@ export class ApiClient {
         })
     }
 
+    async setServiceTier(sessionId: string, serviceTier: string | null): Promise<void> {
+        await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/service-tier`, {
+            method: 'POST',
+            body: JSON.stringify({ serviceTier })
+        })
+    }
+
     async approvePermission(
         sessionId: string,
         requestId: string,

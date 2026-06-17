@@ -197,6 +197,10 @@ export function HappyComposer(props: {
     onModelReasoningEffortChange?: (modelReasoningEffort: string | null) => void
     onEffortChange?: (effort: string | null) => void
     onCompactRuntimeChange?: (change: CompactRuntimeChange) => Promise<void>
+    /** Codex Fast mode (service tier): current value ('fast' or null/standard). */
+    serviceTier?: string | null
+    /** When provided, a Fast-mode toggle renders (Codex GPT-5.5 / GPT-5.4 only). */
+    onServiceTierChange?: (serviceTier: string | null) => void
     onSwitchToRemote?: () => void | Promise<void>
     onTerminal?: () => void
     terminalUnsupported?: boolean
@@ -253,6 +257,8 @@ export function HappyComposer(props: {
         onModelReasoningEffortChange,
         onEffortChange,
         onCompactRuntimeChange,
+        serviceTier: rawServiceTier,
+        onServiceTierChange,
         onSwitchToRemote,
         onTerminal,
         terminalUnsupported = false,
@@ -277,6 +283,7 @@ export function HappyComposer(props: {
     const model = rawModel ?? null
     const modelReasoningEffort = rawModelReasoningEffort ?? null
     const effort = rawEffort ?? null
+    const serviceTier = rawServiceTier ?? null
 
     const api = useAssistantApi()
     const composerText = useAssistantState(({ composer }) => composer.text)
@@ -863,6 +870,20 @@ export function HappyComposer(props: {
         haptic('light')
     }, [onEffortChange, controlsDisabled, haptic])
 
+    const handleServiceTierChange = useCallback((nextServiceTier: string | null) => {
+        if (!onServiceTierChange || controlsDisabled) return
+        onServiceTierChange(nextServiceTier)
+        setShowSettings(false)
+        haptic('light')
+    }, [onServiceTierChange, controlsDisabled, haptic])
+
+    // 'standard' (not null) is the explicit Fast-off choice so it persists
+    // distinctly from an untouched/account-default session.
+    const fastModeOptions: Array<{ value: string; label: string }> = useMemo(() => [
+        { value: 'standard', label: t('misc.fastModeStandard') },
+        { value: 'fast', label: t('misc.fastModeFast') }
+    ], [t])
+
     const showCollaborationSettings = Boolean(onCollaborationModeChange && collaborationModeOptions.length > 0)
     const showPermissionSettings = Boolean(onPermissionModeChange && permissionModeOptions.length > 0)
     const showModelSettings = Boolean(onModelChange && supportsModelChange(agentFlavor) && (piModels && piModels.length > 0 || modelOptions.length > 0))
@@ -870,12 +891,14 @@ export function HappyComposer(props: {
     // For Pi: hide effort when the selected model explicitly has reasoning: false
     const piEffortHidden = piModels && selectedPiModel && selectedPiModel.reasoning === false
     const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor) && !piEffortHidden)
+    const showFastModeSettings = Boolean(onServiceTierChange)
     const showSettingsButton = Boolean(
         showCollaborationSettings
         || showPermissionSettings
         || showModelSettings
         || showModelReasoningEffortSettings
         || showEffortSettings
+        || showFastModeSettings
     )
     const showAbortButton = true
     const voiceEnabled = Boolean(onVoiceToggle)
@@ -977,32 +1000,297 @@ export function HappyComposer(props: {
         }
 
         // Non-Pi flavors: original unified gear menu
-        if (showSettings && (showCollaborationSettings || showPermissionSettings || showModelSettings || showModelReasoningEffortSettings || showEffortSettings)) {
+        if (showSettings && (showCollaborationSettings || showPermissionSettings || showModelSettings || showModelReasoningEffortSettings || showEffortSettings || showFastModeSettings)) {
             return (
                 <div className="absolute bottom-[100%] mb-2 w-full">
                     <FloatingOverlay maxHeight={320}>
-                        <SessionComposerSettingsPanel
-                            controlsDisabled={controlsDisabled}
-                            collaborationMode={collaborationMode}
-                            permissionMode={permissionMode}
-                            model={model}
-                            modelReasoningEffort={modelReasoningEffort}
-                            effort={effort}
-                            showCollaborationSettings={showCollaborationSettings}
-                            showPermissionSettings={showPermissionSettings}
-                            showModelSettings={showModelSettings}
-                            showModelReasoningEffortSettings={showModelReasoningEffortSettings}
-                            showEffortSettings={showEffortSettings}
-                            collaborationModeOptions={collaborationModeOptions}
-                            permissionModeOptions={permissionModeOptions}
-                            modelOptions={modelOptions}
-                            modelReasoningEffortOptions={modelReasoningEffortOptions}
-                            claudeEffortOptions={claudeEffortOptions}
-                            onCollaborationModeChange={handleCollaborationChange}
-                            onPermissionModeChange={handlePermissionChange}
-                            onModelChange={handleModelChange}
-                            onModelReasoningEffortChange={handleModelReasoningEffortChange}
-                        />
+                        {showCollaborationSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.collaborationMode')}
+                                </div>
+                                {collaborationModeOptions.map((option) => (
+                                    <button
+                                        key={option.mode}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handleCollaborationChange(option.mode)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                collaborationMode === option.mode
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {collaborationMode === option.mode && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={collaborationMode === option.mode ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {showCollaborationSettings && (showPermissionSettings || showModelSettings || showModelReasoningEffortSettings || showEffortSettings) ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showPermissionSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.permissionMode')}
+                                </div>
+                                {permissionModeOptions.map((option) => (
+                                    <button
+                                        key={option.mode}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handlePermissionChange(option.mode)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                permissionMode === option.mode
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {permissionMode === option.mode && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={permissionMode === option.mode ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {(showCollaborationSettings || showPermissionSettings) && (showModelSettings || showModelEffortSettings || showModelReasoningEffortSettings || showEffortSettings) ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showModelSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.model')}
+                                </div>
+                                {modelOptions.map((option) => {
+                                    const isSelected = selectedModelBase !== undefined
+                                        ? selectedModelBase === option.value
+                                        : model === option.value
+                                    return (
+                                    <button
+                                        key={option.value ?? 'auto'}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handleModelChange(option.value)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                isSelected
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {isSelected && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={isSelected ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                    )
+                                })}
+                            </div>
+                        ) : null}
+
+                        {showModelSettings && showModelEffortSettings ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showModelEffortSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {agentFlavor === 'cursor' ? t('misc.variant') : t('misc.effort')}
+                                </div>
+                                {modelEffortOptions!.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handleModelEffortChange(option.value)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                (selectedModelVariant ?? model) === option.value
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {(selectedModelVariant ?? model) === option.value && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={(selectedModelVariant ?? model) === option.value ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {(showModelSettings || showModelEffortSettings || showModelReasoningEffortSettings) && showEffortSettings ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showModelReasoningEffortSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.reasoningEffort')}
+                                </div>
+                                {codexReasoningEffortOptions.map((option) => (
+                                    <button
+                                        key={option.value ?? 'default'}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handleModelReasoningEffortChange(option.value)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                modelReasoningEffort === option.value
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {modelReasoningEffort === option.value && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={modelReasoningEffort === option.value ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {showModelReasoningEffortSettings && showEffortSettings ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showEffortSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.effort')}
+                                </div>
+                                {claudeEffortOptions.map((option) => (
+                                    <button
+                                        key={option.value ?? 'auto'}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handleEffortChange(option.value)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                effort === option.value
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {effort === option.value && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={effort === option.value ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {(showModelReasoningEffortSettings || showEffortSettings) && showFastModeSettings ? (
+                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                        ) : null}
+
+                        {showFastModeSettings ? (
+                            <div className="py-2">
+                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                                    {t('misc.fastMode')}
+                                </div>
+                                {fastModeOptions.map((option) => (
+                                    <button
+                                        key={option.value ?? 'standard'}
+                                        type="button"
+                                        disabled={controlsDisabled}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            controlsDisabled
+                                                ? 'cursor-not-allowed opacity-50'
+                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                        }`}
+                                        onClick={() => handleServiceTierChange(option.value)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <div
+                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                serviceTier === option.value
+                                                    ? 'border-[var(--app-link)]'
+                                                    : 'border-[var(--app-hint)]'
+                                            }`}
+                                        >
+                                            {serviceTier === option.value && (
+                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                            )}
+                                        </div>
+                                        <span className={serviceTier === option.value ? 'text-[var(--app-link)]' : ''}>
+                                            {option.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
                     </FloatingOverlay>
                 </div>
             )
@@ -1036,9 +1324,11 @@ export function HappyComposer(props: {
         showModelSettings,
         showModelReasoningEffortSettings,
         showEffortSettings,
+        showFastModeSettings,
         modelOptions,
         modelReasoningEffortOptions,
         claudeEffortOptions,
+        fastModeOptions,
         suggestions,
         selectedIndex,
         controlsDisabled,
@@ -1047,6 +1337,7 @@ export function HappyComposer(props: {
         model,
         modelReasoningEffort,
         effort,
+        serviceTier,
         collaborationModeOptions,
         permissionModeOptions,
         handleCollaborationChange,
@@ -1054,6 +1345,7 @@ export function HappyComposer(props: {
         handleModelChange,
         handleModelReasoningEffortChange,
         handleEffortChange,
+        handleServiceTierChange,
         handleSuggestionSelect,
         t
     ])
@@ -1071,6 +1363,7 @@ export function HappyComposer(props: {
             quotaSevenDay={quotaSevenDay}
             model={model}
             modelReasoningEffort={modelReasoningEffort}
+            serviceTier={serviceTier}
             permissionMode={permissionMode}
             collaborationMode={collaborationMode}
             threadGoal={threadGoal}
