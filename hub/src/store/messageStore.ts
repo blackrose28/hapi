@@ -1,7 +1,27 @@
 import type { Database } from 'bun:sqlite'
 
 import type { StoredMessage } from './types'
-import { addMessage, cancelQueuedMessage, deleteQueuedMessageById, lookupQueuedMessage, getMessages, getDeliverableMessagesAfter, getMessagesByPosition, getUninvokedLocalMessages, getMatureScheduledMessages, getImmediateQueuedLocalMessages, markMessagesInvoked, mergeSessionMessages, type AddMessageResult, type CancelQueuedMessageResult, type LookupQueuedMessageResult } from './messages'
+import {
+    addMessage,
+    cancelQueuedMessage,
+    deleteQueuedMessageById,
+    lookupQueuedMessage,
+    getMessages,
+    getDeliverableMessagesAfter,
+    getMessagesByPosition,
+    getUninvokedLocalMessages,
+    getMatureScheduledMessages,
+    getImmediateQueuedLocalMessages,
+    countFutureScheduledBySessionIds,
+    countFutureScheduledLocalMessages,
+    minFutureScheduledAtBySessionIds,
+    countMessages,
+    markMessagesInvoked,
+    mergeSessionMessages,
+    type AddMessageResult,
+    type CancelQueuedMessageResult,
+    type LookupQueuedMessageResult
+} from './messages'
 
 export class MessageStore {
     private readonly db: Database
@@ -40,6 +60,22 @@ export class MessageStore {
 
     getImmediateQueuedLocalMessages(sessionId: string): StoredMessage[] {
         return getImmediateQueuedLocalMessages(this.db, sessionId)
+    }
+
+    countFutureScheduledLocalMessages(sessionId: string, now: number = Date.now()): number {
+        return countFutureScheduledLocalMessages(this.db, sessionId, now)
+    }
+
+    countFutureScheduledBySessionIds(sessionIds: string[], now: number = Date.now()): Map<string, number> {
+        return countFutureScheduledBySessionIds(this.db, sessionIds, now)
+    }
+
+    minFutureScheduledAtBySessionIds(sessionIds: string[], now: number = Date.now()): Map<string, number> {
+        return minFutureScheduledAtBySessionIds(this.db, sessionIds, now)
+    }
+
+    countMessages(sessionId: string): number {
+        return countMessages(this.db, sessionId)
     }
 
     cancelQueuedMessage(sessionId: string, messageId: string): CancelQueuedMessageResult {

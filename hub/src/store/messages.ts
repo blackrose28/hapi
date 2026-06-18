@@ -228,6 +228,89 @@ export function getImmediateQueuedLocalMessages(
     return rows.map(toStoredMessage)
 }
 
+export function countMessages(db: Database, sessionId: string): number {
+    const row = db.prepare(
+        'SELECT COUNT(*) AS count FROM messages WHERE session_id = ?'
+    ).get(sessionId) as { count: number } | undefined
+    return row?.count ?? 0
+}
+
+/** Count uninvoked local messages scheduled for a future time (session list indicator). */
+export function countFutureScheduledLocalMessages(
+    db: Database,
+    sessionId: string,
+    now: number
+): number {
+    const row = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM messages
+        WHERE session_id = ?
+          AND invoked_at IS NULL
+          AND local_id IS NOT NULL
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at > ?
+    `).get(sessionId, now) as { count: number } | undefined
+    return row?.count ?? 0
+}
+
+/** Batch variant for GET /sessions — one query for all session IDs in a namespace. */
+export function countFutureScheduledBySessionIds(
+    db: Database,
+    sessionIds: string[],
+    now: number
+): Map<string, number> {
+    const counts = new Map<string, number>()
+    if (sessionIds.length === 0) {
+        return counts
+    }
+
+    const placeholders = sessionIds.map(() => '?').join(',')
+    const rows = db.prepare(`
+        SELECT session_id, COUNT(*) AS count
+        FROM messages
+        WHERE session_id IN (${placeholders})
+          AND invoked_at IS NULL
+          AND local_id IS NOT NULL
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at > ?
+        GROUP BY session_id
+    `).all(...sessionIds, now) as { session_id: string; count: number }[]
+
+    for (const row of rows) {
+        counts.set(row.session_id, row.count)
+    }
+    return counts
+}
+
+/** Earliest future scheduled_at per session (session-list clock tooltip). */
+export function minFutureScheduledAtBySessionIds(
+    db: Database,
+    sessionIds: string[],
+    now: number
+): Map<string, number> {
+    const nextAt = new Map<string, number>()
+    if (sessionIds.length === 0) {
+        return nextAt
+    }
+
+    const placeholders = sessionIds.map(() => '?').join(',')
+    const rows = db.prepare(`
+        SELECT session_id, MIN(scheduled_at) AS next_at
+        FROM messages
+        WHERE session_id IN (${placeholders})
+          AND invoked_at IS NULL
+          AND local_id IS NOT NULL
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at > ?
+        GROUP BY session_id
+    `).all(...sessionIds, now) as { session_id: string; next_at: number }[]
+
+    for (const row of rows) {
+        nextAt.set(row.session_id, row.next_at)
+    }
+    return nextAt
+}
+
 export function getMaxSeq(db: Database, sessionId: string): number {
     const row = db.prepare(
         'SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM messages WHERE session_id = ?'

@@ -14,6 +14,15 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CopyIcon, CheckIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
+import { DEFAULT_SESSION_PREVIEW_LIMIT, useSessionPreviewLimit } from '@/hooks/useSessionPreviewLimit'
+import { useSessionListStatusMode } from '@/hooks/useSessionListStatusMode'
+import { classifySessionAttention } from '@/lib/sessionAttention'
+import { getSessionLastSeenAt } from '@/lib/sessionLastSeen'
+import { getAttentionLabel, SessionAttentionIndicator } from '@/components/SessionAttentionIndicator'
+import { HoverTooltip, SESSION_ROW_TOOLTIP_FOCUS_CLASS, useSessionRowTooltipIds } from '@/components/HoverTooltip'
+import { formatRelativeTime } from '@/lib/relativeTime'
+import { formatScheduledTooltipDetail } from '@/lib/scheduledTime'
+import { getCodexImportedAt, subscribeCodexImportedSessions } from '@/lib/codexImportedSessions'
 import { formatReopenError } from '@/lib/reopenError'
 import { compareSessionGroupOrder } from '@/lib/session-group-order'
 import { getArchiveAllDescription, getArchiveSessionDescription, getTotalKnownTerminalLiveCount } from '@/lib/archiveConfirmation'
@@ -576,18 +585,25 @@ function MachineIcon(props: { className?: string }) {
     )
 }
 
-function formatRelativeTime(value: number, t: (key: string, params?: Record<string, string | number>) => string): string | null {
-    const ms = value < 1_000_000_000_000 ? value * 1000 : value
-    if (!Number.isFinite(ms)) return null
-    const delta = Date.now() - ms
-    if (delta < 60_000) return t('session.time.justNow')
-    const minutes = Math.floor(delta / 60_000)
-    if (minutes < 60) return t('session.time.minutesAgo', { n: minutes })
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return t('session.time.hoursAgo', { n: hours })
-    const days = Math.floor(hours / 24)
-    if (days < 7) return t('session.time.daysAgo', { n: days })
-    return new Date(ms).toLocaleDateString()
+
+function ScheduleIcon(props: { className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={props.className}
+        >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+        </svg>
+    )
 }
 
 function SessionItem(props: {
@@ -598,6 +614,7 @@ function SessionItem(props: {
     selected?: boolean
 }) {
     const { t } = useTranslation()
+    const { showDetailedStatus } = useSessionListStatusMode()
     const { session: s, onSelect, showPath = true, api, selected = false } = props
     const { haptic } = usePlatform()
     const [menuOpen, setMenuOpen] = useState(false)
@@ -643,14 +660,33 @@ function SessionItem(props: {
 
     const sessionName = getSessionTitle(s)
     const todoProgress = getTodoProgress(s)
+    const attention = useMemo(
+        () => showDetailedStatus
+            ? classifySessionAttention(s, {
+                selected,
+                lastSeenAt: getSessionLastSeenAt(s.id)
+            })
+            : null,
+        [s, selected, showDetailedStatus]
+    )
+    const attentionLabel = attention ? getAttentionLabel(attention, t) : null
+    const scheduledLabel = s.futureScheduledMessageCount > 1
+        ? t('session.item.scheduledMessages', { count: s.futureScheduledMessageCount })
+        : t('session.item.scheduledMessage')
+    const hasScheduleTooltip = showDetailedStatus && s.futureScheduledMessageCount > 0
+    const { attentionId, scheduleId, describedBy } = useSessionRowTooltipIds(
+        Boolean(attention),
+        hasScheduleTooltip
+    )
     return (
         <>
             <button
                 type="button"
                 {...longPressHandlers}
-                className={`session-list-item flex w-full flex-col gap-1 px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)] select-none rounded-lg ${selected ? 'bg-[var(--app-secondary-bg)]' : ''}`}
+                className={`session-list-item group/session-row flex w-full flex-col gap-1 px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)] select-none rounded-lg ${selected ? 'bg-[var(--app-secondary-bg)]' : ''}`}
                 style={{ WebkitTouchCallout: 'none' }}
                 aria-current={selected ? 'page' : undefined}
+                aria-describedby={describedBy}
             >
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -684,6 +720,30 @@ function SessionItem(props: {
                         </div>
                         {s.active && s.thinking ? (
                             <LoaderIcon className="h-3.5 w-3.5 shrink-0 text-[var(--app-hint)] animate-spin-slow" />
+                        ) : attention ? (
+                            <SessionAttentionIndicator
+                                attention={attention}
+                                summary={s}
+                                label={attentionLabel ?? ''}
+                                tooltipId={attentionId!}
+                            />
+                        ) : null}
+                        {hasScheduleTooltip ? (
+                            <HoverTooltip
+                                id={scheduleId!}
+                                target={<ScheduleIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" />}
+                                side="bottom"
+                                align="start"
+                                className="shrink-0"
+                                revealOnParentFocusClass={SESSION_ROW_TOOLTIP_FOCUS_CLASS}
+                            >
+                                <span className="block">
+                                    <span className="block font-medium">{scheduledLabel}</span>
+                                    <span className="mt-1 block text-[var(--app-hint)]">
+                                        {formatScheduledTooltipDetail(s, t)}
+                                    </span>
+                                </span>
+                            </HoverTooltip>
                         ) : null}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 text-xs">
