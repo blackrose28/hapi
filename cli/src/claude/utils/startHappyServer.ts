@@ -5,13 +5,16 @@ import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
+import { lstat, readFile } from "node:fs/promises";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { AddressInfo } from "node:net";
+import { z } from "zod";
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
 import { getHapiSessionToolDefinition, HAPI_SESSION_TOOL_NAMES } from "@/mcp/hapiSessionTools";
+import { detectImageMimeType, registerGeneratedImage } from "@/modules/common/generatedImages";
 
 export interface StartHappyServerOptions {
     /**
@@ -23,29 +26,23 @@ export interface StartHappyServerOptions {
     enableChangeTitle?: boolean;
 }
 
-export async function startHappyServer(client: ApiSessionClient, options: StartHappyServerOptions = {}) {
+function createHapiMcpServer(client: ApiSessionClient, options: StartHappyServerOptions): McpServer {
     const enableChangeTitle = options.enableChangeTitle ?? true;
 
-    // Handler that sends title updates via the client
     const handler = async (title: string) => {
         logger.debug('[hapiMCP] Changing title to:', title);
         try {
-            // Send title as a summary message, similar to title generator
             client.sendClaudeSessionMessage({
                 type: 'summary',
                 summary: title,
                 leafUuid: randomUUID()
             });
-            
+
             return { success: true };
         } catch (error) {
             return { success: false, error: String(error) };
         }
     };
-
-    //
-    // Create the MCP server
-    //
 
     const mcp = new McpServer({
         name: "HAPI Session Tools",
@@ -147,19 +144,127 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         }
     });
 
-    const transport = new StreamableHTTPServerTransport({
-        // NOTE: Returning session id here will result in claude
-        // sdk spawn to fail with `Invalid Request: Server already initialized`
-        sessionIdGenerator: undefined
+    const displayImageInputSchema: z.ZodTypeAny = z.object({
+        path: z.string().describe('Local filesystem path of the image to display to the user'),
+        title: z.string().optional().describe('Optional display title or filename for the image'),
     });
-    await mcp.connect(transport);
 
-    //
-    // Create the HTTP server
-    //
+    mcp.registerTool<any, any>('display_image', {
+        description: 'Display a local image file inline in the current HAPI chat session',
+        title: 'Display Image',
+        inputSchema: displayImageInputSchema,
+    }, async (args: { path: string; title?: string }) => {
+        logger.debug('[hapiMCP] Display image:', args.path);
+
+        try {
+            const info = await lstat(args.path);
+            if (!info.isFile()) {
+                throw new Error('Path is not a regular file');
+            }
+
+            const maxImageBytes = 25 * 1024 * 1024;
+            if (info.size > maxImageBytes) {
+                throw new Error('Image is too large to display inline');
+            }
+
+            const bytes = await readFile(args.path);
+            const mimeType = detectImageMimeType(bytes);
+            if (!mimeType) {
+                throw new Error('Unsupported image content');
+            }
+
+            const image = registerGeneratedImage({
+                id: randomUUID(),
+                path: args.path,
+                fileName: args.title,
+                mimeType,
+                bytes
+            });
+
+            client.sendAgentMessage({
+                type: 'generated-image',
+                imageId: image.id,
+                fileName: image.fileName,
+                mimeType: image.mimeType,
+                id: randomUUID()
+            });
+
+            return {
+                content: [
+                    {
+                        type: 'text' as const,
+                        text: `Displayed image: ${image.fileName}`,
+                    },
+                ],
+                isError: false,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.debug('[hapiMCP] Failed to display image:', message);
+            return {
+                content: [
+                    {
+                        type: 'text' as const,
+                        text: `Failed to display image: ${message}`,
+                    },
+                ],
+                isError: true,
+            };
+        }
+    });
+
+    return mcp;
+}
+
+function readMcpSessionId(req: IncomingMessage): string | undefined {
+    const raw = req.headers['mcp-session-id'];
+    if (typeof raw === 'string') {
+        return raw;
+    }
+    if (Array.isArray(raw)) {
+        return raw[0];
+    }
+    return undefined;
+}
+
+export async function startHappyServer(client: ApiSessionClient, options: StartHappyServerOptions = {}) {
+    const enableChangeTitle = options.enableChangeTitle ?? true;
+    const transports = new Map<string, StreamableHTTPServerTransport>();
+    const mcps = new Map<string, McpServer>();
+
+    const createMcpTransport = () => {
+        const mcp = createHapiMcpServer(client, options);
+        const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => randomUUID(),
+            onsessioninitialized: (sessionId) => {
+                transports.set(sessionId, transport);
+                mcps.set(sessionId, mcp);
+            },
+            onsessionclosed: (sessionId) => {
+                transports.delete(sessionId);
+                const server = mcps.get(sessionId);
+                mcps.delete(sessionId);
+                void server?.close();
+            },
+        });
+        void mcp.connect(transport);
+        return transport;
+    };
 
     const server = createServer(async (req, res) => {
         try {
+            const sessionId = readMcpSessionId(req);
+            const transport = sessionId
+                ? transports.get(sessionId)
+                : createMcpTransport();
+
+            if (!transport) {
+                if (!res.headersSent) {
+                    res.writeHead(404).end();
+                }
+                return;
+            }
+
             await transport.handleRequest(req, res);
         } catch (error) {
             logger.debug("Error handling request:", error);
@@ -176,15 +281,27 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         });
     });
 
+    const mcpUrl = baseUrl.toString();
+    client.updateMetadata((metadata) => ({
+        ...metadata,
+        hapiMcpUrl: mcpUrl,
+    }));
+
+    const toolNames = enableChangeTitle
+        ? [...HAPI_SESSION_TOOL_NAMES, 'display_image']
+        : [...HAPI_SESSION_TOOL_NAMES.filter((name) => name !== 'change_title'), 'display_image'];
+
     return {
-        url: baseUrl.toString(),
-        toolNames: enableChangeTitle
-            ? [...HAPI_SESSION_TOOL_NAMES]
-            : HAPI_SESSION_TOOL_NAMES.filter((name) => name !== 'change_title'),
+        url: mcpUrl,
+        toolNames,
         stop: () => {
             logger.debug('[hapiMCP] Stopping server');
-            mcp.close();
+            for (const mcp of mcps.values()) {
+                mcp.close();
+            }
+            transports.clear();
+            mcps.clear();
             server.close();
         }
-    }
+    };
 }
