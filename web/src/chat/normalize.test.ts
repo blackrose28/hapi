@@ -155,6 +155,49 @@ describe('normalizeDecryptedMessage', () => {
         })
     })
 
+    it('keeps Codex/OpenCode reasoning stream ids for snapshot merging', () => {
+        const normalized = normalizeDecryptedMessage(makeMessage({
+            role: 'agent',
+            content: {
+                type: 'codex',
+                data: {
+                    type: 'reasoning',
+                    id: 'reasoning-stream-1',
+                    message: 'thinking'
+                }
+            }
+        }))
+
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            content: [{
+                type: 'reasoning',
+                text: 'thinking',
+                streamId: 'reasoning-stream-1'
+            }]
+        })
+    })
+
+    it('normalizes agent error payloads as error events', () => {
+        const normalized = normalizeDecryptedMessage(makeMessage({
+            role: 'agent',
+            content: {
+                type: 'codex',
+                data: {
+                    type: 'error',
+                    message: 'Cursor Agent failed: authentication required'
+                }
+            }
+        }))
+
+        expect(normalized).toMatchObject({
+            role: 'event',
+            content: {
+                type: 'error',
+                message: 'Cursor Agent failed: authentication required'
+            }
+        })
+    })
     it('treats non-sidechain string user output as sidechain', () => {
         const message = makeMessage({
             role: 'agent',
