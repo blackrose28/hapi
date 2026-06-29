@@ -130,7 +130,13 @@ export class AcpSdkBackend implements AgentBackend {
                 protocolVersion: 1,
                 clientCapabilities: {
                     fs: { readTextFile: false, writeTextFile: false },
-                    terminal: false
+                    terminal: false,
+                    _meta: {
+                        // Cursor ACP exposes Composer's non-fast/fast choice as separate
+                        // `model` + `fast` config options only when the client advertises
+                        // this capability. Agents that do not know this metadata ignore it.
+                        parameterizedModelPicker: true
+                    }
                 },
                 clientInfo: {
                     name: 'hapi',
@@ -736,6 +742,23 @@ export class AcpSdkBackend implements AgentBackend {
      * expose model metadata (e.g. current Gemini ACP build) simply leave the
      * cache untouched.
      */
+    private extractModelConfigOption(response: Record<string, unknown>): {
+        currentValue: string | null;
+        options: unknown[];
+    } | null {
+        if (!Array.isArray(response.configOptions)) return null;
+
+        for (const entry of response.configOptions) {
+            if (!isObject(entry)) continue;
+            if (asString(entry.category) !== 'model' && asString(entry.id) !== 'model') continue;
+            return {
+                currentValue: asString(entry.currentValue),
+                options: Array.isArray(entry.options) ? entry.options : []
+            };
+        }
+
+        return null;
+    }
     private captureSessionModelsMetadata(sessionId: string, response: unknown): void {
         if (!isObject(response)) return;
 
