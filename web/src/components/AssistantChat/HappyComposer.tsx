@@ -46,6 +46,7 @@ import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
 import { getClaudeComposerEffortOptions } from './claudeEffortOptions'
 import { getCodexComposerReasoningEffortOptions } from './codexReasoningEffortOptions'
 import { shouldSendComposerOnEnter } from './composerKeyboard'
+import { getDisplayedCodexServiceTier } from './codexFastMode'
 import { getPiThinkingLevelOptions, getHighestThinkingLevel, isThinkingLevelSupported } from './piThinkingLevelOptions'
 import { groupModelsByProvider } from './piModelGroups'
 import { PiModelPanel } from './PiModelPanel'
@@ -284,6 +285,7 @@ export function HappyComposer(props: {
     const modelReasoningEffort = rawModelReasoningEffort ?? null
     const effort = rawEffort ?? null
     const serviceTier = rawServiceTier ?? null
+    const displayedServiceTier = getDisplayedCodexServiceTier(serviceTier)
 
     const api = useAssistantApi()
     const composerText = useAssistantState(({ composer }) => composer.text)
@@ -1275,16 +1277,16 @@ export function HappyComposer(props: {
                                     >
                                         <div
                                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                serviceTier === option.value
+                                                displayedServiceTier === option.value
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
                                             }`}
                                         >
-                                            {serviceTier === option.value && (
+                                            {displayedServiceTier === option.value && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
                                             )}
                                         </div>
-                                        <span className={serviceTier === option.value ? 'text-[var(--app-link)]' : ''}>
+                                        <span className={displayedServiceTier === option.value ? 'text-[var(--app-link)]' : ''}>
                                             {option.label}
                                         </span>
                                     </button>
@@ -1337,7 +1339,7 @@ export function HappyComposer(props: {
         model,
         modelReasoningEffort,
         effort,
-        serviceTier,
+        displayedServiceTier,
         collaborationModeOptions,
         permissionModeOptions,
         handleCollaborationChange,
