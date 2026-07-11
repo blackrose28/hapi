@@ -148,7 +148,8 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
         const sdkToLogConverter = new SDKToLogConverter({
             sessionId: session.sessionId || 'unknown',
             cwd: session.path,
-            version: process.env.npm_package_version
+            version: process.env.npm_package_version,
+            selectedModel: session.getModel()
         }, permissionHandler.getResponses());
 
         const handleSessionFound = (sessionId: string) => {
@@ -413,6 +414,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                                 permissionHandler.handleModeChange(p.mode.permissionMode);
                                 inFlightMessage = { items: p.items, mode: p.mode, isolate: p.isolate };
                                 deliveredMessageThisAttempt = true;
+                                sdkToLogConverter.updateSelectedModel(p.mode.model ?? null);
                                 return p;
                             }
 
@@ -420,19 +422,6 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
 
                             if (msg) {
                                 if ((modeHash && msg.hash !== modeHash) || msg.isolate) {
-                                    // Parked into `pending`, not handed to the
-                                    // SDK -- deliberately NOT tracked as
-                                    // inFlightMessage. `pending` is declared
-                                    // outside the while loop and is only ever
-                                    // cleared when actually consumed (the
-                                    // `if (pending)` branch above), so it
-                                    // already survives a throw in this or any
-                                    // later attempt without help from the
-                                    // restore-on-catch logic below. Tracking
-                                    // it here too would restore a second copy
-                                    // via queue.unshift() on top of the one
-                                    // still safely held in `pending`,
-                                    // delivering it twice.
                                     logger.debug('[remote]: mode has changed, pending message');
                                     pending = msg;
                                     return null;
@@ -442,6 +431,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                                 permissionHandler.handleModeChange(mode.permissionMode);
                                 inFlightMessage = { items: msg.items, mode: msg.mode, isolate: msg.isolate };
                                 deliveredMessageThisAttempt = true;
+                                sdkToLogConverter.updateSelectedModel(mode.model ?? null);
                                 return {
                                     message: msg.message,
                                     mode: msg.mode
