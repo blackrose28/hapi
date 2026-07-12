@@ -1,9 +1,9 @@
 import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { CodexPermissionMode } from '@hapi/protocol/types';
-import type { ApprovalPolicy, SandboxMode, SandboxPolicy } from '../appServerTypes';
+import type { ApprovalPolicyPreset, SandboxMode, SandboxPolicy } from '../appServerTypes';
 
 export type CodexPermissionModeConfig = {
-    approvalPolicy: ApprovalPolicy;
+    approvalPolicy: ApprovalPolicyPreset;
     sandbox: SandboxMode;
     sandboxPolicy: SandboxPolicy;
 };

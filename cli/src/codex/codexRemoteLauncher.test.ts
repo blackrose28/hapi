@@ -1033,8 +1033,8 @@ describe('codexRemoteLauncher', () => {
         expect(session.thinking).toBe(false);
     });
 
-    it('uses live permission mode for app-server MCP elicitation handlers', async () => {
-        const { session, setPermissionMode } = createSessionStub();
+    it('routes app-server MCP elicitation through the existing user-input transport', async () => {
+        const { session, codexMessages, rpcHandlers, setPermissionMode } = createSessionStub();
 
         const exitReason = await codexRemoteLauncher(session as never);
 
@@ -1060,14 +1060,24 @@ describe('codexRemoteLauncher', () => {
             }
         };
 
-        await expect(handler?.(request)).resolves.toEqual({
-            action: 'cancel',
-            content: null,
-            _meta: null
+        setPermissionMode('yolo');
+        const response = handler?.(request);
+        await vi.waitFor(() => {
+            expect(codexMessages).toContainEqual(expect.objectContaining({
+                type: 'tool-call',
+                name: 'request_user_input'
+            }));
+        });
+        const requestMessage = codexMessages.find((message) => (
+            typeof message === 'object' && message !== null && 'name' in message && message.name === 'request_user_input'
+        )) as { callId: string };
+        await rpcHandlers.get('permission')?.({
+            id: requestMessage.callId,
+            approved: true,
+            answers: { approval: { answers: ['allow'] } }
         });
 
-        setPermissionMode('yolo');
-        await expect(handler?.(request)).resolves.toEqual({
+        await expect(response).resolves.toEqual({
             action: 'accept',
             content: {
                 approval: 'allow'
@@ -1075,12 +1085,6 @@ describe('codexRemoteLauncher', () => {
             _meta: null
         });
 
-        setPermissionMode('default');
-        await expect(handler?.(request)).resolves.toEqual({
-            action: 'cancel',
-            content: null,
-            _meta: null
-        });
     });
 
     it('sends Codex plan collaboration mode when the app-server advertises it', async () => {

@@ -1,5 +1,17 @@
 import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
-export type ApprovalPolicy = 'untrusted' | 'on-failure' | 'on-request' | 'never';
+export type ApprovalPolicyPreset = 'untrusted' | 'on-failure' | 'on-request' | 'never';
+
+export type ApprovalPolicy =
+    | ApprovalPolicyPreset
+    | {
+        granular: {
+            sandbox_approval: boolean;
+            rules: boolean;
+            skill_approval?: boolean;
+            request_permissions?: boolean;
+            mcp_elicitations: boolean;
+        };
+    };
 export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
 
 export interface InitializeCapabilities {
