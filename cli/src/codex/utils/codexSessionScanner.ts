@@ -123,6 +123,7 @@ class CodexSessionScannerImpl extends BaseSessionScanner<CodexSessionEvent> {
         const lines = content.split('\n');
         const hasTrailingEmpty = lines.length > 0 && lines[lines.length - 1] === '';
         const totalLines = hasTrailingEmpty ? lines.length - 1 : lines.length;
+        let nextCursor = totalLines;
         const currentSize = Buffer.byteLength(content);
         const previousSize = this.fileSizeByPath.get(filePath);
         let effectiveStartLine = startLine;
@@ -146,6 +147,9 @@ class CodexSessionScannerImpl extends BaseSessionScanner<CodexSessionEvent> {
                 parsed = JSON.parse(line);
             } catch (error) {
                 logger.debug(`[codex-session-scanner] Failed to parse transcript line ${filePath}:${lineIndex + 1}: ${error}`);
+                if (!hasTrailingEmpty && lineIndex === totalLines - 1) {
+                    nextCursor = lineIndex;
+                }
                 continue;
             }
 
@@ -170,7 +174,7 @@ class CodexSessionScannerImpl extends BaseSessionScanner<CodexSessionEvent> {
 
         return {
             events,
-            nextCursor: totalLines
+            nextCursor
         };
     }
 

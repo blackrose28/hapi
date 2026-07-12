@@ -44,8 +44,22 @@ describe('convertCodexEvent', () => {
         });
 
         expect(result).toEqual({
-            userMessage: 'hello from response_item user'
+            userMessage: 'hello from response_item user',
+            userActivity: true
         });
+    });
+
+    it('marks image-only response_item messages as user activity', () => {
+        const result = convertCodexEvent({
+            type: 'response_item',
+            payload: {
+                type: 'message',
+                role: 'user',
+                content: [{ type: 'input_image', image_url: 'data:image/png;base64,abc' }]
+            }
+        });
+
+        expect(result).toEqual({ userActivity: true });
     });
 
     it('converts response_item assistant messages', () => {

@@ -4,12 +4,14 @@ import { HAPI_SESSION_ID_ENV, bootstrapSession } from './sessionFactory'
 
 const {
     getSessionMock,
+    getOrCreateSessionMock,
     getOrCreateMachineMock,
     sessionSyncClientMock,
     notifyRunnerSessionStartedMock,
     readSettingsMock
 } = vi.hoisted(() => ({
     getSessionMock: vi.fn(),
+    getOrCreateSessionMock: vi.fn(),
     getOrCreateMachineMock: vi.fn(),
     sessionSyncClientMock: vi.fn(),
     notifyRunnerSessionStartedMock: vi.fn(async () => ({})),
@@ -20,7 +22,7 @@ vi.mock('@/api/api', () => ({
     ApiClient: {
         create: async () => ({
             getSession: getSessionMock,
-            getOrCreateSession: getSessionMock,
+            getOrCreateSession: getOrCreateSessionMock,
             getOrCreateMachine: getOrCreateMachineMock,
             sessionSyncClient: sessionSyncClientMock
         })
@@ -49,7 +51,7 @@ vi.mock('@/ui/logger', () => ({
     }
 }))
 
-import { bootstrapExistingSession, buildSessionMetadata } from './sessionFactory'
+import { bootstrapExistingSession, bootstrapLazySession, buildSessionMetadata } from './sessionFactory'
 
 function createSession(): Session {
     return {
@@ -84,6 +86,7 @@ function createSession(): Session {
 describe('bootstrapExistingSession', () => {
     beforeEach(() => {
         getSessionMock.mockReset()
+        getOrCreateSessionMock.mockReset()
         getOrCreateMachineMock.mockReset()
         sessionSyncClientMock.mockReset()
         notifyRunnerSessionStartedMock.mockClear()
@@ -202,5 +205,67 @@ describe('bootstrapSession HAPI_SESSION_ID export', () => {
 
         expect(result.sessionInfo.id).toBe('hub-session-42')
         expect(process.env[HAPI_SESSION_ID_ENV]).toBe('hub-session-42')
+    })
+})
+
+describe('bootstrapLazySession', () => {
+    beforeEach(() => {
+        getOrCreateSessionMock.mockReset()
+        getOrCreateMachineMock.mockReset()
+        sessionSyncClientMock.mockReset()
+        notifyRunnerSessionStartedMock.mockClear()
+        readSettingsMock.mockReset()
+    })
+
+    it('does not persist a machine or session until materialization', async () => {
+        const pendingClient = { isPending: () => true }
+        sessionSyncClientMock.mockReturnValue(pendingClient)
+        readSettingsMock.mockResolvedValue({ machineId: 'machine-1' })
+
+        const result = await bootstrapLazySession({
+            flavor: 'codex',
+            startedBy: 'terminal',
+            workingDirectory: '/tmp/project',
+            agentState: { controlledByUser: false }
+        })
+
+        expect(result.session).toBe(pendingClient)
+        expect(getOrCreateMachineMock).not.toHaveBeenCalled()
+        expect(getOrCreateSessionMock).not.toHaveBeenCalled()
+        expect(notifyRunnerSessionStartedMock).not.toHaveBeenCalled()
+
+        const [provisional, options] = sessionSyncClientMock.mock.calls[0]
+        expect(provisional.id).toMatch(/^[0-9a-f-]{36}$/)
+        expect(provisional.metadata).toEqual(expect.objectContaining({
+            machineId: 'machine-1',
+            path: '/tmp/project',
+            flavor: 'codex'
+        }))
+
+        const materialized = createSession()
+        materialized.id = provisional.id
+        getOrCreateSessionMock.mockResolvedValue(materialized)
+        const snapshot = {
+            metadata: {
+                ...provisional.metadata,
+                codexSessionId: 'codex-thread-1'
+            },
+            agentState: { controlledByUser: true }
+        }
+        await options.materialize(snapshot, new AbortController().signal)
+
+        expect(getOrCreateSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+            id: provisional.id,
+            metadata: snapshot.metadata,
+            state: snapshot.agentState,
+            timeoutMs: 10_000,
+            machine: expect.objectContaining({ id: 'machine-1' })
+        }))
+
+        options.onMaterialized(materialized, snapshot)
+        expect(notifyRunnerSessionStartedMock).toHaveBeenCalledWith(
+            provisional.id,
+            expect.objectContaining({ codexSessionId: 'codex-thread-1' })
+        )
     })
 })

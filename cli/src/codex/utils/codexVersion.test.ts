@@ -13,6 +13,7 @@ vi.mock('cross-spawn', () => ({
 
 import {
     assertCodexLocalSupported,
+    CODEX_VERSION_TIMEOUT_MS,
     isCodexVersionAtLeast,
     MIN_CODEX_HOOKS_VERSION,
     parseCodexVersion

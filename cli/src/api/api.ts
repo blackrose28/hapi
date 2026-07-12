@@ -18,7 +18,7 @@ import { configuration } from '@/configuration'
 import { readRunnerProfile } from '@/runner/profile'
 import { apiValidationError } from '@/utils/errorUtils'
 import { ApiMachineClient } from './apiMachine'
-import { ApiSessionClient } from './apiSession'
+import { ApiSessionClient, type ApiSessionClientOptions } from './apiSession'
 import { buildHubRequestHeaders } from './hubExtraHeaders'
 import type { RunnerCredentialEnvelope } from '@hapi/protocol/runner-enrollment'
 
@@ -60,29 +60,46 @@ export class ApiClient {
     }
 
     async getOrCreateSession(opts: {
+        id?: string
         tag: string
         metadata: Metadata
         state: AgentState | null
         model?: string
         modelReasoningEffort?: string
         effort?: string
+        machine?: {
+            id: string
+            metadata: MachineMetadata
+            runnerState?: RunnerState
+        }
+        timeoutMs?: number
+        signal?: AbortSignal
     }): Promise<Session> {
         const response = await axios.post<CreateSessionResponse>(
             `${configuration.apiUrl}/cli/sessions`,
             {
+                id: opts.id,
                 tag: opts.tag,
                 metadata: opts.metadata,
                 agentState: opts.state,
                 model: opts.model,
                 modelReasoningEffort: opts.modelReasoningEffort,
-                effort: opts.effort
+                effort: opts.effort,
+                machine: opts.machine
+                    ? {
+                        id: opts.machine.id,
+                        metadata: opts.machine.metadata,
+                        runnerState: opts.machine.runnerState ?? null
+                    }
+                    : undefined
             },
             {
                 headers: buildHubRequestHeaders({
                     ...this.headers(),
                     'Content-Type': 'application/json'
                 }),
-                timeout: 60_000
+                timeout: opts.timeoutMs ?? 60_000,
+                signal: opts.signal
             }
         )
 
@@ -278,8 +295,8 @@ export class ApiClient {
         }
     }
 
-    sessionSyncClient(session: Session): ApiSessionClient {
-        return new ApiSessionClient(this.authentication, session)
+    sessionSyncClient(session: Session, options?: ApiSessionClientOptions): ApiSessionClient {
+        return new ApiSessionClient(this.authentication, session, options)
     }
 
     machineSyncClient(machine: Machine, options?: { workspaceRoot?: string }): ApiMachineClient {

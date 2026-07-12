@@ -41,7 +41,7 @@ export function createRunnerLifecycle(options: RunnerLifecycleOptions): RunnerLi
         }))
 
         options.session.sendSessionDeath(sessionEndReason)
-        await options.session.flush()
+        await options.session.flush({ timeoutMs: 1_000 })
         await options.session.close()
     }
 

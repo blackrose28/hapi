@@ -788,17 +788,6 @@ export type SlashCommandsResponse = {
     error?: string
 }
 
-export const CreateOrLoadSessionRequestSchema = z.object({
-    tag: z.string().min(1),
-    metadata: z.unknown(),
-    agentState: z.unknown().nullable().optional(),
-    model: z.string().optional(),
-    modelReasoningEffort: z.string().optional(),
-    effort: z.string().optional()
-})
-
-export type CreateOrLoadSessionRequest = z.infer<typeof CreateOrLoadSessionRequestSchema>
-
 export const CreateOrLoadMachineRequestSchema = z.object({
     id: z.string().min(1),
     metadata: z.unknown(),
@@ -806,6 +795,19 @@ export const CreateOrLoadMachineRequestSchema = z.object({
 })
 
 export type CreateOrLoadMachineRequest = z.infer<typeof CreateOrLoadMachineRequestSchema>
+
+export const CreateOrLoadSessionRequestSchema = z.object({
+    id: z.string().uuid().optional(),
+    tag: z.string().min(1),
+    metadata: z.unknown(),
+    agentState: z.unknown().nullable().optional(),
+    model: z.string().optional(),
+    modelReasoningEffort: z.string().optional(),
+    effort: z.string().optional(),
+    machine: CreateOrLoadMachineRequestSchema.optional()
+})
+
+export type CreateOrLoadSessionRequest = z.infer<typeof CreateOrLoadSessionRequestSchema>
 
 export const CliMessagesResponseSchema = z.object({
     messages: z.array(z.object({
