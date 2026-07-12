@@ -10,6 +10,7 @@ import type { AgentState, CodexCollaborationMode, PermissionMode, ThreadGoal } f
 import type { ConversationStatus } from '@/realtime/types'
 import type { QuotaWindow } from '@/chat/reducer'
 import { getContextBudgetTokens } from '@/chat/modelConfig'
+import { formatCodexReasoningLabel, shouldShowCodexReasoningLabel } from '@/lib/codexStatusLabels'
 import { isFastServiceTier } from './codexFastMode'
 import { useTranslation } from '@/lib/use-translation'
 
@@ -156,12 +157,6 @@ function formatTokenCount(value: number): string {
     return String(value)
 }
 
-function formatCodexReasoningLabel(effort?: string | null): string {
-    const normalized = effort?.trim().toLowerCase()
-    if (!normalized || normalized === 'default') return 'reasoning default'
-    return `reasoning ${normalized}`
-}
-
 function isCodexFastMode(model?: string | null, effort?: string | null): boolean {
     const normalizedEffort = effort?.trim().toLowerCase()
     if (normalizedEffort === 'none' || normalizedEffort === 'minimal' || normalizedEffort === 'low') {
@@ -251,7 +246,11 @@ export function StatusBar(props: {
     const collaborationModeLabel = displayCollaborationMode
         ? getCodexCollaborationModeLabel(displayCollaborationMode)
         : null
+<<<<<<< HEAD
     const codexReasoningLabel = props.agentFlavor === 'codex'
+=======
+    const codexReasoningLabel = shouldShowCodexReasoningLabel(props.agentFlavor)
+>>>>>>> b104c38f (fix(web): show Codex reasoning effort in SessionHeader (#1016))
         ? formatCodexReasoningLabel(props.modelReasoningEffort)
         : null
     // Prefer the explicit service tier (the real Fast-mode toggle) when set;

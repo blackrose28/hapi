@@ -16,12 +16,15 @@ import { SessionExportDialog } from '@/components/SessionExportDialog'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatReopenError } from '@/lib/reopenError'
+import { formatCodexReasoningLabel, shouldShowCodexReasoningLabel } from '@/lib/codexStatusLabels'
 import { getSessionModelLabel } from '@/lib/sessionModelLabel'
 import { useTranslation } from '@/lib/use-translation'
 import { useToast } from '@/lib/toast-context'
 import { queryKeys } from '@/lib/query-keys'
 import { markCodexSessionsImported } from '@/lib/codexImportedSessions'
 import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
+import { AgentFlavorIcon } from '@/components/AgentFlavorIcon'
+import { isFastServiceTier } from '@/components/AssistantChat/codexFastMode'
 
 function getSessionTitle(session: Session): string {
     if (session.metadata?.name) {
@@ -205,6 +208,11 @@ export function SessionHeader(props: {
     const codexSessionId = session.metadata?.flavor === 'codex'
         ? session.metadata.codexSessionId?.trim() || null
         : null
+    const reasoningLabel = shouldShowCodexReasoningLabel(agentFlavor)
+        ? formatCodexReasoningLabel(session.modelReasoningEffort)
+        : null
+    // Match expected Fast badge semantics (#1004): only explicit service tier, no effort/model heuristics.
+    const showFastBadge = agentFlavor === 'codex' && isFastServiceTier(session.serviceTier)
 
     const [menuOpen, setMenuOpen] = useState(false)
     const [menuAnchorPoint, setMenuAnchorPoint] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -638,6 +646,16 @@ export function SessionHeader(props: {
                             {modelLabel ? (
                                 <span>
                                     {t(modelLabel.key)}: {modelLabel.value}
+                                </span>
+                            ) : null}
+                            {reasoningLabel ? (
+                                <span data-testid="session-header-reasoning">
+                                    {reasoningLabel}
+                                </span>
+                            ) : null}
+                            {showFastBadge ? (
+                                <span data-testid="session-header-fast" className="text-[#34C759]">
+                                    fast
                                 </span>
                             ) : null}
                             {worktreeBranch ? (
