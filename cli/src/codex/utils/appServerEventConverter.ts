@@ -282,6 +282,18 @@ function extractStringArray(value: unknown): string[] {
         : [];
 }
 
+function extractCodexErrorInfo(
+    record: Record<string, unknown>,
+    errorRecord: Record<string, unknown> | null
+): string | null {
+    return asString(
+        record.codexErrorInfo
+        ?? record.codex_error_info
+        ?? errorRecord?.codexErrorInfo
+        ?? errorRecord?.codex_error_info
+    );
+}
+
 function buildCollabAgentInput(item: Record<string, unknown>, toolName: string): Record<string, unknown> {
     const targets = extractStringArray(item.receiverThreadIds ?? item.receiver_thread_ids ?? item.targets);
     const input: Record<string, unknown> = {};
@@ -492,12 +504,19 @@ export class AppServerEventConverter {
 
         if (msgType === 'error') {
             const errorRecord = asRecord(msg.error);
-            const willRetry = asBoolean(msg.will_retry ?? msg.willRetry ?? errorRecord?.will_retry ?? errorRecord?.willRetry) ?? false;
+            const retryable = asBoolean(msg.will_retry ?? msg.willRetry ?? errorRecord?.will_retry ?? errorRecord?.willRetry);
+            const willRetry = retryable ?? false;
             if (willRetry) {
                 return [];
             }
             const error = asString(msg.message ?? msg.reason ?? errorRecord?.message);
-            return error ? [{ type: 'task_failed', error }] : [];
+            const codexErrorInfo = extractCodexErrorInfo(msg, errorRecord);
+            return error ? [{
+                type: 'task_failed',
+                ...(retryable !== null ? { retryable } : {}),
+                ...(codexErrorInfo ? { codex_error_info: codexErrorInfo } : {}),
+                error
+            }] : [];
         }
 
         if (msgType === 'plan_update') {
@@ -523,6 +542,11 @@ export class AppServerEventConverter {
     handleNotification(method: string, params: unknown): ConvertedEvent[] {
         const events: ConvertedEvent[] = [];
         const paramsRecord = asRecord(params) ?? {};
+        const scope = extractEventScope(paramsRecord);
+        const scoped = (event: Record<string, unknown>): ConvertedEvent => ({
+            ...scope,
+            ...event
+        }) as ConvertedEvent;
 
         if (method.startsWith('codex/event/')) {
             return this.handleWrappedCodexEvent(paramsRecord) ?? events;
@@ -629,7 +653,9 @@ export class AppServerEventConverter {
             const statusRaw = asString(paramsRecord.status ?? turn.status);
             const status = statusRaw?.toLowerCase();
             const turnId = asString(turn.turnId ?? turn.turn_id ?? turn.id);
-            const errorMessage = asString(paramsRecord.error ?? paramsRecord.message ?? paramsRecord.reason);
+            const turnError = asRecord(paramsRecord.error ?? turn.error);
+            const errorMessage = asString(paramsRecord.error ?? paramsRecord.message ?? paramsRecord.reason)
+                ?? asString(turnError?.message);
 
             if (status === 'interrupted' || status === 'cancelled' || status === 'canceled') {
                 events.push({ type: 'turn_aborted', ...(turnId ? { turn_id: turnId } : {}) });
@@ -637,7 +663,14 @@ export class AppServerEventConverter {
             }
 
             if (status === 'failed' || status === 'error') {
-                events.push({ type: 'task_failed', ...(turnId ? { turn_id: turnId } : {}), ...(errorMessage ? { error: errorMessage } : {}) });
+                const codexErrorInfo = extractCodexErrorInfo(paramsRecord, turnError);
+                events.push(scoped({
+                    type: 'task_failed',
+                    ...(turnId ? { turn_id: turnId } : {}),
+                    terminal_source: 'turn_completed',
+                    ...(codexErrorInfo ? { codex_error_info: codexErrorInfo } : {}),
+                    ...(errorMessage ? { error: errorMessage } : {})
+                }));
                 return events;
             }
 
@@ -659,12 +692,66 @@ export class AppServerEventConverter {
             return events;
         }
 
+        if (method === 'model/safetyBuffering/updated') {
+            const model = asString(paramsRecord.model);
+            const showBufferingUi = asBoolean(paramsRecord.showBufferingUi ?? paramsRecord.show_buffering_ui);
+            if (!model || showBufferingUi === null) {
+                return events;
+            }
+            events.push(scoped({
+                type: 'model_safety_buffering',
+                model,
+                use_cases: extractStringArray(paramsRecord.useCases ?? paramsRecord.use_cases),
+                reasons: extractStringArray(paramsRecord.reasons),
+                show_buffering_ui: showBufferingUi,
+                faster_model: asString(paramsRecord.fasterModel ?? paramsRecord.faster_model)
+            }));
+            return events;
+        }
+
+        if (method === 'model/rerouted') {
+            const fromModel = asString(paramsRecord.fromModel ?? paramsRecord.from_model);
+            const toModel = asString(paramsRecord.toModel ?? paramsRecord.to_model);
+            const reason = asString(paramsRecord.reason);
+            if (fromModel && toModel && reason) {
+                events.push(scoped({
+                    type: 'model_rerouted',
+                    from_model: fromModel,
+                    to_model: toModel,
+                    reason
+                }));
+            }
+            return events;
+        }
+
+        if (method === 'model/verification') {
+            events.push(scoped({
+                type: 'model_verification',
+                verifications: extractStringArray(paramsRecord.verifications)
+            }));
+            return events;
+        }
+
         if (method === 'error') {
-            const willRetry = asBoolean(paramsRecord.will_retry ?? paramsRecord.willRetry) ?? false;
+            const errorRecord = asRecord(paramsRecord.error);
+            const retryable = asBoolean(
+                paramsRecord.will_retry
+                ?? paramsRecord.willRetry
+                ?? errorRecord?.will_retry
+                ?? errorRecord?.willRetry
+            );
+            const willRetry = retryable ?? false;
             if (willRetry) return events;
-            const message = asString(paramsRecord.message) ?? asString(asRecord(paramsRecord.error)?.message);
+            const message = asString(paramsRecord.message) ?? asString(errorRecord?.message);
             if (message) {
-                events.push({ type: 'task_failed', error: message });
+                const codexErrorInfo = extractCodexErrorInfo(paramsRecord, errorRecord);
+                events.push(scoped({
+                    type: 'task_failed',
+                    terminal_source: 'error',
+                    ...(retryable !== null ? { retryable } : {}),
+                    ...(codexErrorInfo ? { codex_error_info: codexErrorInfo } : {}),
+                    error: message
+                }));
             }
             return events;
         }
@@ -680,6 +767,7 @@ export class AppServerEventConverter {
                 this.lastAgentMessageDeltaByItemId.set(itemId, delta);
                 const prev = this.agentMessageBuffers.get(itemId) ?? '';
                 this.agentMessageBuffers.set(itemId, prev + delta);
+                events.push(scoped({ type: 'agent_message_delta' }));
             }
             return events;
         }

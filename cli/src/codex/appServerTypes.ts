@@ -230,6 +230,19 @@ export interface TurnInterruptResponse {
     [key: string]: unknown;
 }
 
+export interface ThreadRollbackParams {
+    threadId: string;
+    numTurns: number;
+}
+
+export interface ThreadRollbackResponse {
+    thread: {
+        id: string;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+
 export interface ThreadCompactStartParams {
     threadId: string;
 }
