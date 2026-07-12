@@ -191,7 +191,7 @@ export default {
   'newSession.type.simple': '简单',
   'newSession.type.simple.desc': '直接使用选定的目录',
   'newSession.type.worktree': '工作树',
-  'newSession.type.worktree.desc': '在仓库旁创建新工作树',
+  'newSession.type.worktree.desc': '在仓库旁创建新工作树（Cursor 使用原生 ~/.cursor/worktrees）',
   'newSession.type.worktree.placeholder': 'feature-x (默认 1228-xxxx)',
   'newSession.agent': '代理',
   'newSession.model': '模型',

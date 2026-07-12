@@ -26,6 +26,8 @@ const formatFailureReason = (message: string): string => {
 export async function runCursor(opts: {
     startedBy?: 'runner' | 'terminal';
     cursorArgs?: string[];
+    cursorWorktree?: boolean | string;
+    cursorAddDirs?: readonly string[];
     permissionMode?: PermissionMode;
     resumeSessionId?: string;
     model?: string;
@@ -134,6 +136,8 @@ export async function runCursor(opts: {
             api,
             session,
             cursorArgs: opts.cursorArgs,
+            cursorWorktree: opts.cursorWorktree,
+            cursorAddDirs: opts.cursorAddDirs,
             startedBy,
             permissionMode: currentPermissionMode,
             resumeSessionId: opts.resumeSessionId,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseCursorSpecialCommand } from './cursorSpecialCommands';
+import {
+    cursorPassThroughStatusMessage,
+    parseCursorSpecialCommand
+} from './cursorSpecialCommands';
 
 describe('parseCursorSpecialCommand', () => {
     it('accepts /summarize with optional instructions', () => {
@@ -29,5 +32,9 @@ describe('parseCursorSpecialCommand', () => {
         expect(parseCursorSpecialCommand('/summarizer')).toEqual({ type: null });
         expect(parseCursorSpecialCommand('please /summarize')).toEqual({ type: null });
         expect(parseCursorSpecialCommand('/clearing')).toEqual({ type: null });
+    });
+
+    it('returns a status line for multitask', () => {
+        expect(cursorPassThroughStatusMessage('multitask')).toMatch(/multitask/i);
     });
 });

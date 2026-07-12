@@ -187,7 +187,7 @@ const en = {
   'newSession.type.simple': 'Simple',
   'newSession.type.simple.desc': 'Use selected directory as-is',
   'newSession.type.worktree': 'Worktree',
-  'newSession.type.worktree.desc': 'Create a new worktree next to repo',
+  'newSession.type.worktree.desc': 'Create a new worktree next to repo (Cursor uses native ~/.cursor/worktrees)',
   'newSession.type.worktree.placeholder': 'feature-x (default 1228-xxxx)',
   'newSession.agent': 'Agent',
   'newSession.model': 'Model',

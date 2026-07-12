@@ -5,7 +5,11 @@ import { CursorSession } from './session';
 import { BaseLocalLauncher } from '@/modules/common/launcher/BaseLocalLauncher';
 import { convertAgentMessage } from '@/agent/messageConverter';
 
-function permissionModeToCursorArgs(mode?: string): { mode?: 'plan' | 'ask'; yolo?: boolean } {
+function permissionModeToCursorArgs(mode?: string): {
+    mode?: 'plan' | 'ask' | 'debug';
+    yolo?: boolean;
+    autoReview?: boolean;
+} {
     if (mode === 'plan') {
         return { mode: 'plan' };
     }
@@ -15,6 +19,9 @@ function permissionModeToCursorArgs(mode?: string): { mode?: 'plan' | 'ask'; yol
     if (mode === 'yolo') {
         return { yolo: true };
     }
+    if (mode === 'autoReview') {
+        return { autoReview: true };
+    }
     return {};
 }
 
@@ -23,7 +30,7 @@ export async function cursorLocalLauncher(session: CursorSession): Promise<'swit
     if (resumeChatId) {
         session.onSessionFound(resumeChatId);
     }
-    const { mode, yolo } = permissionModeToCursorArgs(session.getPermissionMode() as string);
+    const { mode, yolo, autoReview } = permissionModeToCursorArgs(session.getPermissionMode() as string);
 
     const launcher = new BaseLocalLauncher({
         label: 'cursor-local',
@@ -41,6 +48,9 @@ export async function cursorLocalLauncher(session: CursorSession): Promise<'swit
                 model: session.model,
                 mode,
                 yolo,
+                autoReview,
+                worktree: session.cursorWorktree,
+                addDirs: session.cursorAddDirs,
                 onChatFound: (chatId) => session.onSessionFound(chatId)
             });
         },

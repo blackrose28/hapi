@@ -346,20 +346,27 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
       }
 
       if (sessionType === 'worktree') {
-        const worktreeResult = await createWorktree({
-          basePath: directory,
-          nameHint: worktreeName
-        });
-        if (!worktreeResult.ok) {
-          logger.debug(`[RUNNER RUN] Worktree creation failed: ${worktreeResult.error}`);
-          return {
-            type: 'error',
-            errorMessage: worktreeResult.error
-          };
+        // Cursor Agent has native `--worktree` under ~/.cursor/worktrees/. Prefer that
+        // over HAPI's sibling-directory worktree so Cursor sandbox/skills see the same layout.
+        if (agent === 'cursor') {
+          spawnDirectory = directory;
+          logger.debug(`[RUNNER RUN] Cursor-native worktree requested (nameHint=${worktreeName ?? '(auto)'})`);
+        } else {
+          const worktreeResult = await createWorktree({
+            basePath: directory,
+            nameHint: worktreeName
+          });
+          if (!worktreeResult.ok) {
+            logger.debug(`[RUNNER RUN] Worktree creation failed: ${worktreeResult.error}`);
+            return {
+              type: 'error',
+              errorMessage: worktreeResult.error
+            };
+          }
+          worktreeInfo = worktreeResult.info;
+          spawnDirectory = worktreeInfo.worktreePath;
+          logger.debug(`[RUNNER RUN] Created worktree ${worktreeInfo.worktreePath} (branch ${worktreeInfo.branch})`);
         }
-        worktreeInfo = worktreeResult.info;
-        spawnDirectory = worktreeInfo.worktreePath;
-        logger.debug(`[RUNNER RUN] Created worktree ${worktreeInfo.worktreePath} (branch ${worktreeInfo.branch})`);
       }
 
       const cleanupWorktree = async () => {
@@ -1147,6 +1154,13 @@ export function buildCliArgs(
   if (options.recoveryContext) {
     const encoded = Buffer.from(options.recoveryContext).toString("base64")
     args.push("--recovery-context", encoded)
+  }
+  if (agent === 'cursor' && options.sessionType === 'worktree') {
+    args.push('--cursor-worktree');
+    const name = options.worktreeName?.trim();
+    if (name) {
+      args.push(name);
+    }
   }
   return args;
 }

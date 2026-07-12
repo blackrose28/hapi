@@ -27,6 +27,9 @@ export async function cursorLocal(opts: {
     model?: string;
     mode?: 'plan' | 'ask';
     yolo?: boolean;
+    autoReview?: boolean;
+    worktree?: boolean | string;
+    addDirs?: readonly string[];
     onChatFound?: (chatId: string) => void;
     cursorArgs?: string[];
 }): Promise<void> {
@@ -47,6 +50,24 @@ export async function cursorLocal(opts: {
 
     if (opts.yolo) {
         args.push('--yolo');
+    }
+
+    if (opts.autoReview) {
+        args.push('--auto-review');
+    }
+
+    if (opts.worktree !== undefined && opts.worktree !== false) {
+        args.push('--worktree');
+        if (typeof opts.worktree === 'string' && opts.worktree.trim()) {
+            args.push(opts.worktree.trim());
+        }
+    }
+
+    for (const dir of opts.addDirs ?? []) {
+        const trimmed = dir.trim();
+        if (trimmed) {
+            args.push('--add-dir', trimmed);
+        }
     }
 
     if (opts.cursorArgs) {
