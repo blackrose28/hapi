@@ -16,6 +16,11 @@ export type CodexMessage = {
     message: string;
     id: string;
 } | {
+    type: 'proposed_plan';
+    plan: string;
+    id: string;
+    turnId: string;
+} | {
     type: 'reasoning';
     message: string;
     id: string;
@@ -44,6 +49,7 @@ export type CodexConversionResult = {
     message?: CodexMessage;
     userMessage?: string;
     userActivity?: true;
+    finishedTurnId?: string;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -55,30 +61,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asString(value: unknown): string | null {
     return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-function extractCodexText(value: unknown): string {
-    if (typeof value === 'string') {
-        return value.trim();
-    }
-    if (Array.isArray(value)) {
-        return value
-            .map((item) => {
-                const record = asRecord(item);
-                if (record?.type === 'input_text' && typeof record.text === 'string') return record.text;
-                if (record?.type === 'output_text' && typeof record.text === 'string') return record.text;
-                if (record?.type === 'text' && typeof record.text === 'string') return record.text;
-                return null;
-            })
-            .filter((part): part is string => Boolean(part))
-            .join(' ')
-            .trim();
-    }
-    const record = asRecord(value);
-    if (record?.type === 'input_text' && typeof record.text === 'string') return record.text.trim();
-    if (record?.type === 'output_text' && typeof record.text === 'string') return record.text.trim();
-    if (record?.type === 'text' && typeof record.text === 'string') return record.text.trim();
-    return '';
 }
 
 function parseArguments(value: unknown): unknown {
@@ -168,6 +150,29 @@ export function convertCodexEvent(rawEvent: unknown): CodexConversionResult | nu
             };
         }
 
+        if (eventType === 'item_completed') {
+            const item = asRecord(payloadRecord.item);
+            const itemType = asString(item?.type)?.toLowerCase();
+            const message = itemType === 'plan' ? asString(item?.text) : null;
+            const turnId = asString(payloadRecord.turn_id);
+            if (!message || message.trim().length === 0 || !turnId) {
+                return null;
+            }
+            return {
+                message: {
+                    type: 'proposed_plan',
+                    plan: message,
+                    id: asString(item?.id) ?? randomUUID(),
+                    turnId
+                }
+            };
+        }
+
+        if (eventType === 'task_complete' || eventType === 'turn_aborted' || eventType === 'task_failed') {
+            const turnId = asString(payloadRecord.turn_id);
+            return turnId ? { finishedTurnId: turnId } : null;
+        }
+
         if (eventType === 'agent_reasoning') {
             const message = asString(payloadRecord.text) ?? asString(payloadRecord.message);
             if (!message) {
@@ -219,26 +224,7 @@ export function convertCodexEvent(rawEvent: unknown): CodexConversionResult | nu
         }
 
         if (itemType === 'message') {
-            const role = asString(payloadRecord.role);
-            const text = extractCodexText(payloadRecord.content);
-            if (role === 'user') {
-                return {
-                    userActivity: true,
-                    ...(text ? { userMessage: text } : {})
-                };
-            }
-            if (role === 'assistant') {
-                if (!text) {
-                    return null;
-                }
-                return {
-                    message: {
-                        type: 'message',
-                        message: text,
-                        id: randomUUID()
-                    }
-                };
-            }
+            // Response messages are model conversation state; event_msg carries visible chat.
             return null;
         }
 

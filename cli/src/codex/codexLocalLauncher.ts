@@ -6,12 +6,14 @@ import { codexLocal } from './codexLocal';
 import type { ReasoningEffort } from './appServerTypes';
 import { CodexSession } from './session';
 import { createCodexSessionScanner, type CodexSessionScanner } from './utils/codexSessionScanner';
-import { convertCodexEvent } from './utils/codexEventConverter';
+import { convertCodexEvent, type CodexMessage } from './utils/codexEventConverter';
 import { buildHapiMcpBridge } from './utils/buildHapiMcpBridge';
 import { parseCodexCliOverrides, stripCodexCliOverrides } from './utils/codexCliOverrides';
 import { buildCodexPermissionModeCliArgs } from './utils/permissionModeConfig';
 import { BaseLocalLauncher } from '@/modules/common/launcher/BaseLocalLauncher';
 import { createCodexTranscriptLocator, type CodexTranscriptLocator } from './utils/codexTranscriptLocator';
+
+type ProposedPlanMessage = Extract<CodexMessage, { type: 'proposed_plan' }>;
 
 export async function codexLocalLauncher(session: CodexSession, _recoveryContext?: string): Promise<'switch' | 'exit'> {
     const resumeSessionId = session.sessionId;
@@ -23,6 +25,8 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
     let pendingScannerSetup: Promise<void> | null = null;
     let hasSummary = false;
     let transcriptLocator: CodexTranscriptLocator | null = null;
+    let scannerTranscriptPath: string | null = null;
+    const pendingPlansByTurnId = new Map<string, ProposedPlanMessage>();
     const permissionMode = session.getPermissionMode();
     const managedPermissionMode = permissionMode === 'read-only' || permissionMode === 'safe-yolo' || permissionMode === 'yolo'
         ? permissionMode
@@ -63,6 +67,38 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
         return primarySessionId === null || primarySessionId === sessionId;
     };
 
+    const sendProposedPlan = (message: ProposedPlanMessage): void => {
+        const callId = `codex-proposed-plan:${message.id}`;
+        session.sendAgentMessage({
+            type: 'tool-call',
+            name: 'ExitPlanMode',
+            callId,
+            input: { plan: message.plan },
+            id: message.id
+        });
+        session.sendAgentMessage({
+            type: 'tool-call-result',
+            callId,
+            output: null,
+            id: `${message.id}:result`
+        });
+    };
+
+    const flushPendingPlan = (turnId: string): void => {
+        const message = pendingPlansByTurnId.get(turnId);
+        if (!message) {
+            return;
+        }
+        pendingPlansByTurnId.delete(turnId);
+        sendProposedPlan(message);
+    };
+
+    const flushAllPendingPlans = (): void => {
+        for (const turnId of pendingPlansByTurnId.keys()) {
+            flushPendingPlan(turnId);
+        }
+    };
+
     const bindPrimarySession = (sessionId: string, transcriptPath: string, allowSwitch = false): void => {
         if (primarySessionId && primarySessionId !== sessionId && !allowSwitch) {
             logger.debug(`[codex-local]: Ignoring non-primary SessionStart hook ${sessionId}; primary is ${primarySessionId}`);
@@ -85,7 +121,11 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
             return;
         }
         if (scanner) {
+            if (scannerTranscriptPath !== transcriptPath) {
+                flushAllPendingPlans();
+            }
             await scanner.setTranscriptPath(transcriptPath);
+            scannerTranscriptPath = transcriptPath;
             return;
         }
         const createdScanner = await createCodexSessionScanner({
@@ -114,7 +154,12 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
                     session.notifyUserActivity();
                 }
                 if (converted?.message) {
-                    session.sendAgentMessage(converted.message);
+                    if (converted.message.type === 'proposed_plan') {
+                        // Codex may complete the Plan item before emitting its final text preface.
+                        pendingPlansByTurnId.set(converted.message.turnId, converted.message);
+                    } else {
+                        session.sendAgentMessage(converted.message);
+                    }
 
                     // Auto-update session summary from first agent message
                     if (!hasSummary && converted.message.type === 'message') {
@@ -134,6 +179,9 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
                         }
                     }
                 }
+                if (converted?.finishedTurnId) {
+                    flushPendingPlan(converted.finishedTurnId);
+                }
             }
         });
         if (shuttingDown) {
@@ -141,6 +189,7 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
             return;
         }
         scanner = createdScanner;
+        scannerTranscriptPath = transcriptPath;
     };
 
     const handleTranscriptPath = (transcriptPath: string): Promise<void> => {
@@ -268,6 +317,7 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
         if (activeScanner) {
             await activeScanner.cleanup();
         }
+        flushAllPendingPlans();
         happyServer.stop();
         if (!hookReady) {
             logger.debug('[codex-local]: SessionStart hook did not provide transcript path before shutdown');

@@ -89,11 +89,11 @@ describe('codexTranscriptLocator', () => {
 
         await appendFile(transcriptPath, `${JSON.stringify({
             timestamp: new Date().toISOString(),
-            type: 'response_item',
+            type: 'event_msg',
             payload: {
-                type: 'message',
-                role: 'user',
-                content: [{ type: 'input_image', image_url: 'data:image/png;base64,abc' }]
+                type: 'user_message',
+                message: '',
+                images: ['data:image/png;base64,abc']
             }
         })}\n`);
         await wait(100);
