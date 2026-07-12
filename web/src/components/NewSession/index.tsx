@@ -17,6 +17,7 @@ import { useActiveSuggestions, type Suggestion } from '@/hooks/useActiveSuggesti
 import { useDirectorySuggestions } from '@/hooks/useDirectorySuggestions'
 import { useRecentPaths } from '@/hooks/useRecentPaths'
 import { useTranslation } from '@/lib/use-translation'
+import { getCodexModelReasoningEfforts } from '@/lib/codexModelCapabilities'
 import type {
     AgentType,
     LaunchEffort,
@@ -294,6 +295,27 @@ export function NewSession(props: {
         }
         return options
     }, [claudeModelsState.models, model])
+
+    const codexSupportedReasoningEfforts = useMemo(
+        () => getCodexModelReasoningEfforts(codexModelsState.models, model),
+        [codexModelsState.models, model]
+    )
+    const codexReasoningEffortOptions = useMemo(
+        () => codexSupportedReasoningEfforts?.map((value) => ({ value })),
+        [codexSupportedReasoningEfforts]
+    )
+
+    useEffect(() => {
+        if (
+            agent !== 'codex'
+            || modelReasoningEffort === 'default'
+            || !codexSupportedReasoningEfforts
+            || codexSupportedReasoningEfforts.includes(modelReasoningEffort)
+        ) {
+            return
+        }
+        setModelReasoningEffort('default')
+    }, [agent, codexSupportedReasoningEfforts, modelReasoningEffort])
 
     const showCodexFastMode = agent === 'codex'
         && !codexModelsState.error
@@ -864,7 +886,8 @@ export function NewSession(props: {
                 agent={agent}
                 value={modelReasoningEffort}
                 options={opencodeReasoningEffortOptions}
-                isDisabled={isFormDisabled}
+                availableOptions={agent === 'codex' ? codexReasoningEffortOptions : undefined}
+                isDisabled={isFormDisabled || (agent === 'codex' && codexModelsState.isLoading)}
                 onChange={setModelReasoningEffort}
             />
             <GrokPermissionModeSelector

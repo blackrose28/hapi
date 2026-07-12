@@ -13,7 +13,9 @@ const CODEX_REASONING_EFFORT_LABELS: Record<string, string> = {
     low: 'Low',
     medium: 'Medium',
     high: 'High',
-    xhigh: 'XHigh'
+    xhigh: 'XHigh',
+    max: 'Max',
+    ultra: 'Ultra'
 }
 
 function normalizeCodexComposerReasoningEffort(effort?: string | null): string | null {
@@ -30,7 +32,7 @@ function formatCodexReasoningEffortLabel(effort: string): string {
         ?? `${effort.charAt(0).toUpperCase()}${effort.slice(1)}`
 }
 
-function buildOpencodeComposerReasoningEffortOptions(
+function buildDynamicReasoningEffortOptions(
     currentEffort: string | null,
     dynamicOptions: ComposerReasoningEffortSourceOption[]
 ): CodexComposerReasoningEffortOption[] {
@@ -65,7 +67,11 @@ export function getCodexComposerReasoningEffortOptions(
         if (!dynamicOptions || dynamicOptions.length === 0) {
             return []
         }
-        return buildOpencodeComposerReasoningEffortOptions(normalizedCurrentEffort, dynamicOptions)
+        return buildDynamicReasoningEffortOptions(normalizedCurrentEffort, dynamicOptions)
+    }
+
+    if (dynamicOptions && dynamicOptions.length > 0) {
+        return buildDynamicReasoningEffortOptions(normalizedCurrentEffort, dynamicOptions)
     }
 
     const options: CodexComposerReasoningEffortOption[] = [

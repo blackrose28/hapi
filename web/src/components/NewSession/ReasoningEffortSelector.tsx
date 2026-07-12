@@ -1,25 +1,26 @@
 import type { AgentType, ReasoningEffort } from './types'
 import { CODEX_REASONING_EFFORT_OPTIONS } from './types'
 import { useTranslation } from '@/lib/use-translation'
+import { getCodexComposerReasoningEffortOptions } from '@/components/AssistantChat/codexReasoningEffortOptions'
 
 export function ReasoningEffortSelector(props: {
     agent: AgentType
     value: ReasoningEffort
+    availableOptions?: Array<{ value: string; name?: string }>
     options?: Array<{ value: string; label: string }>
     isDisabled: boolean
     onChange: (value: ReasoningEffort) => void
 }) {
     const { t } = useTranslation()
 
-    const options = props.agent === 'codex'
-        ? CODEX_REASONING_EFFORT_OPTIONS
+    const options = props.agent === 'codex' && props.availableOptions?.length
+        ? getCodexComposerReasoningEffortOptions(null, props.agent, props.availableOptions).map((option) => ({
+            value: option.value ?? 'default',
+            label: option.label
+        }))
         : props.agent === 'opencode'
             ? props.options ?? []
-            : []
-
-    if (options.length === 0) {
-        return null
-    }
+            : CODEX_REASONING_EFFORT_OPTIONS
 
     return (
         <div className="flex flex-col gap-1.5 px-3 py-3">

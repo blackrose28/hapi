@@ -21,7 +21,12 @@ import { reconcileChatBlocks } from '@/chat/reconcile'
 import { hasInFlightToolCall } from '@/chat/running'
 import { buildConversationOutline, getConversationMessageAnchorId } from '@/chat/outline'
 import { isQueuedForInvocation, mergeMessages } from '@/lib/messages'
-import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
+import { inactiveSessionCanResume } from '@/lib/sessionResume'
+import {
+    getCodexModelReasoningEfforts,
+    supportsCodexReasoningEffort
+} from '@/lib/codexModelCapabilities'
+import { HappyComposer, type ComposerSendError } from '@/components/AssistantChat/HappyComposer'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import { codexModelAdvertisesFastTier, getEffectiveCodexServiceTier } from '@/components/AssistantChat/codexFastMode'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
@@ -49,6 +54,33 @@ import { useOpencodeReasoningEffortOptions } from '@/hooks/queries/useOpencodeRe
 import { useVoiceOptional } from '@/lib/voice-context'
 import { RealtimeVoiceSession, registerSessionStore, registerVoiceHooksStore, voiceHooks } from '@/realtime'
 import { isRemoteTerminalSupported } from '@/utils/terminalSupport'
+
+type SessionModelSelection = { provider: string; modelId: string } | string | null
+
+export async function applyModelChangeWithReasoningRollback(args: {
+    model: SessionModelSelection
+    previousModelReasoningEffort: string | null
+    shouldClearReasoningEffort: boolean
+    setModel: (model: SessionModelSelection) => Promise<void>
+    setModelReasoningEffort: (effort: string | null) => Promise<void>
+}): Promise<void> {
+    let clearedReasoningEffort = false
+
+    try {
+        if (args.shouldClearReasoningEffort) {
+            await args.setModelReasoningEffort(null)
+            clearedReasoningEffort = true
+        }
+        await args.setModel(args.model)
+    } catch (error) {
+        if (clearedReasoningEffort && args.previousModelReasoningEffort) {
+            await args.setModelReasoningEffort(args.previousModelReasoningEffort).catch((restoreError) => {
+                console.error('Failed to restore model reasoning effort:', restoreError)
+            })
+        }
+        throw error
+    }
+}
 
 /**
  * Returns whether a PendingSchedule should trigger an auto-clear timer.
@@ -209,6 +241,16 @@ export function SessionChat(props: {
             }))
         ]
     }, [agentFlavor, claudeModelsState.models])
+    const codexSupportedReasoningEfforts = useMemo(
+        () => agentFlavor === 'codex'
+            ? getCodexModelReasoningEfforts(codexModelsState.models, props.session.model)
+            : undefined,
+        [agentFlavor, codexModelsState.models, props.session.model]
+    )
+    const codexReasoningEffortOptions = useMemo(
+        () => codexSupportedReasoningEfforts?.map((value) => ({ value })),
+        [codexSupportedReasoningEfforts]
+    )
     const opencodeModelsState = useOpencodeModels({
         api: props.api,
         sessionId: props.session.id,
@@ -529,16 +571,39 @@ export function SessionChat(props: {
     }, [setCollaborationMode, props.onRefresh, haptic])
 
     // Model mode change handler
-    const handleModelChange = useCallback(async (model: { provider: string; modelId: string } | string | null) => {
+    const handleModelChange = useCallback(async (model: SessionModelSelection) => {
+        const previousModelReasoningEffort = props.session.modelReasoningEffort
+        const shouldClearReasoningEffort = agentFlavor === 'codex'
+            && Boolean(previousModelReasoningEffort)
+            && supportsCodexReasoningEffort(
+                codexModelsState.models,
+                model,
+                previousModelReasoningEffort
+            ) === false
+
         try {
-            await setModel(model)
+            await applyModelChangeWithReasoningRollback({
+                model,
+                previousModelReasoningEffort,
+                shouldClearReasoningEffort,
+                setModel,
+                setModelReasoningEffort
+            })
             haptic.notification('success')
             props.onRefresh()
         } catch (e) {
             haptic.notification('error')
             console.error('Failed to set model:', e)
         }
-    }, [setModel, props.onRefresh, haptic])
+    }, [
+        agentFlavor,
+        codexModelsState.models,
+        props.session.modelReasoningEffort,
+        setModelReasoningEffort,
+        setModel,
+        props.onRefresh,
+        haptic
+    ])
 
     const handleModelReasoningEffortChange = useCallback(async (modelReasoningEffort: string | null) => {
         try {
@@ -924,9 +989,11 @@ export function SessionChat(props: {
                                 : undefined
                         }
                         availableModelReasoningEffortOptions={
-                            agentFlavor === 'opencode' && opencodeReasoningEffortState.options.length > 0
-                                ? opencodeReasoningEffortState.options
-                                : undefined
+                            agentFlavor === 'codex'
+                                ? codexReasoningEffortOptions
+                                : agentFlavor === 'opencode' && opencodeReasoningEffortState.options.length > 0
+                                    ? opencodeReasoningEffortState.options
+                                    : undefined
                         }
                         active={props.session.active}
                         allowSendWhenInactive

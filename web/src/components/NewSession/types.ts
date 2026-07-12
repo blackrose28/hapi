@@ -9,7 +9,8 @@ import {
 
 export type AgentType = AgentFlavor
 export type SessionType = 'simple' | 'worktree'
-export type CodexReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhigh'
+// Codex reports supported efforts dynamically; keep this open for new server values.
+export type CodexReasoningEffort = string
 export type ReasoningEffort = CodexReasoningEffort | string
 export type ClaudeEffort = 'auto' | 'medium' | 'high' | 'max'
 // Grok reports effort values dynamically via ACP; keep this open like
