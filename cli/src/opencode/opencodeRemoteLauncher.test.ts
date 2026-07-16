@@ -478,7 +478,6 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         expect(content[0]?.text).toContain('design the fix');
     });
 
->>>>>>> 5b797bb9 (feat(opencode): slash command support (#671) (#753))
     it('registers a listOpencodeModels RPC handler that returns the backend cache', async () => {
         // Override getSessionModelsMetadata for this run only.
         const fixtureModels = [
