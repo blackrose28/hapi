@@ -18,6 +18,7 @@ import { formatRelativeTime } from '@/lib/relativeTime'
 import { formatScheduledTooltipDetail } from '@/lib/scheduledTime'
 import { getCodexImportedAt, subscribeCodexImportedSessions } from '@/lib/codexImportedSessions'
 import { formatReopenError } from '@/lib/reopenError'
+import { getSessionTitle } from '@/lib/sessionTitle'
 import type { Machine } from '@/types/api'
 import { DEFAULT_SESSION_PREVIEW_LIMIT, useSessionPreviewLimit } from '@/hooks/useSessionPreviewLimit'
 import { useSessionListStatusMode } from '@/hooks/useSessionListStatusMode'
@@ -489,21 +490,7 @@ export function getWorktreeSessionLabel(session: SessionSummary): string | null 
     return parts.at(-1) ?? null
 }
 
-export function getWorktreeSessionLabel(session: SessionSummary): string | null {
-    const worktree = session.metadata?.worktree
-    if (!worktree) {
-        return null
-    }
-
-    const name = worktree.name.trim()
-    if (name) {
-        return name
-    }
-
-    const path = (worktree.worktreePath ?? session.metadata?.path ?? '').replace(/[\\/]+$/, '')
-    const parts = path.split(/[\\/]+/).filter(Boolean)
-    return parts.at(-1) ?? null
-}
+export { getSessionTitle } from '@/lib/sessionTitle'
 
 function getTodoProgress(session: SessionSummary): { completed: number; total: number } | null {
     if (!session.todoProgress) return null
