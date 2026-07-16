@@ -672,6 +672,28 @@ describe('AppServerEventConverter', () => {
             verifications: ['trustedAccessForCyber']
         }]);
     });
+    it('maps thread/compacted notifications', () => {
+        const converter = new AppServerEventConverter();
+        const events = converter.handleNotification('thread/compacted', {
+            threadId: 'thread-1',
+            turnId: 'turn-compact'
+        });
+
+        expect(events).toEqual([
+            {
+                type: 'thread_compacted',
+                thread_id: 'thread-1',
+                turn_id: 'turn-compact'
+            },
+            {
+                type: 'context_compacted',
+                thread_id: 'thread-1',
+                turn_id: 'turn-compact'
+            }
+        ]);
+    });
+
+    it('maps thread goal updated notifications', () => {
         const converter = new AppServerEventConverter();
         const events = converter.handleNotification('thread/goal/updated', {
             threadId: 'thread-1',
@@ -704,6 +726,80 @@ describe('AppServerEventConverter', () => {
         }]);
     });
 
+    it('maps completed contextCompaction items and preserves the turn boundary', () => {
+        const converter = new AppServerEventConverter();
+        const events = converter.handleNotification('item/completed', {
+            threadId: 'thread-1',
+            turnId: 'turn-compact',
+            item: { id: 'compact-item-1', type: 'contextCompaction' }
+        });
+
+        expect(events).toEqual([
+            {
+                type: 'thread_compacted',
+                thread_id: 'thread-1',
+                turn_id: 'turn-compact',
+                await_turn_completion: true
+            },
+            {
+                type: 'context_compacted',
+                thread_id: 'thread-1',
+                turn_id: 'turn-compact'
+            }
+        ]);
+    });
+
+    it('ignores compacted notifications without thread ids', () => {
+        const converter = new AppServerEventConverter();
+
+        expect(converter.handleNotification('thread/compacted', { turnId: 'turn-compact' })).toEqual([]);
+        expect(converter.handleNotification('codex/event/context_compacted', {
+            msg: { type: 'context_compacted', turn_id: 'turn-compact' }
+        })).toEqual([]);
+    });
+
+    it('unwraps context_compacted events', () => {
+        const converter = new AppServerEventConverter();
+        const events = converter.handleNotification('codex/event/context_compacted', {
+            msg: { type: 'context_compacted', thread_id: 'thread-1', turn_id: 'turn-compact' }
+        });
+
+        expect(events).toEqual([
+            {
+                type: 'thread_compacted',
+                thread_id: 'thread-1',
+                turn_id: 'turn-compact'
+            },
+            {
+                type: 'context_compacted',
+                thread_id: 'thread-1',
+                turn_id: 'turn-compact'
+            }
+        ]);
+    });
+
+    it('converts completed image generation items without including large result payloads', () => {
+        const converter = new AppServerEventConverter();
+        const largeImageResult = 'a'.repeat(4096);
+
+        const events = converter.handleNotification('item/completed', {
+            item: {
+                id: 'image-1',
+                type: 'imageGeneration',
+                result: largeImageResult,
+                savedPath: '/tmp/image.png',
+                mimeType: 'image/png'
+            }
+        });
+
+        expect(events).toEqual([{
+            type: 'image_generation_completed',
+            id: 'image-1',
+            saved_path: '/tmp/image.png',
+            mime_type: 'image/png'
+        }]);
+    });
+
     it('maps thread goal cleared notifications', () => {
         const converter = new AppServerEventConverter();
         const events = converter.handleNotification('thread/goal/cleared', { threadId: 'thread-1' });
@@ -713,5 +809,5 @@ describe('AppServerEventConverter', () => {
             thread_id: 'thread-1'
         }]);
     });
-
+});
 });
