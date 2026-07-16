@@ -48,6 +48,14 @@ export function getEnvironmentInfo(): Record<string, any> {
     };
 }
 
+export function redactSettingsForDisplay(settings: Record<string, unknown>): Record<string, unknown> {
+    return {
+        ...settings,
+        cliApiToken: settings.cliApiToken ? '***' : undefined,
+        extraHeaders: settings.extraHeaders === undefined ? undefined : '***'
+    }
+}
+
 function getLogFiles(logDir: string): { file: string, path: string, modified: Date }[] {
     if (!existsSync(logDir)) {
         return [];
@@ -127,7 +135,8 @@ export async function runDoctorCommand(filter?: 'all' | 'runner'): Promise<void>
         try {
             settings = await readSettings();
             console.log(chalk.bold('\n📄 Settings (settings.json):'));
-            console.log(chalk.gray(JSON.stringify(settings, null, 2)));
+            const displaySettings = redactSettingsForDisplay({ ...settings });
+            console.log(chalk.gray(JSON.stringify(displaySettings, null, 2)));
         } catch (error) {
             console.log(chalk.bold('\n📄 Settings:'));
             console.log(chalk.red('❌ Failed to read settings'));

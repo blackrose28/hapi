@@ -25,6 +25,7 @@ import { validateWorkspaceDirectory } from './validateWorkspaceDirectory';
 import { join } from 'path';
 import { buildMachineMetadata } from '@/agent/sessionFactory';
 import { resolveWorkspaceRoot } from '@/utils/workspaceRoot';
+import { hashRunnerExtraHeaders } from './runnerIdentity';
 
 export async function startRunner(options: { workspaceRoot?: string; profile?:string } = {}): Promise<void> {
   if(!options.profile)throw new Error('Runner profile is required')
@@ -768,13 +769,10 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
       startedWithCliMtimeMs,
       startedWithApiUrl: configuration.apiUrl,
       startedWithMachineId: machineId,
-<<<<<<< HEAD
       workspaceRoot,
-=======
-      startedWithCliApiTokenHash: hashRunnerCliApiToken(configuration.cliApiToken),
+      startedWithExtraHeadersHash: hashRunnerExtraHeaders(configuration.extraHeaders),
       startedWithArgv,
       startedWithVersionHandoffDisabled,
->>>>>>> a6176014 (fix(runner): self-restart resilience under systemd / external process supervision (#814))
       runnerLogPath: logger.logFilePath
     };
     await writeRunnerProfileState(enrolled.paths,fileState);
@@ -1079,6 +1077,7 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
           workspaceRoot: fileState.workspaceRoot,
 =======
           startedWithCliApiTokenHash: fileState.startedWithCliApiTokenHash,
+          startedWithExtraHeadersHash: fileState.startedWithExtraHeadersHash,
           startedWithArgv,
           startedWithVersionHandoffDisabled,
 >>>>>>> a6176014 (fix(runner): self-restart resilience under systemd / external process supervision (#814))
