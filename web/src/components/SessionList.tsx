@@ -489,6 +489,22 @@ export function getWorktreeSessionLabel(session: SessionSummary): string | null 
     return parts.at(-1) ?? null
 }
 
+export function getWorktreeSessionLabel(session: SessionSummary): string | null {
+    const worktree = session.metadata?.worktree
+    if (!worktree) {
+        return null
+    }
+
+    const name = worktree.name.trim()
+    if (name) {
+        return name
+    }
+
+    const path = (worktree.worktreePath ?? session.metadata?.path ?? '').replace(/[\\/]+$/, '')
+    const parts = path.split(/[\\/]+/).filter(Boolean)
+    return parts.at(-1) ?? null
+}
+
 function getTodoProgress(session: SessionSummary): { completed: number; total: number } | null {
     if (!session.todoProgress) return null
     if (session.todoProgress.completed === session.todoProgress.total) return null
