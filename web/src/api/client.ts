@@ -868,10 +868,10 @@ export class ApiClient {
         })
     }
 
-    async createEnrollment(ownerMembershipId: string): Promise<{ enrollmentId: string; code: string; expiresAt: number }> {
+    async createEnrollment(ownerMembershipId?: string): Promise<{ enrollmentId: string; code: string; expiresAt: number }> {
         return await this.request('/api/runner-enrollments', {
             method: 'POST',
-            body: JSON.stringify({ ownerMembershipId })
+            body: JSON.stringify(ownerMembershipId ? { ownerMembershipId } : {})
         })
     }
 

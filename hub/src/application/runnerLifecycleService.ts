@@ -22,8 +22,9 @@ export class RunnerLifecycleService {
     }
 
     list(subject: AuthorizationSubject) {
-        if (subject.disabled || subject.role !== 'admin') throw new RunnerEnrollmentError('forbidden')
+        if (subject.disabled || subject.role === 'viewer') throw new RunnerEnrollmentError('forbidden')
         return this.store.listRunners(subject.organizationId)
+            .filter((runner) => subject.role === 'admin' || runner.ownerMembershipId === subject.membershipId)
     }
 
     rotate(subject: AuthorizationSubject, runnerId: string, expectedGeneration: number) {

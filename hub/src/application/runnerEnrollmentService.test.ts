@@ -48,6 +48,24 @@ const exchange = (code: string, machine = "m1", profile = "p1") => ({
   },
 });
 describe("RunnerEnrollmentService", () => {
+  it("lets members manage only their own enrollments", () => {
+    const { db, service, subject } = setup();
+    db.exec("INSERT INTO memberships(id,organization_id,invited_email,role,status,created_at) VALUES('u2','o1','member@example.com','member','active',1),('u3','o1','other@example.com','member','active',1)");
+    const member = { membershipId: "u2", organizationId: "o1", role: "member" as const, disabled: false };
+    const otherMember = { membershipId: "u3", organizationId: "o1", role: "member" as const, disabled: false };
+    const owned = service.issue(member, "u1");
+    service.issue(subject, "u1");
+    expect(service.list(member).enrollments.map((enrollment) => enrollment.id)).toEqual([owned.enrollmentId]);
+    expect(() => service.cancel(otherMember, owned.enrollmentId)).toThrow("forbidden");
+    service.cancel(member, owned.enrollmentId);
+    expect(service.list(member).enrollments[0]?.cancelled).toBe(true);
+  });
+  it("rejects viewers from enrollment management", () => {
+    const { service } = setup();
+    const viewer = { membershipId: "u1", organizationId: "o1", role: "viewer" as const, disabled: false };
+    expect(() => service.issue(viewer)).toThrow("forbidden");
+    expect(() => service.list(viewer)).toThrow("forbidden");
+  });
   it("uses exact TTL, hashes code, and permits only one exchange", () => {
     const { db, service, subject } = setup();
     const issued = service.issue(subject, "u1");

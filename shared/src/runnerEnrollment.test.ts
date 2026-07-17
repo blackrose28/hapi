@@ -13,6 +13,7 @@ describe('Runner enrollment contract', () => {
 })
 
 it('bounds enrollment and credential contracts', () => {
+    expect(RunnerEnrollmentIssueSchema.safeParse({}).success).toBe(true)
     expect(RunnerEnrollmentIssueSchema.safeParse({ ownerMembershipId: 'x'.repeat(257) }).success).toBe(false)
     expect(RunnerCredentialEnvelopeSchema.safeParse({ credentialId: 'id', secret: 'x'.repeat(257) }).success).toBe(false)
     expect(RunnerCredentialRotateSchema.safeParse({ expectedGeneration: 0 }).success).toBe(false)

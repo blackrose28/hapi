@@ -30,7 +30,7 @@ export const RunnerSocketAuthSchema = z.object({
     sessionId: BoundedIdSchema.optional()
 }).strict()
 
-export const RunnerEnrollmentIssueSchema = z.object({ ownerMembershipId: BoundedIdSchema }).strict()
+export const RunnerEnrollmentIssueSchema = z.object({ ownerMembershipId: BoundedIdSchema.optional() }).strict()
 export const RunnerEnrollmentIssueResultSchema = z.object({
     enrollmentId: BoundedIdSchema,
     code: z.string().min(16).max(256),

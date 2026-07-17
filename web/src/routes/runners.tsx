@@ -57,7 +57,7 @@ export function RunnersPage() {
     const handleCreateEnrollment = async () => {
         if (!api) return
         try {
-            const result = await api.createEnrollment('')
+            const result = await api.createEnrollment()
             setEnrollmentCode(result)
             setShowDialog(true)
             setError(null)

@@ -12,21 +12,26 @@ export class RunnerEnrollmentService {
     static readonly TTL_MS = 15 * 60 * 1000
     constructor(private readonly store:SharedHubStore, private readonly pepper:string, private readonly hubUrl:string, private readonly now=()=>Date.now(), private readonly afterCredentialInsert?:()=>void) {}
 
-    issue(subject:AuthorizationSubject, ownerMembershipId:string) {
-        if(subject.disabled||subject.role!=='admin'||!this.store.membershipExists(subject.organizationId,ownerMembershipId)) throw new RunnerEnrollmentError('forbidden')
+    issue(subject:AuthorizationSubject, requestedOwnerMembershipId?:string) {
+        if(subject.disabled||subject.role==='viewer') throw new RunnerEnrollmentError('forbidden')
+        const ownerMembershipId = subject.role === 'admin'
+            ? requestedOwnerMembershipId ?? subject.membershipId
+            : subject.membershipId
+        if(!this.store.membershipExists(subject.organizationId,ownerMembershipId)) throw new RunnerEnrollmentError('forbidden')
         const code=randomOpaqueToken(32), createdAt=this.now(), enrollmentId=randomUUID()
         this.store.transaction(()=>{this.store.createEnrollment({id:enrollmentId,organizationId:subject.organizationId,ownerMembershipId,codeHash:keyedHash(code,this.pepper),expiresAt:createdAt+RunnerEnrollmentService.TTL_MS,createdAt});this.store.appendAuditEvent({id:randomUUID(),organizationId:subject.organizationId,actorType:'user',actorId:subject.membershipId,action:'runner.enrollment.issue',resourceType:'runner_enrollment',resourceId:enrollmentId,outcome:'success',metadata:{ownerMembershipId,expiresAt:createdAt+RunnerEnrollmentService.TTL_MS},createdAt});this.store.appendOutboxEvent({id:randomUUID(),organizationId:subject.organizationId,name:'runner.enrollment.issued',resourceType:'runner_enrollment',resourceId:enrollmentId,createdAt})})
         return {enrollmentId,code,expiresAt:createdAt+RunnerEnrollmentService.TTL_MS}
     }
 
     list(subject:AuthorizationSubject) {
-        if(subject.disabled||subject.role!=='admin')throw new RunnerEnrollmentError('forbidden')
+        if(subject.disabled||subject.role==='viewer')throw new RunnerEnrollmentError('forbidden')
         const now=this.now()
-        return {enrollments:this.store.listEnrollments(subject.organizationId).map((e)=>({id:e.id,ownerMembershipId:e.ownerMembershipId,expiresAt:e.expiresAt,consumed:e.consumedAt!==null,cancelled:e.cancelledAt!==null,status:e.cancelledAt!==null?'cancelled' as const:e.consumedAt!==null?'consumed' as const:e.expiresAt<=now?'expired' as const:'active' as const}))}
+        return {enrollments:this.store.listEnrollments(subject.organizationId).filter((e)=>subject.role==='admin'||e.ownerMembershipId===subject.membershipId).map((e)=>({id:e.id,ownerMembershipId:e.ownerMembershipId,expiresAt:e.expiresAt,consumed:e.consumedAt!==null,cancelled:e.cancelledAt!==null,status:e.cancelledAt!==null?'cancelled' as const:e.consumedAt!==null?'consumed' as const:e.expiresAt<=now?'expired' as const:'active' as const}))}
     }
 
     cancel(subject:AuthorizationSubject,id:string):void {
-        if(subject.disabled||subject.role!=='admin')throw new RunnerEnrollmentError('forbidden')
+        const enrollment=this.store.listEnrollments(subject.organizationId).find((candidate)=>candidate.id===id)
+        if(subject.disabled||subject.role==='viewer'||(subject.role!=='admin'&&(!enrollment||enrollment.ownerMembershipId!==subject.membershipId)))throw new RunnerEnrollmentError('forbidden')
         const now=this.now();this.store.transaction(()=>{if(!this.store.cancelEnrollment(subject.organizationId,id,now))throw new RunnerEnrollmentError('not_found');this.store.appendAuditEvent({id:randomUUID(),organizationId:subject.organizationId,actorType:'user',actorId:subject.membershipId,action:'runner.enrollment.cancel',resourceType:'runner_enrollment',resourceId:id,outcome:'success',createdAt:now});this.store.appendOutboxEvent({id:randomUUID(),organizationId:subject.organizationId,name:'runner.enrollment.cancelled',resourceType:'runner_enrollment',resourceId:id,createdAt:now})})
     }
 
