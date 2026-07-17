@@ -1,0 +1,49 @@
+{
+    "realm": "hapi-local",
+    "enabled": true,
+    "displayName": "HAPI Local Development",
+    "registrationAllowed": false,
+    "resetPasswordAllowed": true,
+    "rememberMe": true,
+    "loginWithEmailAllowed": true,
+    "duplicateEmailsAllowed": false,
+    "sslRequired": "external",
+    "clients": [
+        {
+            "clientId": "hapi-local",
+            "name": "HAPI Local",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": true,
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "redirectUris": [
+                "https://hapi.localhost/api/auth/callback"
+            ],
+            "webOrigins": [
+                "https://hapi.localhost"
+            ],
+            "attributes": {
+                "pkce.code.challenge.method": "S256"
+            }
+        }
+    ],
+    "users": [
+        {
+            "username": "developer",
+            "email": "developer@hapi.local",
+            "emailVerified": true,
+            "enabled": true,
+            "firstName": "Local",
+            "lastName": "Developer",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "developer",
+                    "temporary": false
+                }
+            ]
+        }
+    ]
+}
