@@ -52,7 +52,9 @@ describe('Shared Hub auth routes', () => {
         })
         expect(response.status).toBe(200)
         expect(calls.loginInvitation).toBe(invitationToken)
-        expect(await response.text()).not.toContain(invitationToken)
+        const body = await response.json()
+        expect(body).toEqual({ authorizationUrl: 'https://id.example.com/authorize?state=state' })
+        expect(JSON.stringify(body)).not.toContain(invitationToken)
         expect(response.headers.get('set-cookie') ?? '').not.toContain(invitationToken)
     })
 

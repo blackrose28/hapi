@@ -61,8 +61,8 @@ export function useAuth(baseUrl: string): {
                 setIsLoading(false)
                 return
             }
-            const data = (await res.json()) as { redirectUrl: string }
-            window.location.href = data.redirectUrl
+            const data = (await res.json()) as { authorizationUrl: string }
+            window.location.href = data.authorizationUrl
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Login failed')
             setIsLoading(false)
