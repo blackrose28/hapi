@@ -50,6 +50,26 @@ bun install
 bun run build:single-exe
 ```
 
+## Publishing from GitLab
+
+Tags matching `v<major>.<minor>.<patch>` run the GitLab release pipeline. It builds
+the platform archives, creates a GitLab Release, and exposes a manual `publish-npm`
+job. Add an npm granular access token as a masked, protected GitLab CI/CD variable
+named `NPM_TOKEN`. Grant it read/write access to the main package and all five
+platform packages. The publish job writes a temporary npm configuration and removes
+it after the job.
+
+To publish manually with an authenticated npm CLI:
+
+```bash
+bun run publish:npm -- 0.18.0
+```
+
+Add `--dry-run` to validate every generated package without publishing, or
+`--skip-build` to reuse binaries already present in `cli/dist-exe`. Prerelease
+versions use their first prerelease identifier as the npm dist-tag; for example,
+`0.18.4-sharedhub` is published under `sharedhub` instead of `latest`.
+
 ## Credits
 
 HAPI means "哈皮" a Chinese transliteration of [Happy](https://github.com/slopus/happy). Great credit to the original project.

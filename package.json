@@ -39,6 +39,7 @@
     "verify:release": "bun typecheck && bun run test && bun run test:e2e && bun run build:single-exe && bun run checksums:release && git diff --check",
     "clean-session": "bun run hub/scripts/cleanup-sessions.ts",
     "release-all": "cd cli && bun run release-all",
+    "publish:npm": "bun run scripts/publish-npm.ts",
     "release": "bun run scripts/release.ts"
   },
   "devDependencies": {

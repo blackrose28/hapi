@@ -1,0 +1,80 @@
+stages:
+    - test
+    - build
+    - release
+    - publish
+
+default:
+    image: node:24-bookworm
+    before_script:
+        - npm install --global bun@1.3.5
+        - bun install --frozen-lockfile
+
+test:
+    stage: test
+    script:
+        - bun typecheck
+        - bun run test
+    rules:
+        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH
+
+build-release:
+    stage: build
+    script:
+        - apt-get update && apt-get install --yes --no-install-recommends zip
+        - VERSION="${CI_COMMIT_TAG#v}"
+        - bun -e "const path = 'cli/package.json'; const pkg = await Bun.file(path).json(); pkg.version = '${VERSION}'; await Bun.write(path, JSON.stringify(pkg, null, 2) + '\n')"
+        - bun run build:single-exe:all
+        - mkdir -p cli/release-artifacts
+        - |
+          for dir in cli/dist-exe/bun-*/; do
+              target="${dir%/}"
+              platform="${target##*/bun-}"
+              name="hapi-${platform/windows/win32}"
+              if [[ "$platform" == *windows* ]]; then
+                  (cd "$target" && zip -j "../../release-artifacts/${name}.zip" hapi.exe)
+              else
+                  tar -czf "cli/release-artifacts/${name}.tar.gz" -C "$target" hapi
+              fi
+          done
+        - (cd cli/release-artifacts && sha256sum * > checksums.txt)
+        - cp cli/scripts/install.sh cli/release-artifacts/install.sh
+    artifacts:
+        paths:
+            - cli/dist-exe/
+            - cli/release-artifacts/
+        expire_in: 1 week
+    rules:
+        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+create-release:
+    stage: release
+    image: registry.gitlab.com/gitlab-org/cli:latest
+    before_script: []
+    needs:
+        - job: build-release
+          artifacts: true
+    script:
+        - glab release create "$CI_COMMIT_TAG" --name "Release $CI_COMMIT_TAG" --notes "Release $CI_COMMIT_TAG" cli/release-artifacts/* --use-package-registry
+    rules:
+        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+
+publish-npm:
+    stage: publish
+    needs:
+        - job: build-release
+          artifacts: true
+    script:
+        - test -n "$NPM_TOKEN" || (echo "NPM_TOKEN is not configured" && exit 1)
+        - printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > .npmrc
+        - bun run publish:npm -- "$CI_COMMIT_TAG" --skip-build
+    environment: npm
+    resource_group: npm-publish
+    rules:
+        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+          when: manual
+    allow_failure: false
+    after_script:
+        - rm -f .npmrc

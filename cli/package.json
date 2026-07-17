@@ -1,6 +1,6 @@
 {
   "name": "@blackrose28/hapi",
-  "version": "0.17.6",
+  "version": "0.18.4-sharedhub",
   "description": "App for agentic coding - access coding agent anywhere",
   "author": "daudaudinang",
   "license": "AGPL-3.0-only",
@@ -26,11 +26,11 @@
     }
   },
   "optionalDependencies": {
-    "@blackrose28/hapi-darwin-arm64": "0.17.6",
-    "@blackrose28/hapi-darwin-x64": "0.17.6",
-    "@blackrose28/hapi-linux-arm64": "0.17.6",
-    "@blackrose28/hapi-linux-x64": "0.17.6",
-    "@blackrose28/hapi-win32-x64": "0.17.6"
+    "@blackrose28/hapi-darwin-arm64": "0.18.4-sharedhub",
+    "@blackrose28/hapi-darwin-x64": "0.18.4-sharedhub",
+    "@blackrose28/hapi-linux-arm64": "0.18.4-sharedhub",
+    "@blackrose28/hapi-linux-x64": "0.18.4-sharedhub",
+    "@blackrose28/hapi-win32-x64": "0.18.4-sharedhub"
   },
   "scripts": {
     "postinstall": "node -e \"try{require('fs').chmodSync(require('path').join(__dirname,'bin','hapi.cjs'),0o755)}catch(e){}\"",
