@@ -409,11 +409,16 @@ export class ApiClient {
         localId?: string | null,
         attachments?: AttachmentMetadata[]
     ): Promise<{ status: 'sent'; sessionId: string } | { status: 'resuming'; sessionId: string }> {
+        const headers = new Headers({
+            'content-type': 'application/json'
+        })
+        const csrfToken = readCsrfCookie()
+        if (csrfToken) headers.set('x-csrf-token', csrfToken)
+
         const res = await fetch(this.buildUrl(`/api/sessions/${encodeURIComponent(sessionId)}/messages`), {
             method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
+            headers,
+            credentials: 'include',
             body: JSON.stringify({
                 text,
                 localId: localId ?? undefined,

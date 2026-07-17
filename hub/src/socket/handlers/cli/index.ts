@@ -137,6 +137,8 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
         socket.emit('error', { message, code: reason, scope, id })
     }
 
+    registerRpcHandlers(socket, rpcRegistry)
+
     if (socket.data.runnerClientType === 'machine-scoped') {
         registerMachineHandlers(socket, {
             store,
@@ -150,7 +152,6 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
         return
     }
 
-    registerRpcHandlers(socket, rpcRegistry)
     registerSessionHandlers(socket, {
         store,
         resolveSessionAccess,

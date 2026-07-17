@@ -36,12 +36,12 @@ function createHarness(clientType: 'machine-scoped' | 'session-scoped') {
     return events
 }
 
-it('registers only machine events for Runner principal', () => {
+it('registers machine events and RPC handlers for a machine-scoped Runner principal', () => {
     const events = createHarness('machine-scoped')
 
     expect(events).toContain('machine-alive')
     expect(events).not.toContain('session-alive')
-    expect(events).not.toContain('rpc-register')
+    expect(events).toContain('rpc-register')
     expect(events.some((event) => event.startsWith('terminal:'))).toBe(false)
 })
 
