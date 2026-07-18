@@ -35,17 +35,25 @@ build_single_exe:
   script:
     - |
       ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-        "DEPLOY_PATH='$DEPLOY_PATH' CI_SERVER_HOST='$CI_SERVER_HOST' CI_PROJECT_PATH='$CI_PROJECT_PATH' CI_COMMIT_REF_NAME='$CI_COMMIT_REF_NAME' GITLAB_TOKEN_USER='$GITLAB_TOKEN_USER' GITLAB_ACCESS_TOKEN='$GITLAB_ACCESS_TOKEN' bash -s" <<'REMOTE'
+        "DEPLOY_PATH='$DEPLOY_PATH' CI_SERVER_HOST='$CI_SERVER_HOST' CI_PROJECT_PATH='$CI_PROJECT_PATH' CI_COMMIT_REF_NAME='$CI_COMMIT_REF_NAME' GITLAB_TOKEN_USER='$GITLAB_TOKEN_USER' GITLAB_ACCESS_TOKEN='$GITLAB_ACCESS_TOKEN' BUN_BIN='${BUN_BIN:-}' bash -s" <<'REMOTE'
       set -euo pipefail
       cd "$DEPLOY_PATH"
+
+      export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+      export PATH="$BUN_INSTALL/bin:$PATH"
+      BUN_BIN="${BUN_BIN:-$(command -v bun || true)}"
+      if [ -z "$BUN_BIN" ]; then
+        echo "Bun was not found. Install it for $USER, or set the BUN_BIN CI/CD variable."
+        exit 1
+      fi
 
       auth_remote="https://${GITLAB_TOKEN_USER}:${GITLAB_ACCESS_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
       git fetch "$auth_remote" "$CI_COMMIT_REF_NAME"
       git checkout "$CI_COMMIT_REF_NAME"
       git merge --ff-only FETCH_HEAD
 
-      bun install --frozen-lockfile
-      bun run build:single-exe
+      "$BUN_BIN" install --frozen-lockfile
+      "$BUN_BIN" run build:single-exe
       REMOTE
 
 deploy_pm2:
@@ -57,9 +65,18 @@ deploy_pm2:
   script:
     - |
       ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-        "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+        "DEPLOY_PATH='$DEPLOY_PATH' BUN_BIN='${BUN_BIN:-}' bash -s" <<'REMOTE'
       set -euo pipefail
       cd "$DEPLOY_PATH"
+      export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+      export PATH="$BUN_INSTALL/bin:$PATH"
+      if [ -n "${BUN_BIN:-}" ]; then
+        export PATH="$(dirname "$BUN_BIN"):$PATH"
+      fi
+      if ! command -v bun >/dev/null 2>&1; then
+        echo "Bun was not found. Install it for $USER, or set PATH in that user's shell profile."
+        exit 1
+      fi
       pm2 stop all
       pm2 start all
       REMOTE
