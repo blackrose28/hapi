@@ -1145,7 +1145,7 @@ function SessionItem(props: {
                 <SessionExportDialog
                     isOpen={true}
                     onClose={() => setExportOpen(false)}
-                    session={s as any}
+                    sessionId={s.id}
                     api={api}
                 />
             ) : null}

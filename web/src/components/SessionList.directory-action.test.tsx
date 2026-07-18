@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { SessionSummary } from '@/types/api'
 import { I18nProvider } from '@/lib/i18n-context'
+import { ToastProvider } from '@/lib/toast-context'
 import { SessionList } from './SessionList'
 
 afterEach(() => {
@@ -41,9 +42,11 @@ function renderWithProviders(children: ReactNode) {
 
     return render(
         <QueryClientProvider client={queryClient}>
-            <I18nProvider>
-                {children}
-            </I18nProvider>
+            <ToastProvider>
+                <I18nProvider>
+                    {children}
+                </I18nProvider>
+            </ToastProvider>
         </QueryClientProvider>
     )
 }
@@ -140,7 +143,6 @@ describe('SessionList directory action', () => {
         expect(screen.queryByRole('button', { name: 'New session in this directory' })).toBeNull()
     })
 })
-
 
 describe('SessionList time filter', () => {
     beforeEach(() => {
