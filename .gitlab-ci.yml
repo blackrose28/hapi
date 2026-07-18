@@ -1,80 +1,65 @@
 stages:
-    - test
-    - build
-    - release
-    - publish
+  - build
+  - deploy
 
 default:
-    image: node:24-bookworm
-    before_script:
-        - npm install --global bun@1.3.5
-        - bun install --frozen-lockfile
+  tags:
+    - shell-ai-gitlab-runner-82-33
 
-test:
-    stage: test
-    script:
-        - bun typecheck
-        - bun run test
-    rules:
-        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
-        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-        - if: $CI_COMMIT_BRANCH
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "feat/shared-hub-shipping"'
+    - when: never
 
-build-release:
-    stage: build
-    script:
-        - apt-get update && apt-get install --yes --no-install-recommends zip
-        - VERSION="${CI_COMMIT_TAG#v}"
-        - bun -e "const path = 'cli/package.json'; const pkg = await Bun.file(path).json(); pkg.version = '${VERSION}'; await Bun.write(path, JSON.stringify(pkg, null, 2) + '\n')"
-        - bun run build:single-exe:all
-        - mkdir -p cli/release-artifacts
-        - |
-          for dir in cli/dist-exe/bun-*/; do
-              target="${dir%/}"
-              platform="${target##*/bun-}"
-              name="hapi-${platform/windows/win32}"
-              if [[ "$platform" == *windows* ]]; then
-                  (cd "$target" && zip -j "../../release-artifacts/${name}.zip" hapi.exe)
-              else
-                  tar -czf "cli/release-artifacts/${name}.tar.gz" -C "$target" hapi
-              fi
-          done
-        - (cd cli/release-artifacts && sha256sum * > checksums.txt)
-        - cp cli/scripts/install.sh cli/release-artifacts/install.sh
-    artifacts:
-        paths:
-            - cli/dist-exe/
-            - cli/release-artifacts/
-        expire_in: 1 week
-    rules:
-        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+.remote_defaults: &remote_defaults
+  before_script:
+    - |
+      : "${DEPLOY_HOST:?Set DEPLOY_HOST in GitLab CI/CD variables}"
+      : "${DEPLOY_USER:?Set DEPLOY_USER in GitLab CI/CD variables}"
+      : "${DEPLOY_PATH:?Set DEPLOY_PATH in GitLab CI/CD variables}"
+      : "${GITLAB_ACCESS_TOKEN:?Set GITLAB_ACCESS_TOKEN in GitLab CI/CD variables}"
+      : "${GITLAB_TOKEN_USER:?Set GITLAB_TOKEN_USER in GitLab CI/CD variables}"
+      export DEPLOY_PORT="${DEPLOY_PORT:-22}"
+      export GITLAB_TOKEN_USER GITLAB_ACCESS_TOKEN
+    - mkdir -p ~/.ssh
+    - |
+      if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+      fi
 
-create-release:
-    stage: release
-    image: registry.gitlab.com/gitlab-org/cli:latest
-    before_script: []
-    needs:
-        - job: build-release
-          artifacts: true
-    script:
-        - glab release create "$CI_COMMIT_TAG" --name "Release $CI_COMMIT_TAG" --notes "Release $CI_COMMIT_TAG" cli/release-artifacts/* --use-package-registry
-    rules:
-        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+build_single_exe:
+  stage: build
+  extends: .remote_defaults
+  resource_group: shared-hub-shipping-production
+  script:
+    - |
+      ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+        "DEPLOY_PATH='$DEPLOY_PATH' CI_SERVER_HOST='$CI_SERVER_HOST' CI_PROJECT_PATH='$CI_PROJECT_PATH' CI_COMMIT_REF_NAME='$CI_COMMIT_REF_NAME' GITLAB_TOKEN_USER='$GITLAB_TOKEN_USER' GITLAB_ACCESS_TOKEN='$GITLAB_ACCESS_TOKEN' bash -s" <<'REMOTE'
+      set -euo pipefail
+      cd "$DEPLOY_PATH"
 
-publish-npm:
-    stage: publish
-    needs:
-        - job: build-release
-          artifacts: true
-    script:
-        - test -n "$NPM_TOKEN" || (echo "NPM_TOKEN is not configured" && exit 1)
-        - printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > .npmrc
-        - bun run publish:npm -- "$CI_COMMIT_TAG" --skip-build
-    environment: npm
-    resource_group: npm-publish
-    rules:
-        - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
-          when: manual
-    allow_failure: false
-    after_script:
-        - rm -f .npmrc
+      auth_remote="https://${GITLAB_TOKEN_USER}:${GITLAB_ACCESS_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      git fetch "$auth_remote" "$CI_COMMIT_REF_NAME"
+      git checkout "$CI_COMMIT_REF_NAME"
+      git merge --ff-only FETCH_HEAD
+
+      bun install --frozen-lockfile
+      bun run build:single-exe
+      REMOTE
+
+deploy_pm2:
+  stage: deploy
+  extends: .remote_defaults
+  resource_group: shared-hub-shipping-production
+  needs:
+    - build_single_exe
+  script:
+    - |
+      ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+        "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+      set -euo pipefail
+      cd "$DEPLOY_PATH"
+      pm2 stop all
+      pm2 start all
+      REMOTE
