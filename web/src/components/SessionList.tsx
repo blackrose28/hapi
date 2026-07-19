@@ -611,7 +611,6 @@ function MachineIcon(props: { className?: string }) {
             <rect x="2" y="3" width="20" height="14" rx="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
->>>>>>> 02bc206f (fix(web): polish session search and ordering (#551))
         </svg>
     )
 }
@@ -719,6 +718,160 @@ function SessionDateRangePicker(props: {
                         {t('sessions.timeFilter.clear')}
                     </button>
                 ) : null}
+=======
+    onChange: (start: string, end: string) => void
+    onClose: () => void
+}) {
+    const { t } = useTranslation()
+    const initialDate = parseLocalDate(props.start) ?? new Date()
+    const [visibleMonth, setVisibleMonth] = useState(() => new Date(initialDate.getFullYear(), initialDate.getMonth(), 1))
+    const firstWeekday = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1).getDay()
+    const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate()
+    const weekdays = Array.from({ length: 7 }, (_, day) => (
+        new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(new Date(2026, 5, 7 + day))
+    ))
+
+    const selectDate = (value: string) => {
+        if (!props.start || props.end) {
+            props.onChange(value, '')
+            return
+        }
+        props.onChange(value < props.start ? value : props.start, value < props.start ? props.start : value)
+        props.onClose()
+    }
+
+    return (
+        <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-3 shadow-xl">
+            <div className="mb-2 flex items-center justify-between">
+                <button
+                    type="button"
+                    onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))}
+                    className="rounded-lg p-1.5 text-[var(--app-hint)] hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]"
+                    aria-label={t('sessions.timeFilter.previousMonth')}
+                >
+                    <span aria-hidden="true">‹</span>
+                </button>
+                <div className="text-sm font-medium">
+                    {visibleMonth.toLocaleDateString(undefined, { year: 'numeric', month: 'long' })}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))}
+                    className="rounded-lg p-1.5 text-[var(--app-hint)] hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]"
+                    aria-label={t('sessions.timeFilter.nextMonth')}
+                >
+                    <span aria-hidden="true">›</span>
+                </button>
+            </div>
+            <div className="mb-1 grid grid-cols-7 text-center text-[10px] text-[var(--app-hint)]">
+                {weekdays.map((weekday, index) => <div key={`${weekday}-${index}`} className="py-1">{weekday}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-0.5">
+                {Array.from({ length: firstWeekday }, (_, index) => <div key={`blank-${index}`} />)}
+                {Array.from({ length: daysInMonth }, (_, index) => {
+                    const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), index + 1)
+                    const value = formatDateValue(date)
+                    const isEndpoint = value === props.start || value === props.end
+                    const isInRange = Boolean(props.start && props.end && value > props.start && value < props.end)
+                    return (
+                        <button
+                            key={value}
+                            type="button"
+                            onClick={() => selectDate(value)}
+                            aria-label={date.toLocaleDateString()}
+                            className={cn(
+                                'h-8 rounded-lg text-xs transition-colors',
+                                isEndpoint && 'bg-[var(--app-link)] text-white',
+                                isInRange && 'bg-[var(--app-link)]/15 text-[var(--app-link)]',
+                                !isEndpoint && !isInRange && 'hover:bg-[var(--app-subtle-bg)]'
+                            )}
+                        >
+                            {index + 1}
+                        </button>
+                    )
+                })}
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-[var(--app-divider)] pt-2 text-xs">
+                <span className="text-[var(--app-hint)]">
+                    {!props.start
+                        ? t('sessions.timeFilter.pickStart')
+                        : !props.end
+                            ? t('sessions.timeFilter.pickEnd')
+                            : `${props.start} – ${props.end}`}
+                </span>
+                {props.start ? (
+                    <button type="button" onClick={() => props.onChange('', '')} className="text-[var(--app-link)]">
+                        {t('sessions.timeFilter.clear')}
+                    </button>
+                ) : null}
+            </div>
+        </div>
+    )
+}
+
+function SessionListSearch(props: {
+    value: string
+    onChange: (value: string) => void
+    customStart: string
+    customEnd: string
+    onDateRangeChange: (start: string, end: string) => void
+}) {
+    const { t } = useTranslation()
+    const [datePickerOpen, setDatePickerOpen] = useState(false)
+    const hasDateRange = Boolean(props.customStart && props.customEnd)
+    return (
+        <div className="px-3 pb-2">
+            <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                    <div className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--app-hint)]">
+                        <SearchIcon className="h-3.5 w-3.5" />
+                    </div>
+                    <input
+                        type="search"
+                        value={props.value}
+                        onChange={(event) => props.onChange(event.target.value)}
+                        placeholder={t('sessions.search.placeholder')}
+                        className="w-full appearance-none rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] py-1.5 pl-8 pr-8 text-sm text-[var(--app-fg)] outline-none transition-colors placeholder:text-[var(--app-hint)] focus:border-[var(--app-link)] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                    />
+                    {props.value ? (
+                        <button
+                            type="button"
+                            onClick={() => props.onChange('')}
+                            className="absolute inset-y-0 right-2 flex items-center rounded p-0.5 text-[var(--app-hint)] hover:text-[var(--app-fg)]"
+                            title={t('sessions.search.clear')}
+                        >
+                            <XIcon className="h-3.5 w-3.5" />
+                        </button>
+                    ) : null}
+                </div>
+                <div className="relative shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => setDatePickerOpen(open => !open)}
+                        className={cn(
+                            'relative rounded-lg p-2 transition-colors hover:bg-[var(--app-subtle-bg)]',
+                            hasDateRange ? 'text-[var(--app-link)]' : 'text-[var(--app-hint)]'
+                        )}
+                        title={hasDateRange ? `${props.customStart} – ${props.customEnd}` : t('sessions.timeFilter.label')}
+                        aria-label={t('sessions.timeFilter.label')}
+                        aria-expanded={datePickerOpen}
+                    >
+                        <CalendarIcon className="h-5 w-5" />
+                        {hasDateRange ? <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--app-link)]" /> : null}
+                    </button>
+                    {datePickerOpen ? (
+                        <>
+                            <button type="button" aria-label={t('sessions.timeFilter.close')} className="fixed inset-0 z-20 cursor-default" onClick={() => setDatePickerOpen(false)} />
+                            <SessionDateRangePicker
+                                start={props.customStart}
+                                end={props.customEnd}
+                                onChange={props.onDateRangeChange}
+                                onClose={() => setDatePickerOpen(false)}
+                            />
+                        </>
+                    ) : null}
+                </div>
+>>>>>>> 2623a51b (feat(web): filter sessions by last activity (#1083))
             </div>
         </div>
     )
@@ -1189,6 +1342,7 @@ export function SessionList(props: {
         return getVisibleSessionPreview(
             group.sessions,
             {
+                expanded: isFiltering,
                 selectedSessionId,
                 limit: getGroupVisibleCount(group)
             }
@@ -1377,7 +1531,7 @@ export function SessionList(props: {
                                             {hiddenSessionCount > 0
                                                 ? t('sessions.group.showMore', { n: showMoreCount })
                                                 : t('sessions.group.showLess')}
-                                        </button>
+                                ) : null}
                                 </div>
                                 </div>
                             </div>

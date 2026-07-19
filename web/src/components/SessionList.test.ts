@@ -3,12 +3,16 @@ import type { SessionSummary } from '@/types/api'
 import {
     deduplicateSessionsByAgentId,
     expandSelectedSessionCollapseOverrides,
+    filterActiveSessionsOnly,
+    getSessionTimeRange,
+    getNextSessionVisibleCount,
     getSessionDedupKey,
     getVisibleSessionPreview,
     isSidebarEmptySessionStub,
     normalizeSearch,
     prepareSidebarSessions,
     sessionMatchesQuery,
+    sessionMatchesTimeRange,
     shouldShowSessionInSidebar
 } from './SessionList'
 
@@ -239,6 +243,23 @@ describe('session list search helpers', () => {
         expect(sessionMatchesQuery(session, normalizeSearch('bot review'), 'desktop')).toBe(true)
         expect(sessionMatchesQuery(session, normalizeSearch('desktop'), 'desktop')).toBe(true)
         expect(sessionMatchesQuery(session, normalizeSearch('missing'), 'desktop')).toBe(false)
+    })
+})
+
+describe('session list time filter helpers', () => {
+    it('treats the selected end date as inclusive in local time', () => {
+        const range = getSessionTimeRange('2026-07-01', '2026-07-18')
+        expect(range).toEqual({
+            start: new Date(2026, 6, 1).getTime(),
+            end: new Date(2026, 6, 19).getTime()
+        })
+        expect(sessionMatchesTimeRange(makeSession({ id: 'inside', updatedAt: new Date(2026, 6, 18, 23, 59).getTime() }), range)).toBe(true)
+        expect(sessionMatchesTimeRange(makeSession({ id: 'outside', updatedAt: new Date(2026, 6, 19).getTime() }), range)).toBe(false)
+    })
+
+    it('does not filter until both dates are selected', () => {
+        expect(getSessionTimeRange('', '')).toBeNull()
+        expect(getSessionTimeRange('2026-07-01', '')).toBeNull()
     })
 })
 
