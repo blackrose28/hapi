@@ -69,7 +69,7 @@ describe('appServerConfig', () => {
         });
     });
 
-    it('keeps on-failure approvals for safe-yolo threads', () => {
+    it('keeps supported escalation approvals for safe-yolo threads', () => {
         const params = buildThreadStartParams({
             cwd: '/workspace/project',
             mode: { permissionMode: 'safe-yolo', collaborationMode: 'default' },
@@ -77,7 +77,7 @@ describe('appServerConfig', () => {
         });
 
         expect(params.sandbox).toBe('workspace-write');
-        expect(params.approvalPolicy).toBe('on-failure');
+        expect(params.approvalPolicy).toBe('on-request');
     });
 
     it('allows MCP elicitation without enabling sandbox prompts for read-only threads', () => {
@@ -425,7 +425,7 @@ describe('appServerConfig', () => {
             cliOverrides: { sandbox: 'read-only', approvalPolicy: 'never' }
         });
 
-        expect(params.approvalPolicy).toBe('on-failure');
+        expect(params.approvalPolicy).toBe('on-request');
         expect(params.sandboxPolicy).toEqual({ type: 'workspaceWrite' });
         expect(params.collaborationMode).toEqual({
             mode: 'default',
