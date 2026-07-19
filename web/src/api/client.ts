@@ -15,6 +15,7 @@ import type {
     CodexDesktopScriptResponse,
     CodexDesktopSyncRequest,
     CodexDesktopStatusResponse,
+    CodexArchiveSessionResponse,
     CodexCollaborationMode,
     DeleteUploadResponse,
     ListDirectoryResponse,
@@ -308,8 +309,19 @@ export class ApiClient {
         })
     }
 
-    async getCodexSessions(): Promise<CodexLocalSessionsResponse> {
-        return await this.request<CodexLocalSessionsResponse>('/api/codex/sessions')
+    async getCodexSessions(cwd?: string | null, machineId?: string | null): Promise<CodexLocalSessionsResponse> {
+        const params = new URLSearchParams()
+        if (cwd?.trim()) params.set('cwd', cwd.trim())
+        if (machineId?.trim()) params.set('machineId', machineId.trim())
+        const query = params.size ? `?${params.toString()}` : ''
+        return await this.request<CodexLocalSessionsResponse>(`/api/codex/sessions${query}`)
+    }
+
+    async archiveCodexSession(sessionId: string, machineId?: string | null): Promise<CodexArchiveSessionResponse> {
+        return await this.request<CodexArchiveSessionResponse>('/api/codex/archive-session', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId, machineId: machineId ?? undefined })
+        })
     }
 
     async getCodexDesktopStatus(): Promise<CodexDesktopStatusResponse> {

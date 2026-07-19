@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Machine, Session, ThreadGoal } from '@/types/api'
 import type { ApiClient } from '@/api/client'
 import { isTelegramApp } from '@/hooks/useTelegram'
@@ -17,6 +18,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatReopenError } from '@/lib/reopenError'
 import { getSessionModelLabel } from '@/lib/sessionModelLabel'
 import { useTranslation } from '@/lib/use-translation'
+<<<<<<< HEAD
 import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
 
 function getSessionTitle(session: Session): string {
@@ -40,7 +42,13 @@ function normalizeTeamAlias(alias: string): string {
 function isDesktopFocusViewport(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
     return !window.matchMedia('(max-width: 768px)').matches
-}
+import { AgentFlavorIcon } from '@/components/AgentFlavorIcon'
+import { isFastServiceTier } from '@/components/AssistantChat/codexFastMode'
+import { getSessionTitle } from '@/lib/sessionTitle'
+import { useToast } from '@/lib/toast-context'
+import { queryKeys } from '@/lib/query-keys'
+import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
+import { markCodexSessionsImported } from '@/lib/codexImportedSessions'
 
 function FilesIcon(props: { className?: string }) {
     return (
@@ -186,6 +194,7 @@ export function SessionHeader(props: {
 }) {
     const { t } = useTranslation()
     const navigate = useNavigate()
+    const queryClient = useQueryClient()
     const { session, api, onSessionDeleted, onSessionReopened, compactMode, pinIndex } = props
     const title = useMemo(() => getSessionTitle(session), [session])
     const worktreeBranch = session.metadata?.worktree?.branch
@@ -195,6 +204,9 @@ export function SessionHeader(props: {
     const sessionStatus = session.thinking ? 'thinking' : !session.active ? 'archived' : 'active'
     const editorSearch = session.metadata?.machineId && session.metadata?.path
         ? { machine: session.metadata.machineId, project: session.metadata.path }
+        : null
+    const codexSessionId = session.metadata?.flavor === 'codex'
+        ? session.metadata.codexSessionId?.trim() || null
         : null
 
     const [menuOpen, setMenuOpen] = useState(false)
@@ -209,10 +221,6 @@ export function SessionHeader(props: {
     const [teamMenuOpen, setTeamMenuOpen] = useState(false)
     const [addingTeamChatId, setAddingTeamChatId] = useState<string | null>(null)
     const [teamAlias, setTeamAlias] = useState(title)
-    const [desktopFocusEnabled, setDesktopFocusEnabled] = useState(() => isDesktopFocusViewport())
-    const normalizedTeamAlias = normalizeTeamAlias(teamAlias)
-    const teamAliasError = !normalizedTeamAlias
-        ? 'Alias is required.'
         : normalizedTeamAlias.length > 32
             ? 'Alias must be 32 characters or fewer.'
             : null
@@ -242,6 +250,9 @@ export function SessionHeader(props: {
         if (target?.closest('button,a,input,select,textarea,[role="button"],[data-focus-ignore="true"]')) return
         props.onFocusSession?.()
     }, [canFocusSession, props.onFocusSession])
+=======
+    const [isSyncingCodex, setIsSyncingCodex] = useState(false)
+>>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
 
     const { archiveSession, reopenSession, renameSession, deleteSession, isPending } = useSessionActions(
         api,
@@ -268,6 +279,47 @@ export function SessionHeader(props: {
             }
         } catch (error) {
             setReopenError(formatReopenError(error))
+        }
+    }
+
+    const handleSyncCodex = async () => {
+        if (!api || !codexSessionId || isSyncingCodex) return
+
+        setIsSyncingCodex(true)
+        try {
+            // 中文注释：手动同步必须携带当前会话归属机器和目录；多台 runner 在线时后端不能靠猜。
+            const result = await api.syncCodexSession({
+                sessionIds: [codexSessionId],
+                cwd: typeof session.metadata?.path === 'string' ? session.metadata.path : undefined,
+                machineId: typeof session.metadata?.machineId === 'string' ? session.metadata.machineId : undefined
+            })
+            if (!result.success) {
+                throw new Error(result.error || t('codexSync.failed.body'))
+            }
+
+            markCodexSessionsImported([codexSessionId])
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: queryKeys.session(session.id) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.messages(session.id) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.sessions })
+            ])
+            addToast({
+                title: t('codexSync.manual.success.title'),
+                body: (result.syncedCount ?? 1) === 0
+                    ? t('codexSync.manual.success.noNewMessages')
+                    : t('codexSync.manual.success.body', { n: result.syncedCount ?? 1 }),
+                sessionId: session.id,
+                url: `/sessions/${session.id}`
+            })
+        } catch (error) {
+            addToast({
+                title: t('codexSync.manual.failed.title'),
+                body: error instanceof Error ? error.message : t('codexSync.failed.body'),
+                sessionId: session.id,
+                url: `/sessions/${session.id}`
+            })
+        } finally {
+            setIsSyncingCodex(false)
         }
     }
 
@@ -771,6 +823,7 @@ export function SessionHeader(props: {
                 sessionActive={session.active}
                 onRename={() => setRenameOpen(true)}
                 onExport={() => setExportOpen(true)}
+                onSyncCodex={api && codexSessionId ? handleSyncCodex : undefined}
                 onArchive={() => setArchiveOpen(true)}
                 onReopen={handleReopen}
                 onDelete={() => setDeleteOpen(true)}

@@ -59,7 +59,10 @@ export async function runCodex(opts: {
             model: opts.model,
             modelReasoningEffort: opts.modelReasoningEffort
         });
-    const { api, session } = bootstrap;
+    const { api, session, sessionInfo } = bootstrap;
+    const codexSourceSessionId = typeof sessionInfo.metadata?.codexSourceSessionId === 'string'
+        ? sessionInfo.metadata.codexSourceSessionId
+        : undefined;
 
     const startingMode: 'local' | 'remote' = startedBy === 'runner' ? 'remote' : 'local';
 
@@ -78,7 +81,10 @@ export async function runCodex(opts: {
     // 需要在首次附着 transcript 时回放已有历史；恢复已有 Hapi 会话时则保持原来的增量模式，避免重复灌入旧消息。
     const replayTranscriptHistoryOnStart = Boolean(opts.resumeSessionId && !opts.existingSessionId);
 
-    let currentPermissionMode: PermissionMode = opts.permissionMode ?? 'default';
+    const persistedPermissionMode = sessionInfo.permissionMode ?? sessionInfo.metadata?.preferredPermissionMode;
+    let currentPermissionMode: PermissionMode = opts.permissionMode
+        ?? (persistedPermissionMode && isPermissionModeAllowedForFlavor(persistedPermissionMode, 'codex') ? persistedPermissionMode as PermissionMode : undefined)
+        ?? 'default';
     let currentModel = opts.model;
     let currentModelReasoningEffort: ReasoningEffort | undefined = opts.modelReasoningEffort;
     let currentCollaborationMode: EnhancedMode['collaborationMode'] = opts.collaborationMode ?? 'default';
@@ -358,6 +364,7 @@ export async function runCodex(opts: {
             collaborationMode: currentCollaborationMode,
             resumeSessionId: opts.resumeSessionId,
             recoveryContext: opts.recoveryContext,
+            sourceSessionId: codexSourceSessionId,
             replayTranscriptHistoryOnStart,
             onModeChange: createModeChangeHandler(session),
             onSessionReady: (instance) => {

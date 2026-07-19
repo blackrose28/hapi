@@ -2,7 +2,10 @@ import {
     AgentModelCatalogResultSchema,
     type AgentFlavor,
     type AgentModelCatalogResult,
-    RPC_METHODS
+    RPC_METHODS,
+    ArchiveCodexSessionRpcResponseSchema,
+    CursorChatStoreStatusSchema,
+    ListCodexSessionsRpcResponseSchema
 } from '@hapi/protocol'
 import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/types'
 import type {
@@ -16,6 +19,8 @@ import type {
     FileReadResponse,
     GeneratedImageResponse,
     ListDirectoryResponse,
+    ListCodexSessionsRpcResponse,
+    ArchiveCodexSessionRpcResponse,
     OpencodeModelsResponse,
     OpencodeModelSummary,
     ListOpencodeReasoningEffortOptionsResponse,
@@ -194,6 +199,29 @@ export class RpcTargetMissingError extends Error {
     }
 }
 
+<<<<<<< HEAD
+=======
+export type RpcCommandResponse = CommandResponse
+export type RpcReadFileResponse = FileReadResponse
+export type RpcGeneratedImageResponse = GeneratedImageResponse
+export type RpcUploadFileResponse = UploadFileResponse
+export type RpcDeleteUploadResponse = DeleteUploadResponse
+export type RpcDirectoryEntry = DirectoryEntry
+export type RpcListDirectoryResponse = ListDirectoryResponse
+export type RpcPathExistsResponse = PathExistsResponse
+export type RpcCodexModel = CodexModelSummary
+export type RpcListCodexModelsResponse = CodexModelsResponse
+export type RpcListCodexSessionsResponse = ListCodexSessionsRpcResponse
+export type RpcArchiveCodexSessionResponse = ArchiveCodexSessionRpcResponse
+export type RpcCursorModel = CursorModelSummary
+export type RpcListCursorModelsResponse = CursorModelsResponse
+export type RpcCursorChatStoreStatus = CursorChatStoreStatus
+export type RpcOpencodeModel = OpencodeModelSummary
+export type RpcListOpencodeModelsResponse = OpencodeModelsResponse
+export type RpcListGrokModelsResponse = GrokModelsResponse
+export type RpcListGrokReasoningEffortOptionsResponse = GrokReasoningEffortResponse
+export type RpcListOpencodeReasoningEffortOptionsResponse = OpencodeReasoningEffortResponse
+
 export class RpcGateway {
     constructor(
         private readonly io: Server,
@@ -277,13 +305,14 @@ export class RpcGateway {
         effort?: string,
         permissionMode?: PermissionMode,
         recoveryContext?: string,
+        serviceTier?: string,
         existingSessionId?: string
     ): Promise<{ type: 'success'; sessionId: string } | { type: 'error'; message: string }> {
         try {
             const result = await this.machineRpc(
                 machineId,
-                'spawn-happy-session',
-                { type: 'spawn-in-directory', directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, resumeSessionId, effort, permissionMode, recoveryContext, existingSessionId }
+                RPC_METHODS.SpawnHappySession,
+                { type: 'spawn-in-directory', directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, resumeSessionId, effort, permissionMode, recoveryContext, serviceTier, existingSessionId, sessionId: existingSessionId }
             )
             if (result && typeof result === 'object') {
                 const obj = result as Record<string, unknown>
@@ -603,6 +632,16 @@ export class RpcGateway {
         return this.parseAgentModelCatalog(
             await this.machineRpc(machineId, 'listAgentModels', { agent, cwd })
         )
+    }
+
+    async listCodexSessionsForMachine(machineId: string, cwd?: string | null, sessionIds?: string[]): Promise<RpcListCodexSessionsResponse> {
+        const result = await this.machineRpc(machineId, RPC_METHODS.ListCodexSessions, { cwd: cwd ?? null, sessionIds }, MODEL_LIST_RPC_TIMEOUT_MS)
+        return ListCodexSessionsRpcResponseSchema.parse(result)
+    }
+
+    async archiveCodexSessionForMachine(machineId: string, sessionId: string): Promise<RpcArchiveCodexSessionResponse> {
+        const result = await this.machineRpc(machineId, RPC_METHODS.ArchiveCodexSession, { sessionId }, MODEL_LIST_RPC_TIMEOUT_MS)
+        return ArchiveCodexSessionRpcResponseSchema.parse(result)
     }
 
     async listCursorModelsForSession(sessionId: string): Promise<RpcListCursorModelsResponse> {

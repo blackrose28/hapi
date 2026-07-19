@@ -55,6 +55,7 @@ export default {
   'sessions.group.showLess': '收起',
   'sessions.group.new': '在此目录新建会话',
   'codexSync.tooltip': '从 Codex 导入会话到 Hapi',
+  'codexSync.newSessionAction': '导入 Codex 历史',
   'codexSync.confirm.title': '导入 Codex 会话',
   'codexSync.confirm.description': '选择需要导入到 Hapi 的 Codex 会话',
   // 中文注释：以下文案支撑导入弹窗的多选列表、加载态，以及右上角重启 Codex 客户端按钮提示。
@@ -68,6 +69,9 @@ export default {
   'codexSync.confirm.loading': '正在读取本地 Codex 会话…',
   'codexSync.success.title': '导入完成',
   'codexSync.success.body': '已导入 {n} 个 Codex 会话到 Hapi。',
+  'codexSync.manual.success.title': 'Codex 同步完成',
+  'codexSync.manual.success.body': '已同步 {n} 个 Codex 会话。',
+  'codexSync.manual.failed.title': '同步 Codex 会话失败',
   'codexSync.error.timeout': '执行超时',
   'codexSync.error.active': '当前会话仍处于活跃状态，请等待会话结束后重试',
   'codexSync.failed.title': '导入 Codex 会话失败',
@@ -159,6 +163,7 @@ export default {
   // Session actions
   'session.action.rename': '重命名',
   'session.action.export': '导出对话',
+  'session.action.syncCodex': '从 Codex 同步',
   'session.action.archive': '归档',
   'session.action.reopen': '重新打开',
   'session.action.delete': '删除',
@@ -699,6 +704,7 @@ export default {
   'misc.percentLeft': '剩余 {percent}%',
   'misc.online': '在线',
 
+<<<<<<< HEAD
   // Dashboard (Mission Control)
   'dashboard.loading': '加载会话…',
   'dashboard.loadingSessions': '加载会话…',
@@ -762,4 +768,38 @@ export default {
   'mermaid.renderError': '无法预览此 Mermaid 图表。',
   'mermaid.retry': '重试预览',
   'mermaid.fullscreenUnavailable': '此浏览器不支持全屏。',
-} as const satisfies Record<TranslationKey, string>
+
+  // Web Share Target 分享面板
+  'share.title': '分享到 HAPI',
+  'share.subtitle': '选择要附加到的会话。',
+  'share.recentSessions': '最近的活跃会话',
+  'share.newSession': '新建会话',
+  'share.discard': '放弃',
+  'share.loading': '正在加载分享内容…',
+  'share.notFound.title': '未找到分享内容',
+  'share.notFound.body': '此分享链接已过期或被直接打开而没有传输。',
+  'share.error.ingest': '无法读取分享内容,请从源应用重试。',
+  'share.error.noId': '未提供分享 ID,请从系统分享面板打开此页面。',
+  'share.backToSessions': '返回会话列表',
+  'share.preview.text': '分享文本',
+  'share.preview.empty': '(空分享)',
+  'share.preview.files': '{n} 个文件',
+  'share.noActiveSessions': '没有活跃会话。请在下方选择"新建会话"。',
+  'button.refresh': '刷新',
+  'sessions.refresh.success.title': '已刷新',
+  'sessions.refresh.success.body': '会话列表已更新。',
+  'sessions.refresh.failed.title': '刷新失败',
+  'codexSync.newSessionInline.title': '导入 Codex 历史',
+  'codexSync.newSessionInline.description': '可选：先单选一个本机 Codex 会话，再选择模型/思考强度，点创建时导入。',
+  'codexSync.newSessionInline.clear': '清除已选历史',
+  'codexSync.newSessionInline.choose': '选择历史',
+  'codexSync.confirm.search': '搜索',
+  'codexSync.confirm.searchPlaceholder': '搜索标题、消息、目录、会话 ID',
+  'codexSync.confirm.useSelected': '使用选中会话',
+  'codexSync.confirm.imported': '已导入',
+  'codexSync.confirm.original': '原会话',
+  'codexSync.confirm.fork': 'fork会话',
+  'codexSync.confirm.archiveAction': '在 Codex 侧归档',
+  'session.action.syncCodexDisabledActive': '当前会话正在运行，停止或归档后才能同步 Codex 历史。',
+  'codexSync.manual.success.noNewMessages': '没有新的 Codex 消息。',
+} as const

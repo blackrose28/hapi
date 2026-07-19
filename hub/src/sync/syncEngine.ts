@@ -31,6 +31,7 @@ import {
     type RpcEditorProjectsResponse,
     type RpcListDirectoryResponse,
     type RpcListCodexModelsResponse,
+    type RpcArchiveCodexSessionResponse,
     type RpcListCursorModelsResponse,
     type RpcListOpencodeModelsResponse,
     type RpcListPiModelsResponse,
@@ -961,6 +962,7 @@ export class SyncEngine {
         effort?: string,
         permissionMode?: PermissionMode,
         recoveryContext?: string,
+        serviceTier?: string,
         existingSessionId?: string
     ): Promise<{ type: 'success'; sessionId: string } | { type: 'error'; message: string }> {
         return await this.rpcGateway.spawnSession(
@@ -976,6 +978,7 @@ export class SyncEngine {
             effort,
             permissionMode,
             recoveryContext,
+            serviceTier,
             existingSessionId
         )
     }
@@ -1492,9 +1495,12 @@ export class SyncEngine {
               })()
             : undefined
 
-        const preferredPermissionMode = opts?.permissionMode
-            ?? session.permissionMode
-            ?? session.metadata?.preferredPermissionMode
+        const metadataPermissionMode = session.metadata?.preferredPermissionMode
+        const preferredPermissionMode = metadataPermissionMode === 'yolo' && opts?.permissionMode === 'default'
+            ? metadataPermissionMode
+            : opts?.permissionMode
+                ?? session.permissionMode
+                ?? metadataPermissionMode
         const existingSessionId = (flavor === 'codex' || flavor === 'cursor') ? session.id : undefined
         const spawnResult = await this.rpcGateway.spawnSession(
             targetMachine.id,
@@ -1509,6 +1515,7 @@ export class SyncEngine {
             session.effort ?? undefined,
             preferredPermissionMode,
             recoveryContext,
+            session.serviceTier ?? undefined,
             existingSessionId
         )
 
@@ -1552,6 +1559,7 @@ export class SyncEngine {
             }
         }
 
+        this.sessionCache.markSessionActive(spawnResult.sessionId)
         return { type: 'success', sessionId: spawnResult.sessionId }
     }
 
@@ -2032,6 +2040,14 @@ export class SyncEngine {
 
     resetAutoResumeAttempts(sessionId: string): void {
         this.resumeAttempts.delete(sessionId)
+=======
+    async listCodexSessionsForMachine(machineId: string, cwd?: string | null, sessionIds?: string[]) {
+        return await this.rpcGateway.listCodexSessionsForMachine(machineId, cwd, sessionIds)
+    }
+
+    async archiveCodexSessionForMachine(machineId: string, sessionId: string): Promise<RpcArchiveCodexSessionResponse> {
+        return await this.rpcGateway.archiveCodexSessionForMachine(machineId, sessionId)
+>>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
     }
 
     async listCursorModelsForSession(sessionId: string): Promise<RpcListCursorModelsResponse> {
