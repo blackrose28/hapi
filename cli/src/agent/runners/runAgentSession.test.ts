@@ -121,4 +121,5 @@ describe('runAgentSession', () => {
         expect(harness.sendSessionDeath).toHaveBeenCalledWith('error')
         expect(harness.sendSessionDeath).not.toHaveBeenCalledWith('completed')
     })
+
 })

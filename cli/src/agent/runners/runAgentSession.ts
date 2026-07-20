@@ -167,6 +167,8 @@ export async function runAgentSession(opts: {
                 continue;
             }
 
+            // skill_lookup discovery lives on the MCP tool description — do not
+            // prepend instructions onto user turns (prompt-injection false positive).
             const promptContent: PromptContent[] = [{
                 type: 'text',
                 text: batch.message
