@@ -41,7 +41,7 @@ export class SessionSecurityProjection {
         try {
             const reconciledAt = this.now()
             const sessions = this.legacy.getSessions().flatMap((session) => session.machineId
-                ? [{ sessionId: session.id, machineId: session.machineId, updatedAt: session.updatedAt }]
+                ? [{ sessionId: session.id, machineId: session.machineId, updatedAt: reconciledAt }]
                 : [])
             this.store.reconcileSessionProjections(this.organizationId, sessions, reconciledAt)
             this.causalTimestamp = Math.max(reconciledAt, ...sessions.map((session) => session.updatedAt))

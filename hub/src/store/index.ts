@@ -28,7 +28,7 @@ export { SessionStore } from './sessionStore'
 export { TeamChatStore } from './teamChatStore'
 export { UserStore } from './userStore'
 
-const SCHEMA_VERSION: number = 11
+const SCHEMA_VERSION: number = 12
 const REQUIRED_TABLES = [
     'sessions',
     'machines',
@@ -112,6 +112,7 @@ export class Store {
             8: () => this.migrateFromV8ToV9(),
             9: () => this.migrateFromV9ToV10(),
             10: () => this.migrateFromV10ToV11(),
+            11: () => this.migrateFromV11ToV12(),
         })
 
         if (currentVersion === 0) {
@@ -477,6 +478,23 @@ export class Store {
         if (columns.size > 0 && !columns.has('owner_membership_id')) {
             this.db.exec('ALTER TABLE team_chats ADD COLUMN owner_membership_id TEXT')
         }
+    }
+
+    private migrateFromV11ToV12(): void {
+        const columns = this.getSessionColumnNames()
+        if (columns.size === 0 || !columns.has('machine_id') || !columns.has('metadata')) return
+        this.db.exec(`
+            UPDATE sessions
+            SET machine_id = CASE
+                WHEN json_valid(metadata) THEN
+                    CASE WHEN json_type(metadata, '$.machineId') = 'text'
+                        THEN json_extract(metadata, '$.machineId')
+                        ELSE NULL
+                    END
+                ELSE NULL
+            END
+            WHERE machine_id IS NULL
+        `)
     }
 
     private migrateFromV7ToV8(): void {

@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite'
+import { MetadataSchema } from '@hapi/protocol/schemas'
 import { randomUUID } from 'node:crypto'
 
 import type { StoredSession, VersionedUpdateResult } from './types'
@@ -26,6 +27,11 @@ type DbSessionRow = {
     active: number
     active_at: number | null
     seq: number
+}
+
+function getMetadataMachineId(metadata: unknown): string | null {
+    const parsed = MetadataSchema.safeParse(metadata)
+    return parsed.success ? parsed.data.machineId ?? null : null
 }
 
 function toStoredSession(row: DbSessionRow): StoredSession {
@@ -75,6 +81,7 @@ export function getOrCreateSession(
     const id = randomUUID()
 
     const metadataJson = JSON.stringify(metadata)
+    const machineId = getMetadataMachineId(metadata)
     const agentStateJson = agentState === null || agentState === undefined ? null : JSON.stringify(agentState)
 
     db.prepare(`
@@ -88,7 +95,7 @@ export function getOrCreateSession(
             todos, todos_updated_at,
             active, active_at, seq
         ) VALUES (
-            @id, @tag, @namespace, NULL, @created_at, @updated_at,
+            @id, @tag, @namespace, @machine_id, @created_at, @updated_at,
             @metadata, 1,
             @agent_state, 1,
             @model,
@@ -101,6 +108,7 @@ export function getOrCreateSession(
         id,
         tag,
         namespace,
+        machine_id: machineId,
         created_at: now,
         updated_at: now,
         metadata: metadataJson,
@@ -127,6 +135,7 @@ export function updateSessionMetadata(
 ): VersionedUpdateResult<unknown | null> {
     const now = Date.now()
     const touchUpdatedAt = options?.touchUpdatedAt !== false
+    const machineId = getMetadataMachineId(metadata)
 
     return updateVersionedField({
         db,
@@ -143,11 +152,13 @@ export function updateSessionMetadata(
         },
         decode: safeJsonParse,
         setClauses: [
+            'machine_id = @machine_id',
             'updated_at = CASE WHEN @touch_updated_at = 1 THEN @updated_at ELSE updated_at END',
             'seq = seq + 1'
         ],
         params: {
             updated_at: now,
+            machine_id: machineId,
             touch_updated_at: touchUpdatedAt ? 1 : 0
         }
     })

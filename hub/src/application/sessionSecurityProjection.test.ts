@@ -30,6 +30,18 @@ function session(id: string, machineId: string, updatedAt: number): Session {
 }
 
 describe('SessionSecurityProjection', () => {
+    it('restores a startup snapshot newer than an earlier retirement tombstone', () => {
+        const state = setup()
+        state.store.retireSessionProjection('o1', 's1', 20)
+        const projection = new SessionSecurityProjection(state.store, 'o1', { getSessions: () => [{
+            id: 's1', machineId: 'm1', updatedAt: 10
+        }] as never }, state.events, () => 30)
+
+        projection.start()
+
+        expect(state.store.findSessionRunner('o1', 's1')?.id).toBe('r1')
+    })
+
     it('subscribes before snapshot and replays a newer event after stale reconciliation', () => {
         const state = setup()
         let reads = 0
