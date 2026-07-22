@@ -190,6 +190,7 @@ function SessionsPage() {
     const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false)
     const [isRestartingCodexDesktop, setIsRestartingCodexDesktop] = useState(false)
     const [pendingDuplicateSessionIds, setPendingDuplicateSessionIds] = useState<string[]>([])
+    const [pendingDuplicateHapiSessionIds, setPendingDuplicateHapiSessionIds] = useState<string[]>([])
     const [duplicateSessionGroups, setDuplicateSessionGroups] = useState<CodexDuplicateSessionGroup[]>([])
     const [isDuplicateMergeConfirmOpen, setIsDuplicateMergeConfirmOpen] = useState(false)
     const [isMergingDuplicateSessions, setIsMergingDuplicateSessions] = useState(false)
@@ -298,6 +299,7 @@ function SessionsPage() {
         // 中文注释：重复会话确认框关闭时一并清空“本次选中导入”的上下文，确保后续检测不会误用上一轮的 codexSessionId。
         setIsDuplicateMergeConfirmOpen(false)
         setPendingDuplicateSessionIds([])
+        setPendingDuplicateHapiSessionIds([])
         setDuplicateSessionGroups([])
     }, [])
 
@@ -353,7 +355,9 @@ function SessionsPage() {
 
             const redirectTarget = selectedSessionId
                 ? result.merged.find((group) => group.removedSessionIds?.includes(selectedSessionId))
-                : undefined
+                    ?? result.merged.find((group) => Boolean(group.canonicalSessionId))
+                : result.merged.find((group) => Boolean(group.canonicalSessionId))
+            const redirectSessionId = redirectTarget?.canonicalSessionId ?? pendingDuplicateHapiSessionIds[0]
 
             closeDuplicateMergeDialog()
             await Promise.all([
@@ -367,10 +371,10 @@ function SessionsPage() {
             ])
             await refetch()
 
-            if (redirectTarget?.canonicalSessionId) {
+            if (redirectSessionId) {
                 navigate({
                     to: '/sessions/$sessionId',
-                    params: { sessionId: redirectTarget.canonicalSessionId }
+                    params: { sessionId: redirectSessionId }
                 })
             }
         } catch (error) {
@@ -394,6 +398,7 @@ function SessionsPage() {
         isMergingDuplicateSessions,
         navigate,
         normalizeCodexScriptError,
+        pendingDuplicateHapiSessionIds,
         pendingDuplicateSessionIds,
         queryClient,
         refetch,
@@ -461,6 +466,7 @@ function SessionsPage() {
             await refetch()
 
             setPendingDuplicateSessionIds([])
+            setPendingDuplicateHapiSessionIds(result.hapiSessionIds ?? [])
             setDuplicateSessionGroups([])
             setIsDuplicateMergeConfirmOpen(false)
             try {
@@ -475,6 +481,7 @@ function SessionsPage() {
 
                 if (duplicateResult.duplicates.length > 0) {
                     setPendingDuplicateSessionIds(sessionIds)
+                    setPendingDuplicateHapiSessionIds(result.hapiSessionIds ?? [])
                     setDuplicateSessionGroups(duplicateResult.duplicates)
                     setIsDuplicateMergeConfirmOpen(true)
                 }
@@ -515,6 +522,7 @@ function SessionsPage() {
         refetch,
         setDuplicateSessionGroups,
         setIsDuplicateMergeConfirmOpen,
+        setPendingDuplicateHapiSessionIds,
         setPendingDuplicateSessionIds,
         t
     ])
