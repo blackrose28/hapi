@@ -445,7 +445,7 @@ describe('AcpMessageHandler', () => {
         expect((textMessages[1] as { text: string }).text).toMatch(/^Claude AI usage limit warning\|/);
     });
 
-    it('suppresses allowed rate_limit_event chunk without affecting text buffer', () => {
+    it('forwards allowed rate_limit_event chunk as a quota status message', () => {
         const messages: AgentMessage[] = [];
         const handler = new AcpMessageHandler((message) => messages.push(message));
 
@@ -468,15 +468,19 @@ describe('AcpMessageHandler', () => {
 
         handler.flushText();
 
-        // Only the normal text, no rate limit noise
-        expect(messages).toEqual([{ type: 'text', text: 'hello' }]);
+        // Normal text is flushed first, then the converted quota status (not raw JSON)
+        expect(messages).toEqual([
+            { type: 'text', text: 'hello' },
+            { type: 'text', text: 'Claude AI usage status|1774278000||' }
+        ]);
     });
 
-    it('does not split text buffer when suppressing allowed event mid-stream', () => {
+    it('splits text buffer around an allowed event mid-stream', () => {
         const messages: AgentMessage[] = [];
         const handler = new AcpMessageHandler((message) => messages.push(message));
 
-        // text → allowed → text → flush should produce ONE merged text message
+        // text → allowed → text → flush: the allowed event is now forwarded as a real
+        // message, so it acts as a boundary between the two text segments.
         handler.handleUpdate({
             sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentMessageChunk,
             content: { type: 'text', text: 'part one ' }
@@ -498,8 +502,11 @@ describe('AcpMessageHandler', () => {
 
         handler.flushText();
 
-        // Must be a single text message, not split into two
-        expect(messages).toEqual([{ type: 'text', text: 'part one part two' }]);
+        expect(messages).toEqual([
+            { type: 'text', text: 'part one ' },
+            { type: 'text', text: 'Claude AI usage status|1774278000||' },
+            { type: 'text', text: 'part two' }
+        ]);
     });
 
     it('allows kind fallback to replace placeholder tool name', () => {
@@ -611,7 +618,7 @@ describe('AcpMessageHandler', () => {
         expect(messages).toEqual([]);
     });
 
-    it('clears buffered prefix when cumulative rate_limit_event chunk arrives', () => {
+    it('clears buffered prefix when cumulative allowed rate_limit_event chunk arrives', () => {
         const messages: AgentMessage[] = [];
         const handler = new AcpMessageHandler((message) => messages.push(message));
 
@@ -621,7 +628,7 @@ describe('AcpMessageHandler', () => {
             content: { type: 'text', text: '{"type":"rate' }
         });
 
-        // Second chunk: full cumulative rate_limit_event (allowed — should be suppressed)
+        // Second chunk: full cumulative rate_limit_event (allowed — forwarded as quota status)
         const rateLimitJson = JSON.stringify({
             type: 'rate_limit_event',
             rate_limit_info: {
@@ -636,8 +643,8 @@ describe('AcpMessageHandler', () => {
 
         handler.flushText();
 
-        // Both the prefix and the full chunk should be gone
-        expect(messages).toEqual([]);
+        // The stale prefix must not leak; only the converted quota status remains
+        expect(messages).toEqual([{ type: 'text', text: 'Claude AI usage status|1774278000||' }]);
     });
 
     it('clears buffered prefix when cumulative displayable rate_limit_event arrives', () => {

@@ -303,12 +303,51 @@ describe('SDKToLogConverter', () => {
     })
 
     describe('Internal event filtering', () => {
-        it('should suppress rate_limit_event with allowed status', () => {
+        it('should convert allowed status to pipe-delimited quota status text', () => {
             const sdkMessage = {
                 type: 'rate_limit_event',
                 rate_limit_info: {
                     status: 'allowed',
                     resetsAt: 1775559600,
+                    utilization: 0.3,
+                    rateLimitType: 'five_hour'
+                }
+            } as unknown as SDKMessage
+
+            const logMessage = converter.convert(sdkMessage)
+
+            expect(logMessage).not.toBeNull()
+            expect(logMessage!.type).toBe('assistant')
+            expect((logMessage as any).message.content[0].text).toBe(
+                'Claude AI usage status|1775559600|30|five_hour'
+            )
+        })
+
+        it('should leave the percent field empty when allowed status has no utilization', () => {
+            // Real Claude Code payloads: a plain 'allowed' status below any warning
+            // threshold carries no utilization figure at all.
+            const sdkMessage = {
+                type: 'rate_limit_event',
+                rate_limit_info: {
+                    status: 'allowed',
+                    resetsAt: 1775559600,
+                    rateLimitType: 'five_hour'
+                }
+            } as unknown as SDKMessage
+
+            const logMessage = converter.convert(sdkMessage)
+
+            expect(logMessage).not.toBeNull()
+            expect((logMessage as any).message.content[0].text).toBe(
+                'Claude AI usage status|1775559600||five_hour'
+            )
+        })
+
+        it('should suppress rate_limit_event with allowed status when resetsAt is missing', () => {
+            const sdkMessage = {
+                type: 'rate_limit_event',
+                rate_limit_info: {
+                    status: 'allowed',
                     rateLimitType: 'five_hour'
                 }
             } as unknown as SDKMessage

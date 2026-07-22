@@ -93,12 +93,52 @@ describe('parseRateLimitText', () => {
         });
     });
 
-    it('suppresses allowed status', () => {
+    it('forwards allowed status as a quota status update (not suppressed)', () => {
         const result = parseRateLimitText(JSON.stringify({
             type: 'rate_limit_event',
             rate_limit_info: {
                 status: 'allowed',
                 resetsAt: 1774278000,
+                rateLimitType: 'five_hour',
+                utilization: 0.3,
+            },
+        }));
+
+        expect(result).toEqual({
+            suppress: false,
+            message: {
+                type: 'text',
+                text: 'Claude AI usage status|1774278000|30|five_hour',
+            },
+        });
+    });
+
+    it('forwards allowed status with an empty percent when utilization is not reported', () => {
+        // Real Claude Code payloads: a plain 'allowed' status below any warning
+        // threshold carries no utilization figure at all.
+        const result = parseRateLimitText(JSON.stringify({
+            type: 'rate_limit_event',
+            rate_limit_info: {
+                status: 'allowed',
+                resetsAt: 1774278000,
+                rateLimitType: 'five_hour',
+            },
+        }));
+
+        expect(result).toEqual({
+            suppress: false,
+            message: {
+                type: 'text',
+                text: 'Claude AI usage status|1774278000||five_hour',
+            },
+        });
+    });
+
+    it('suppresses allowed status when resetsAt is missing', () => {
+        const result = parseRateLimitText(JSON.stringify({
+            type: 'rate_limit_event',
+            rate_limit_info: {
+                status: 'allowed',
                 utilization: 0.3,
             },
         }));

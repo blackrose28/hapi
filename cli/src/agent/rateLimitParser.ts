@@ -6,12 +6,19 @@ import type { AgentMessage } from './types';
  * parse undocumented Claude-internal JSON formats.
  *
  * Converted text format (pipe-delimited, parsed by web's reducerEvents.ts):
+ *   - "Claude AI usage status|{unixSeconds}|{percentInt}|{rateLimitType}" (normal, sub-threshold usage)
+ *     percentInt is empty when Claude didn't report a utilization figure (plain 'allowed'
+ *     status below any warning threshold carries no percentage at all).
  *   - "Claude AI usage limit warning|{unixSeconds}|{percentInt}|{rateLimitType}"
  *   - "Claude AI usage limit reached|{unixSeconds}|{rateLimitType}"
  *
+ * The 'allowed' status is forwarded (not suppressed) so the web app can track
+ * live quota utilization continuously rather than only near a limit — the web
+ * reducer treats it as silent state (never rendered as a chat bubble).
+ *
  * Returns null if the text is not a rate_limit_event (pass through as-is).
- * Returns { suppress: true } for known-noisy statuses (e.g. 'allowed').
- * Returns { suppress: false, message } for statuses worth displaying.
+ * Returns { suppress: true } for statuses with nothing usable to report.
+ * Returns { suppress: false, message } for statuses worth forwarding.
  */
 export type RateLimitResult =
     | null
@@ -43,12 +50,6 @@ export function parseRateLimitText(text: string): RateLimitResult {
 
     const { status, resetsAt, utilization, rateLimitType } = info as Record<string, unknown>;
 
-    // Suppress early for statuses that never need display,
-    // before checking resetsAt — malformed payloads should not leak.
-    if (status === 'allowed') {
-        return { suppress: true };
-    }
-
     if (typeof resetsAt !== 'number') {
         // Malformed rate_limit_event (missing resetsAt) — suppress to prevent
         // raw JSON from leaking into chat.
@@ -57,21 +58,30 @@ export function parseRateLimitText(text: string): RateLimitResult {
 
     // Ensure integer for the pipe-delimited format (web regex uses \d+)
     const resetsAtInt = Math.round(resetsAt);
+    const limitType = typeof rateLimitType === 'string' ? rateLimitType : '';
+    const pct = typeof utilization === 'number' ? Math.round(utilization * 100) : null;
 
-    if (status === 'allowed_warning') {
-        const pct = typeof utilization === 'number' ? Math.round(utilization * 100) : 0;
-        const limitType = typeof rateLimitType === 'string' ? rateLimitType : '';
+    if (status === 'allowed') {
         return {
             suppress: false,
             message: {
                 type: 'text',
-                text: `Claude AI usage limit warning|${resetsAtInt}|${pct}|${limitType}`,
+                text: `Claude AI usage status|${resetsAtInt}|${pct ?? ''}|${limitType}`,
+            },
+        };
+    }
+
+    if (status === 'allowed_warning') {
+        return {
+            suppress: false,
+            message: {
+                type: 'text',
+                text: `Claude AI usage limit warning|${resetsAtInt}|${pct ?? ''}|${limitType}`,
             },
         };
     }
 
     if (status === 'rejected') {
-        const limitType = typeof rateLimitType === 'string' ? rateLimitType : '';
         return {
             suppress: false,
             message: {

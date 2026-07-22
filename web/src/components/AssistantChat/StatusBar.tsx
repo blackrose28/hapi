@@ -5,9 +5,10 @@ import {
     isPermissionModeAllowedForFlavor
 } from '@hapi/protocol'
 import type { PermissionModeTone } from '@hapi/protocol'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types/api'
 import type { ConversationStatus } from '@/realtime/types'
+import type { QuotaWindow } from '@/chat/reducer'
 import { getContextBudgetTokens } from '@/chat/modelConfig'
 import { useTranslation } from '@/lib/use-translation'
 
@@ -116,6 +117,38 @@ function getContextWarning(contextSize: number, maxContextSize: number, t: (key:
     }
 }
 
+function formatTimeRemaining(endsAt: number, nowMs: number): string {
+    const endMs = endsAt < 1_000_000_000_000 ? endsAt * 1000 : endsAt
+    const diffMs = endMs - nowMs
+    if (diffMs <= 0) return '0m'
+
+    const totalMinutes = Math.round(diffMs / 60_000)
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+    return `${minutes}m`
+}
+
+function getQuotaLabel(
+    window: QuotaWindow | null | undefined,
+    label: string,
+    nowMs: number
+): { text: string; color: string } | null {
+    if (!window) return null
+
+    const pct = window.reached ? 100 : window.utilization !== null ? Math.round(window.utilization * 100) : null
+    const remaining = formatTimeRemaining(window.endsAt, nowMs)
+    const text = pct !== null ? `${label} ${pct}% · resets ${remaining}` : `${label} resets ${remaining}`
+
+    const color = window.reached || (pct !== null && pct >= 95)
+        ? 'text-red-500'
+        : pct !== null && pct >= 85
+            ? 'text-amber-500'
+            : 'text-[var(--app-hint)]'
+
+    return { text, color }
+}
+
 function formatTokenCount(value: number): string {
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
     if (value >= 1_000) return `${Math.round(value / 1_000)}k`
@@ -146,6 +179,8 @@ export function StatusBar(props: {
     contextSize?: number
     contextCacheRead?: number
     contextWindow?: number | null
+    quotaFiveHour?: QuotaWindow | null
+    quotaSevenDay?: QuotaWindow | null
     model?: string | null
     modelReasoningEffort?: string | null
     permissionMode?: PermissionMode
@@ -179,6 +214,22 @@ export function StatusBar(props: {
         if (!props.contextCacheRead || props.contextCacheRead <= 0) return null
         return `cache ${formatTokenCount(props.contextCacheRead)}`
     }, [props.contextCacheRead])
+
+    // Ticks every 30s so "resets in Xh Ym" stays fresh without a per-second re-render.
+    const [nowTick, setNowTick] = useState(() => Date.now())
+    useEffect(() => {
+        const id = setInterval(() => setNowTick(Date.now()), 30_000)
+        return () => clearInterval(id)
+    }, [])
+
+    const quotaFiveHourLabel = useMemo(
+        () => getQuotaLabel(props.quotaFiveHour, '5h', nowTick),
+        [props.quotaFiveHour, nowTick]
+    )
+    const quotaSevenDayLabel = useMemo(
+        () => getQuotaLabel(props.quotaSevenDay, '7d', nowTick),
+        [props.quotaSevenDay, nowTick]
+    )
 
     const permissionMode = props.permissionMode
     const displayPermissionMode = permissionMode
@@ -223,6 +274,16 @@ export function StatusBar(props: {
                 {cacheHitLabel ? (
                     <span className="text-[10px] text-[var(--app-hint)]">
                         {cacheHitLabel}
+                    </span>
+                ) : null}
+                {quotaFiveHourLabel ? (
+                    <span className={`text-[10px] ${quotaFiveHourLabel.color}`}>
+                        {quotaFiveHourLabel.text}
+                    </span>
+                ) : null}
+                {quotaSevenDayLabel ? (
+                    <span className={`text-[10px] ${quotaSevenDayLabel.color}`}>
+                        {quotaSevenDayLabel.text}
                     </span>
                 ) : null}
             </div>

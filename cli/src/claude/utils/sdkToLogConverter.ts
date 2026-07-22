@@ -87,9 +87,11 @@ export class SDKToLogConverter {
     }
 
     /**
-     * Convert rate_limit_event to pipe-delimited text matching the ACP path format,
-     * or suppress if the status does not need display (e.g. 'allowed').
-     * Must not mutate converter state (UUID chain) so dropped events are invisible.
+     * Convert rate_limit_event to pipe-delimited text matching the ACP path format.
+     * 'allowed' is forwarded too (as a silent quota status update, never shown as a
+     * chat bubble) so the web app can track live utilization continuously instead
+     * of only near a limit. Must not mutate converter state (UUID chain) so dropped
+     * events (unknown/malformed) are invisible.
      */
     private convertRateLimitEvent(sdkMessage: SDKMessage): RawJSONLines | null {
         const info = (sdkMessage as any).rate_limit_info
@@ -97,18 +99,18 @@ export class SDKToLogConverter {
 
         const { status, resetsAt, utilization, rateLimitType } = info
 
-        if (status === 'allowed') return null
         if (typeof resetsAt !== 'number') return null
 
         const resetsAtInt = Math.round(resetsAt)
+        const limitType = typeof rateLimitType === 'string' ? rateLimitType : ''
+        const pct = typeof utilization === 'number' ? Math.round(utilization * 100) : null
         let text: string
 
-        if (status === 'allowed_warning') {
-            const pct = typeof utilization === 'number' ? Math.round(utilization * 100) : 0
-            const limitType = typeof rateLimitType === 'string' ? rateLimitType : ''
-            text = `Claude AI usage limit warning|${resetsAtInt}|${pct}|${limitType}`
+        if (status === 'allowed') {
+            text = `Claude AI usage status|${resetsAtInt}|${pct ?? ''}|${limitType}`
+        } else if (status === 'allowed_warning') {
+            text = `Claude AI usage limit warning|${resetsAtInt}|${pct ?? ''}|${limitType}`
         } else if (status === 'rejected') {
-            const limitType = typeof rateLimitType === 'string' ? rateLimitType : ''
             text = `Claude AI usage limit reached|${resetsAtInt}|${limitType}`
         } else {
             return null

@@ -144,6 +144,13 @@ describe('reduceTimeline', () => {
         expect(textBlocks).toHaveLength(1)
     })
 
+    it('never renders a quota-update (sub-threshold usage) message as a chat block', () => {
+        const msg = makeAgentMessage('Claude AI usage status|1774278000|30|five_hour')
+        const { blocks } = reduceTimeline([msg], makeContext())
+
+        expect(blocks).toHaveLength(0)
+    })
+
     it('extracts task-notification summary as event from sidechain block', () => {
         const msg: TracedMessage = {
             id: 'msg-notif',

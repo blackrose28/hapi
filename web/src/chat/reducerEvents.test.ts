@@ -62,6 +62,36 @@ describe('parseMessageAsEvent — usage limit formats', () => {
         })
     })
 
+    it('parses status (sub-threshold usage) with five_hour type', () => {
+        const msg = makeAgentTextMessage('Claude AI usage status|1774278000|30|five_hour')
+        expect(parseMessageAsEvent(msg)).toEqual({
+            type: 'quota-update',
+            utilization: 0.3,
+            endsAt: 1774278000,
+            limitType: 'five_hour',
+        })
+    })
+
+    it('parses status with missing limitType', () => {
+        const msg = makeAgentTextMessage('Claude AI usage status|1774278000|0|')
+        expect(parseMessageAsEvent(msg)).toEqual({
+            type: 'quota-update',
+            utilization: 0,
+            endsAt: 1774278000,
+            limitType: '',
+        })
+    })
+
+    it('parses status with an empty percent as unknown utilization, not 0%', () => {
+        const msg = makeAgentTextMessage('Claude AI usage status|1774278000||five_hour')
+        expect(parseMessageAsEvent(msg)).toEqual({
+            type: 'quota-update',
+            utilization: null,
+            endsAt: 1774278000,
+            limitType: 'five_hour',
+        })
+    })
+
     it('returns null for non-limit text', () => {
         const msg = makeAgentTextMessage('Hello world')
         expect(parseMessageAsEvent(msg)).toBeNull()

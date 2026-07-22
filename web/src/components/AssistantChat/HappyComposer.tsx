@@ -13,6 +13,7 @@ import {
     useState
 } from 'react'
 import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types/api'
+import type { QuotaWindow } from '@/chat/reducer'
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import type { ConversationStatus } from '@/realtime/types'
 import { useActiveWord } from '@/hooks/useActiveWord'
@@ -77,6 +78,8 @@ export function HappyComposer(props: {
     contextSize?: number
     contextCacheRead?: number
     contextWindow?: number | null
+    quotaFiveHour?: QuotaWindow | null
+    quotaSevenDay?: QuotaWindow | null
     controlledByUser?: boolean
     agentFlavor?: string | null
     availableModelOptions?: Array<{ value: string | null; label: string }>
@@ -116,6 +119,8 @@ export function HappyComposer(props: {
         contextSize,
         contextCacheRead,
         contextWindow,
+        quotaFiveHour,
+        quotaSevenDay,
         controlledByUser = false,
         agentFlavor,
         availableModelOptions,
@@ -650,6 +655,8 @@ export function HappyComposer(props: {
                         contextSize={contextSize}
                         contextCacheRead={contextCacheRead}
                         contextWindow={contextWindow}
+                        quotaFiveHour={quotaFiveHour}
+                        quotaSevenDay={quotaSevenDay}
                         model={model}
                         modelReasoningEffort={modelReasoningEffort}
                         permissionMode={permissionMode}

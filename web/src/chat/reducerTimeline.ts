@@ -78,6 +78,10 @@ export function reduceTimeline(
 
         const event = parseMessageAsEvent(msg)
         if (event) {
+            // quota-update is silent state (see reducer.ts's latestQuota scan) — never a chat bubble.
+            if (event.type === 'quota-update') {
+                continue
+            }
             blocks.push({
                 kind: 'agent-event',
                 id: msg.id,

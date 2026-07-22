@@ -19,6 +19,19 @@ function parseClaudeUsageLimit(text: string): AgentEvent | null {
         }
     }
 
+    // Percent segment is empty when the CLI didn't get a utilization figure from Claude
+    // (e.g. plain 'allowed' status below any warning threshold) — treat that as unknown,
+    // not 0%.
+    const statusMatch = text.match(/^Claude AI usage status\|(\d+)\|(\d*)\|([^|]*)$/)
+    if (statusMatch) {
+        const timestamp = Number.parseInt(statusMatch[1], 10)
+        const utilization = statusMatch[2] === '' ? null : Number.parseInt(statusMatch[2], 10) / 100
+        const limitType = statusMatch[3] || ''
+        if (Number.isFinite(timestamp)) {
+            return { type: 'quota-update', utilization, endsAt: timestamp, limitType }
+        }
+    }
+
     return null
 }
 

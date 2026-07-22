@@ -2,9 +2,12 @@ import type { AgentState } from '@/types/api'
 import type { TeamMentionRequest } from '@/types/api'
 import type { ChatBlock, CodexGoalState, NormalizedMessage, UsageData } from '@/chat/types'
 import { traceMessages, type TracedMessage } from '@/chat/tracer'
-import { dedupeAgentEvents, foldApiErrorEvents } from '@/chat/reducerEvents'
+import { dedupeAgentEvents, foldApiErrorEvents, parseMessageAsEvent } from '@/chat/reducerEvents'
 import { collectTitleChanges, collectToolIdsFromMessages, ensureToolBlock, getPermissions } from '@/chat/reducerTools'
 import { reduceTimeline } from '@/chat/reducerTimeline'
+
+// Model-scoped weekly rate limits (seven_day_opus, seven_day_sonnet, ...) all share the 7d window display.
+const SEVEN_DAY_LIMIT_TYPES = new Set(['seven_day', 'seven_day_opus', 'seven_day_sonnet', 'seven_day_overage_included'])
 
 // Calculate context size from usage data
 function calculateContextSize(usage: UsageData): number {
@@ -24,11 +27,24 @@ export type LatestUsage = {
     timestamp: number
 }
 
+export type QuotaWindow = {
+    limitType: string
+    utilization: number | null
+    endsAt: number
+    reached: boolean
+    timestamp: number
+}
+
+export type LatestQuota = {
+    fiveHour: QuotaWindow | null
+    sevenDay: QuotaWindow | null
+}
+
 export function reduceChatBlocks(
     normalized: NormalizedMessage[],
     agentState: AgentState | null | undefined,
     teamMentionRequests: TeamMentionRequest[] = []
-): { blocks: ChatBlock[]; hasReadyEvent: boolean; latestUsage: LatestUsage | null; latestGoal: CodexGoalState | null } {
+): { blocks: ChatBlock[]; hasReadyEvent: boolean; latestUsage: LatestUsage | null; latestGoal: CodexGoalState | null; latestQuota: LatestQuota } {
     const permissionsById = getPermissions(agentState)
     const toolIdsInMessages = collectToolIdsFromMessages(normalized)
     const titleChangesByToolUseId = collectTitleChanges(normalized)
@@ -115,6 +131,28 @@ export function reduceChatBlocks(
         }
     }
 
+    // Find the most recent quota (rate limit) event per window type (five_hour / seven_day).
+    const latestQuota: LatestQuota = { fiveHour: null, sevenDay: null }
+    for (let i = normalized.length - 1; i >= 0 && (!latestQuota.fiveHour || !latestQuota.sevenDay); i--) {
+        const msg = normalized[i]
+        const event = parseMessageAsEvent(msg)
+        if (!event || (event.type !== 'limit-warning' && event.type !== 'limit-reached' && event.type !== 'quota-update')) continue
+
+        const quotaEvent = event as { type: 'limit-warning' | 'limit-reached' | 'quota-update'; limitType: string; endsAt: number; utilization?: number | null }
+        const key = quotaEvent.limitType === 'five_hour'
+            ? 'fiveHour'
+            : SEVEN_DAY_LIMIT_TYPES.has(quotaEvent.limitType) ? 'sevenDay' : null
+        if (!key || latestQuota[key]) continue
+
+        latestQuota[key] = {
+            limitType: quotaEvent.limitType,
+            utilization: quotaEvent.type !== 'limit-reached' ? quotaEvent.utilization ?? null : null,
+            endsAt: quotaEvent.endsAt,
+            reached: quotaEvent.type === 'limit-reached',
+            timestamp: msg.createdAt
+        }
+    }
+
     let latestGoal: CodexGoalState | null = null
     for (const msg of normalized) {
         if (msg.role !== 'event' || msg.content.type !== 'codex-goal') continue
@@ -128,5 +166,5 @@ export function reduceChatBlocks(
         }
     }
 
-    return { blocks: dedupeAgentEvents(foldApiErrorEvents(rootResult.blocks)), hasReadyEvent, latestUsage, latestGoal }
+    return { blocks: dedupeAgentEvents(foldApiErrorEvents(rootResult.blocks)), hasReadyEvent, latestUsage, latestGoal, latestQuota }
 }

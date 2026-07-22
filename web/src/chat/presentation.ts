@@ -28,7 +28,7 @@ export function formatResetTime(value: number): string {
 
 // Known types: five_hour → "5-hour", seven_day → "7-day".
 // Unknown types use underscore-to-space fallback (e.g. thirty_day → "thirty day").
-function formatLimitType(limitType: string | undefined): string {
+export function formatLimitType(limitType: string | undefined): string {
     if (!limitType) return ''
     if (limitType === 'five_hour') return '5-hour'
     if (limitType === 'seven_day') return '7-day'
@@ -159,6 +159,14 @@ export function getEventPresentation(event: AgentEvent): EventPresentation {
         const typeLabel = formatLimitType(ev.limitType)
         const suffix = typeLabel ? ` (${typeLabel})` : ''
         return { icon: '⚠️', text: endsAt ? `Usage limit ${pct}%${suffix} · resets ${formatResetTime(endsAt)}` : `Usage limit ${pct}%${suffix}` }
+    }
+    if (event.type === 'quota-update') {
+        const ev = event as { utilization?: number; endsAt?: number; limitType?: string }
+        const pct = Math.round((ev.utilization ?? 0) * 100)
+        const endsAt = typeof ev.endsAt === 'number' ? ev.endsAt : null
+        const typeLabel = formatLimitType(ev.limitType)
+        const suffix = typeLabel ? ` (${typeLabel})` : ''
+        return { icon: '◷', text: endsAt ? `Usage ${pct}%${suffix} · resets ${formatResetTime(endsAt)}` : `Usage ${pct}%${suffix}` }
     }
     if (event.type === 'limit-reached') {
         const ev = event as { endsAt?: number; limitType?: string }
