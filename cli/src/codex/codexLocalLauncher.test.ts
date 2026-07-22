@@ -460,7 +460,7 @@ describe('codexLocalLauncher', () => {
         });
     });
 
-    it('replays semantic chat events once and keeps a same-turn preface before its plan', async () => {
+    it('replays semantic chat and tool events once and keeps a same-turn preface before its plan', async () => {
         const transcriptPath = join(tempDir, 'codex-import-response-item-transcript.jsonl');
         const { session, userMessages, agentMessages, getUserActivityCount } = createSessionStub('default', undefined, '/tmp/worktree', null, true);
         let releaseRunBarrier: (() => void) | undefined;
@@ -483,6 +483,111 @@ describe('codexLocalLauncher', () => {
                 JSON.stringify({
                     type: 'event_msg',
                     payload: { type: 'user_message', message: 'visible user message' }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'function_call',
+                        name: 'LegacyTool',
+                        call_id: 'call-function',
+                        arguments: '{"path":"README.md"}'
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'function_call_output',
+                        call_id: 'call-function',
+                        output: { ok: true }
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'custom_tool_call',
+                        call_id: 'call-exec',
+                        name: 'exec',
+                        input: 'pwd'
+                    }
+                }),
+                JSON.stringify({
+                    type: 'event_msg',
+                    payload: {
+                        type: 'exec_command_end',
+                        call_id: 'call-exec',
+                        output: '/tmp/worktree'
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'custom_tool_call_output',
+                        call_id: 'call-exec',
+                        output: [{ type: 'input_text', text: '/tmp/worktree' }]
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'custom_tool_call',
+                        call_id: 'call-patch',
+                        name: 'apply_patch',
+                        input: '*** Begin Patch\n*** End Patch'
+                    }
+                }),
+                JSON.stringify({
+                    type: 'event_msg',
+                    payload: {
+                        type: 'patch_apply_end',
+                        call_id: 'call-patch',
+                        output: 'Done!'
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'custom_tool_call_output',
+                        call_id: 'call-patch',
+                        output: 'Done!'
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'tool_search_call',
+                        call_id: 'call-tool-search',
+                        arguments: { query: 'hapi change title', limit: 5 }
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'tool_search_output',
+                        call_id: 'call-tool-search',
+                        execution: 'client',
+                        status: 'completed',
+                        tools: [{ name: 'mcp__hapi', description: 'Hapi tools' }]
+                    }
+                }),
+                JSON.stringify({
+                    type: 'response_item',
+                    payload: {
+                        type: 'web_search_call',
+                        status: 'failed',
+                        action: {
+                            type: 'search',
+                            query: 'Codex transcript format',
+                            queries: ['Codex transcript format']
+                        }
+                    }
+                }),
+                JSON.stringify({
+                    type: 'event_msg',
+                    payload: { type: 'web_search_end', query: 'Codex transcript format' }
+                }),
+                JSON.stringify({
+                    type: 'event_msg',
+                    payload: { type: 'mcp_tool_call_end', call_id: 'call-mcp-summary' }
                 }),
                 JSON.stringify({
                     type: 'event_msg',
@@ -547,6 +652,69 @@ describe('codexLocalLauncher', () => {
         expect(userMessages).toEqual(['visible user message']);
         expect(getUserActivityCount()).toBe(0);
         expect(agentMessages).toEqual([{
+            type: 'tool-call',
+            name: 'LegacyTool',
+            callId: 'call-function',
+            input: { path: 'README.md' },
+            id: expect.any(String)
+        }, {
+            type: 'tool-call-result',
+            callId: 'call-function',
+            output: { ok: true },
+            id: expect.any(String)
+        }, {
+            type: 'tool-call',
+            name: 'exec',
+            callId: 'call-exec',
+            input: 'pwd',
+            id: expect.any(String)
+        }, {
+            type: 'tool-call-result',
+            callId: 'call-exec',
+            output: [{ type: 'input_text', text: '/tmp/worktree' }],
+            id: expect.any(String)
+        }, {
+            type: 'tool-call',
+            name: 'apply_patch',
+            callId: 'call-patch',
+            input: '*** Begin Patch\n*** End Patch',
+            id: expect.any(String)
+        }, {
+            type: 'tool-call-result',
+            callId: 'call-patch',
+            output: 'Done!',
+            id: expect.any(String)
+        }, {
+            type: 'tool-call',
+            name: 'ToolSearch',
+            callId: 'call-tool-search',
+            input: { query: 'hapi change title', limit: 5 },
+            id: expect.any(String)
+        }, {
+            type: 'tool-call-result',
+            callId: 'call-tool-search',
+            output: {
+                execution: 'client',
+                tools: [{ name: 'mcp__hapi', description: 'Hapi tools' }]
+            },
+            id: expect.any(String)
+        }, {
+            type: 'tool-call',
+            name: 'WebSearch',
+            callId: expect.any(String),
+            input: {
+                type: 'search',
+                query: 'Codex transcript format',
+                queries: ['Codex transcript format']
+            },
+            id: expect.any(String)
+        }, {
+            type: 'tool-call-result',
+            callId: expect.any(String),
+            output: null,
+            id: expect.any(String),
+            is_error: true
+        }, {
             type: 'message',
             message: 'visible assistant preface',
             id: expect.any(String)
@@ -562,6 +730,9 @@ describe('codexLocalLauncher', () => {
             output: null,
             id: 'plan-1:result'
         }]);
+        expect(agentMessages[9]).toMatchObject({
+            callId: (agentMessages[8] as { callId: string }).callId
+        });
     });
 
     it('replays a plan-only turn when the turn completes', async () => {
