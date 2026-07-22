@@ -10,6 +10,7 @@ import { useSessionTeamMemberships } from '@/hooks/queries/useSessionTeamMembers
 import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionGoalControl } from '@/components/SessionGoalControl'
+import { SessionTaskListControl } from '@/components/SessionTaskListControl'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { getSessionModelLabel } from '@/lib/sessionModelLabel'
@@ -323,7 +324,10 @@ export function SessionHeader(props: {
                         {pinIndex !== undefined && <span className="db-pinned__index-badge">{pinIndex}</span>}
                         <span className={`db-card__dot db-card__dot--${sessionStatus}`} />
                         <span className="db-pinned__compact-title">{title}</span>
-                        <span className={`db-card__agent db-card__agent--${agentFlavor}`}>{agentFlavor}</span>
+                        <span className="session-provider-tasks">
+                            <span className={`db-card__agent db-card__agent--${agentFlavor}`}>{agentFlavor}</span>
+                            <SessionTaskListControl todos={session.todos} compact />
+                        </span>
                         {teamMemberships.slice(0, 1).map((membership) => (
                             <span
                                 key={membership.participant.id}
@@ -503,9 +507,12 @@ export function SessionHeader(props: {
                             </div>
                         ) : null}
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--app-hint)]">
-                            <span className="inline-flex items-center gap-1">
-                                <span aria-hidden="true">❖</span>
-                                {session.metadata?.flavor?.trim() || 'unknown'}
+                            <span className="session-provider-tasks">
+                                <span className="inline-flex items-center gap-1">
+                                    <span aria-hidden="true">❖</span>
+                                    {session.metadata?.flavor?.trim() || 'unknown'}
+                                </span>
+                                <SessionTaskListControl todos={session.todos} />
                             </span>
                             {modelLabel ? (
                                 <span>
@@ -522,7 +529,6 @@ export function SessionHeader(props: {
                             ) : null}
                         </div>
                     </div>
-
 
                     <select
                         aria-label="Machine"

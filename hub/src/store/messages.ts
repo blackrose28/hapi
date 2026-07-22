@@ -14,6 +14,10 @@ type DbMessageRow = {
     invoked_at: number | null
 }
 
+export type AddMessageResult =
+    | { kind: 'inserted'; message: StoredMessage }
+    | { kind: 'duplicate'; message: StoredMessage }
+
 function toStoredMessage(row: DbMessageRow): StoredMessage {
     return {
         id: row.id,
@@ -31,7 +35,7 @@ export function addMessage(
     sessionId: string,
     content: unknown,
     localId?: string
-): StoredMessage {
+): AddMessageResult {
     const now = Date.now()
 
     if (localId) {
@@ -39,7 +43,7 @@ export function addMessage(
             'SELECT * FROM messages WHERE session_id = ? AND local_id = ? LIMIT 1'
         ).get(sessionId, localId) as DbMessageRow | undefined
         if (existing) {
-            return toStoredMessage(existing)
+            return { kind: 'duplicate', message: toStoredMessage(existing) }
         }
     }
 
@@ -76,7 +80,7 @@ export function addMessage(
     if (!row) {
         throw new Error('Failed to create message')
     }
-    return toStoredMessage(row)
+    return { kind: 'inserted', message: toStoredMessage(row) }
 }
 
 export function getMessages(

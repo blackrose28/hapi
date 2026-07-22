@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { CLAUDE_EFFORT_OPTIONS, MODEL_OPTIONS } from './types'
 
 describe('Claude model options', () => {
-    it('includes 1m model options in the expected order', () => {
+    it('derives Claude fallback options from shared presets', () => {
         expect(MODEL_OPTIONS.claude).toEqual([
             { value: 'auto', label: 'Default' },
-            { value: 'opus', label: 'Opus' },
-            { value: 'opus[1m]', label: 'Opus 1M' },
-            { value: 'sonnet', label: 'Sonnet' },
-            { value: 'sonnet[1m]', label: 'Sonnet 1M' },
+            ...CLAUDE_MODEL_PRESETS.map((model) => ({
+                value: model,
+                label: getClaudeModelLabel(model) ?? model
+            }))
         ])
     })
 

@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { SyntaxHighlighter } from '@/components/assistant-ui/shiki-highlighter'
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
 import { CopyIcon, CheckIcon } from '@/components/icons'
+import { MERMAID_LANGUAGE_COMPONENTS } from '@/components/assistant-ui/mermaid'
 
 import type { MarkdownTextPrimitiveProps } from '@assistant-ui/react-markdown'
 
@@ -233,6 +234,7 @@ export function MarkdownText() {
             remarkPlugins={MARKDOWN_PLUGINS}
             rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
             components={defaultComponents}
+            componentsByLanguage={MERMAID_LANGUAGE_COMPONENTS}
             className={cn('aui-md min-w-0 max-w-full break-words text-sm')}
         />
     )

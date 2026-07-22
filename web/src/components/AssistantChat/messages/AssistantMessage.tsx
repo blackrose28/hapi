@@ -1,37 +1,36 @@
 import { MessagePrimitive, useAssistantState } from '@assistant-ui/react'
 import { MarkdownText } from '@/components/assistant-ui/markdown-text'
 import { Reasoning, ReasoningGroup } from '@/components/assistant-ui/reasoning'
+import { CliOutputMessagePart } from '@/components/AssistantChat/messages/CliOutputMessagePart'
+import { ReasoningMessagePart } from '@/components/AssistantChat/messages/ReasoningMessagePart'
 import { HappyToolMessage } from '@/components/AssistantChat/messages/ToolMessage'
-import { CliOutputBlock } from '@/components/CliOutputBlock'
+import { ToolRunGroup } from '@/components/ToolCard/ToolRunGroup'
 import { CopyIcon, CheckIcon } from '@/components/icons'
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
-import type { HappyChatMessageMetadata } from '@/lib/assistant-runtime'
+import { CLI_OUTPUT_TOOL_NAME } from '@/lib/cliOutputPart'
+import { REASONING_TOOL_NAME } from '@/lib/reasoningPart'
 import { getAssistantCopyText } from '@/components/AssistantChat/messages/assistantCopyText'
 import { getConversationMessageAnchorId } from '@/chat/outline'
 
 const TOOL_COMPONENTS = {
-    Fallback: HappyToolMessage
+    Fallback: HappyToolMessage,
+    by_name: {
+        [CLI_OUTPUT_TOOL_NAME]: CliOutputMessagePart,
+        [REASONING_TOOL_NAME]: ReasoningMessagePart
+    }
 } as const
 
 const MESSAGE_PART_COMPONENTS = {
     Text: MarkdownText,
     Reasoning: Reasoning,
     ReasoningGroup: ReasoningGroup,
+    ToolGroup: ToolRunGroup,
     tools: TOOL_COMPONENTS
 } as const
 
 export function HappyAssistantMessage() {
     const { copied, copy } = useCopyToClipboard()
     const messageId = useAssistantState(({ message }) => message.id)
-    const isCliOutput = useAssistantState(({ message }) => {
-        const custom = message.metadata.custom as Partial<HappyChatMessageMetadata> | undefined
-        return custom?.kind === 'cli-output'
-    })
-    const cliText = useAssistantState(({ message }) => {
-        const custom = message.metadata.custom as Partial<HappyChatMessageMetadata> | undefined
-        if (custom?.kind !== 'cli-output') return ''
-        return message.content.find((part) => part.type === 'text')?.text ?? ''
-    })
     const toolOnly = useAssistantState(({ message }) => {
         if (message.role !== 'assistant') return false
         const parts = message.content
@@ -44,17 +43,6 @@ export function HappyAssistantMessage() {
     const rootClass = toolOnly
         ? 'py-1 min-w-0 max-w-full overflow-x-hidden'
         : 'px-1 min-w-0 max-w-full overflow-x-hidden'
-
-    if (isCliOutput) {
-        return (
-            <MessagePrimitive.Root
-                id={getConversationMessageAnchorId(messageId)}
-                className="scroll-mt-4 px-1 min-w-0 max-w-full overflow-x-hidden"
-            >
-                <CliOutputBlock text={cliText} />
-            </MessagePrimitive.Root>
-        )
-    }
 
     return (
         <MessagePrimitive.Root

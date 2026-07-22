@@ -65,7 +65,14 @@ vi.mock('@/lib/use-translation', () => ({
             const messages: Record<string, string> = {
                 'dialog.archive.description': 'Archive "{name}"? You can still find it in archived sessions.',
                 'dialog.archive.terminalImpact': 'Archiving will stop all running terminals in this session.',
-                'dialog.archive.terminalCount': 'Running terminals: {n}/{max}'
+                'dialog.archive.terminalCount': 'Running terminals: {n}/{max}',
+                'session.tasks.label': 'Tasks',
+                'session.tasks.trigger': 'Session tasks: {completed} of {total} completed',
+                'session.tasks.title': 'Session tasks',
+                'session.tasks.progress': '{completed} of {total} completed',
+                'session.tasks.status.pending': 'Pending',
+                'session.tasks.status.in_progress': 'In progress',
+                'session.tasks.status.completed': 'Completed'
             }
             let value = messages[key] ?? key
             for (const [param, replacement] of Object.entries(params ?? {})) {
@@ -185,6 +192,97 @@ describe('SessionHeader editor entry point', () => {
         render(<QueryClientProvider client={qc}><SessionHeader session={makeSession()} onBack={vi.fn()} api={null} onGoalCommand={vi.fn()} /></QueryClientProvider>)
 
         expect(screen.queryByRole('button', { name: 'Codex goal' })).not.toBeInTheDocument()
+    })
+
+    it('hides the session task control when the snapshot is empty', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        render(<QueryClientProvider client={qc}><SessionHeader session={makeSession({ todos: [] })} onBack={vi.fn()} api={null} /></QueryClientProvider>)
+
+        expect(screen.queryByRole('button', { name: /Session tasks:/ })).not.toBeInTheDocument()
+    })
+
+    it('shows the normal task counter and opens its dialog', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession({
+                        todos: [
+                            { id: '1', content: 'Done task', status: 'completed', priority: 'medium' },
+                            { id: '2', content: 'Current task', status: 'in_progress', priority: 'high' }
+                        ]
+                    })}
+                    onBack={vi.fn()}
+                    api={null}
+                />
+            </QueryClientProvider>
+        )
+
+        const trigger = screen.getByRole('button', { name: 'Session tasks: 1 of 2 completed' })
+        expect(trigger).not.toHaveTextContent('Tasks')
+        expect(trigger).toHaveTextContent('1/2')
+        expect(trigger.parentElement).toHaveClass('session-provider-tasks')
+        expect(trigger.parentElement).toHaveTextContent('codex')
+
+        fireEvent.click(trigger)
+
+        expect(screen.getByRole('dialog')).toHaveTextContent('Done task')
+        expect(screen.getByRole('dialog')).toHaveTextContent('Current task')
+    })
+
+    it('shows the compact task counter without the label and opens the same dialog', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession({
+                        todos: [
+                            { id: '1', content: 'Done task', status: 'completed', priority: 'medium' },
+                            { id: '2', content: 'Current task', status: 'in_progress', priority: 'high' }
+                        ]
+                    })}
+                    onBack={vi.fn()}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                />
+            </QueryClientProvider>
+        )
+
+        const trigger = screen.getByRole('button', { name: 'Session tasks: 1 of 2 completed' })
+        expect(trigger).toHaveTextContent('1/2')
+        expect(trigger).not.toHaveTextContent('Tasks')
+        expect(trigger.parentElement).toHaveClass('session-provider-tasks')
+        expect(trigger.parentElement).toHaveTextContent('codex')
+        expect(trigger.closest('.db-pinned__compact-actions')).toBeNull()
+
+        fireEvent.click(trigger)
+
+        expect(screen.getByRole('dialog')).toHaveTextContent('Done task')
+        expect(screen.getByRole('dialog')).toHaveTextContent('Current task')
+    })
+
+    it('does not focus the session when double-clicking the compact task control', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        const onFocusSession = vi.fn()
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession({
+                        todos: [{ id: '1', content: 'Task', status: 'pending', priority: 'medium' }]
+                    })}
+                    onBack={vi.fn()}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                    onFocusSession={onFocusSession}
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.doubleClick(screen.getByRole('button', { name: 'Session tasks: 0 of 1 completed' }))
+
+        expect(onFocusSession).not.toHaveBeenCalled()
     })
 
     it('shows the Codex goal button when a Codex session has goal state', () => {

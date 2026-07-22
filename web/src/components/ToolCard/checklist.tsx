@@ -77,6 +77,20 @@ export function extractUpdatePlanChecklist(input: unknown, result: unknown): Che
     return []
 }
 
+export function getChecklistProgress(items: ChecklistItem[]): {
+    completed: number
+    total: number
+    percent: number
+} {
+    const completed = items.filter((item) => item.status === 'completed').length
+    const total = items.length
+    return {
+        completed,
+        total,
+        percent: total === 0 ? 0 : Math.round((completed / total) * 100)
+    }
+}
+
 function checklistTone(item: ChecklistItem): string {
     if (item.status === 'completed') return 'text-emerald-600 line-through'
     if (item.status === 'in_progress') return 'text-[var(--app-link)]'
@@ -97,15 +111,15 @@ export function ChecklistList(props: { items: ChecklistItem[]; emptyLabel?: stri
     }
 
     return (
-        <div className="flex flex-col gap-1">
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {props.items.map((item, idx) => {
                 const text = item.text.trim().length > 0 ? item.text.trim() : '(empty)'
                 return (
-                    <div key={item.id ?? String(idx)} className={`text-sm ${checklistTone(item)}`}>
+                    <li key={item.id ?? String(idx)} className={`text-sm ${checklistTone(item)}`}>
                         {checklistIcon(item)} {text}
-                    </div>
+                    </li>
                 )
             })}
-        </div>
+        </ul>
     )
 }

@@ -61,12 +61,12 @@ function PermissionRowButton(props: {
     disabled: boolean
     onClick: () => void
 }) {
-    const base = 'flex w-full items-center justify-between rounded-md px-2 py-2 text-sm text-left transition-colors disabled:pointer-events-none disabled:opacity-50 hover:bg-[var(--app-subtle-bg)]'
+    const base = 'inline-flex min-h-10 min-w-[7rem] flex-1 items-center justify-center gap-2 rounded-full px-3.5 py-1.5 text-center text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]'
     const tone = props.tone === 'allow'
-        ? 'text-emerald-600'
+        ? 'border border-[var(--app-primary-action-bg)] bg-[var(--app-primary-action-bg)] text-[var(--app-primary-action-text)] hover:bg-[var(--app-primary-action-bg-hover)]'
         : props.tone === 'deny'
-            ? 'text-red-600'
-            : 'text-[var(--app-link)]'
+            ? 'border border-[var(--app-border)] bg-transparent text-[var(--app-badge-error-text)] hover:bg-[var(--app-subtle-bg)]'
+            : 'border border-[var(--app-border)] bg-[var(--app-secondary-bg)] text-[var(--app-fg)] hover:bg-[var(--app-subtle-bg)]'
 
     return (
         <button
@@ -76,7 +76,7 @@ function PermissionRowButton(props: {
             aria-busy={props.loading === true}
             onClick={props.onClick}
         >
-            <span className="flex-1">{props.label}</span>
+            <span>{props.label}</span>
             {props.loading ? (
                 <span className="ml-2 shrink-0">
                     <Spinner size="sm" label={null} className="text-current" />
@@ -194,7 +194,7 @@ export function PermissionFooter(props: {
         if (!permission.reason) return null
 
         return (
-            <div className="mt-2 text-xs text-red-600">
+            <div className="mt-2 text-xs text-[var(--app-badge-error-text)]">
                 {permission.reason}
             </div>
         )
@@ -205,12 +205,12 @@ export function PermissionFooter(props: {
             <div className="text-xs text-[var(--app-hint)]">{summary}</div>
 
             {error ? (
-                <div className="mt-2 text-xs text-red-600">
+                <div className="mt-2 text-xs text-[var(--app-badge-error-text)]">
                     {error}
                 </div>
             ) : null}
 
-            <div className="mt-2 flex flex-col gap-1">
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {codex ? (
                     <>
                         <PermissionRowButton

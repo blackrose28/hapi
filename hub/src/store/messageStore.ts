@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite'
 
 import type { StoredMessage } from './types'
 import { addMessage, getMessages, getMessagesAfter, getMessagesByPosition, getUninvokedLocalMessages, markMessagesInvoked, mergeSessionMessages } from './messages'
+import type { AddMessageResult } from './messages'
 
 export class MessageStore {
     private readonly db: Database
@@ -10,7 +11,7 @@ export class MessageStore {
         this.db = db
     }
 
-    addMessage(sessionId: string, content: unknown, localId?: string): StoredMessage {
+    addMessage(sessionId: string, content: unknown, localId?: string): AddMessageResult {
         return addMessage(this.db, sessionId, content, localId)
     }
 

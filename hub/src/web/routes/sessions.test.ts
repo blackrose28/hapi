@@ -54,6 +54,12 @@ function createApp(session: Session, opts?: {
     resumeSession?: (sessionId: string, namespace: string, resumeOpts?: { permissionMode?: string }) => Promise<{ type: string; sessionId?: string; message?: string; code?: string }>
     getTerminalLiveCount?: (sessionId: string, namespace: string) => number | undefined
     getUserCapability?: () => 'view' | 'interact' | 'spawn' | 'operate' | 'manage' | null
+    listAgentModelsForSession?: () => Promise<{
+        status: 'dynamic' | 'fallback' | 'unsupported' | 'failed'
+        models: Array<{ id: string; displayName: string }>
+        source: string
+        error?: string
+    }>
 }) {
     const applySessionConfigCalls: Array<[string, Record<string, unknown>]> = []
     const applySessionConfig = async (sessionId: string, config: Record<string, unknown>) => {
@@ -73,13 +79,22 @@ function createApp(session: Session, opts?: {
         ],
         currentModelId: 'ollama/exaone:4.5-33b-q8'
     })
+    const listAgentModelsForSession = opts?.listAgentModelsForSession ?? (async () => ({
+        status: 'dynamic' as const,
+        models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
+        source: 'gateway:example.test/v1'
+    }))
     const cacheCodexModelsForSessionCalls: Array<[string, unknown]> = []
     const cacheOpencodeModelsForSessionCalls: Array<[string, unknown]> = []
+    const cacheAgentModelsForSessionCalls: Array<[string, string, unknown]> = []
     const cacheCodexModelsForSession = (sessionId: string, result: unknown) => {
         cacheCodexModelsForSessionCalls.push([sessionId, result])
     }
     const cacheOpencodeModelsForSession = (sessionId: string, result: unknown) => {
         cacheOpencodeModelsForSessionCalls.push([sessionId, result])
+    }
+    const cacheAgentModelsForSession = (sessionId: string, agent: string, result: unknown) => {
+        cacheAgentModelsForSessionCalls.push([sessionId, agent, result])
     }
     const resumeSession = opts?.resumeSession ?? (async (sessionId: string) => ({ type: 'success', sessionId }))
     const engine = {
@@ -88,8 +103,10 @@ function createApp(session: Session, opts?: {
         applySessionConfig,
         listCodexModelsForSession,
         listOpencodeModelsForSession,
+        listAgentModelsForSession,
         cacheCodexModelsForSession,
         cacheOpencodeModelsForSession,
+        cacheAgentModelsForSession,
         resumeSession
     } as Partial<SyncEngine>
 
@@ -107,7 +124,13 @@ function createApp(session: Session, opts?: {
         getUserCapability: opts?.getUserCapability ?? (() => 'interact')
     }))
 
-    return { app, applySessionConfigCalls, cacheCodexModelsForSessionCalls, cacheOpencodeModelsForSessionCalls }
+    return {
+        app,
+        applySessionConfigCalls,
+        cacheCodexModelsForSessionCalls,
+        cacheOpencodeModelsForSessionCalls,
+        cacheAgentModelsForSessionCalls
+    }
 }
 
 describe('sessions routes', () => {
@@ -118,6 +141,90 @@ describe('sessions routes', () => {
 
         expect(await (await denied.app.request('/api/sessions')).json()).toEqual({ sessions: [] })
         expect((await readOnly.app.request('/api/sessions/archive-all', { method: 'POST' })).status).toBe(403)
+    })
+
+    it('returns and caches a generic model catalog for an active matching session', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'claude' }
+        })
+        const { app, cacheAgentModelsForSessionCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/models?agent=claude')
+        const expected = {
+            status: 'dynamic',
+            models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
+            source: 'gateway:example.test/v1'
+        }
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual(expected)
+        expect(cacheAgentModelsForSessionCalls).toEqual([
+            ['session-1', 'claude', expected]
+        ])
+    })
+
+    it('returns the cached catalog for an inactive matching session', async () => {
+        const session = createSession({
+            active: false,
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'claude',
+                cachedAgentModels: {
+                    agent: 'claude',
+                    status: 'dynamic',
+                    models: [{ id: 'claude-cached', displayName: 'Claude Cached' }],
+                    source: 'gateway:cached.test/v1',
+                    cachedAt: 123
+                }
+            }
+        })
+        const { app, cacheAgentModelsForSessionCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/models?agent=claude')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            status: 'dynamic',
+            models: [{ id: 'claude-cached', displayName: 'Claude Cached' }],
+            source: 'gateway:cached.test/v1'
+        })
+        expect(cacheAgentModelsForSessionCalls).toEqual([])
+    })
+
+    it('does not replace a good cache with a transient failed catalog', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'claude' }
+        })
+        const { app, cacheAgentModelsForSessionCalls } = createApp(session, {
+            listAgentModelsForSession: async () => ({
+                status: 'failed',
+                models: [{ id: 'sonnet', displayName: 'Sonnet' }],
+                source: 'gateway:example.test/v1',
+                error: 'Agent model discovery failed'
+            })
+        })
+
+        const response = await app.request('/api/sessions/session-1/models?agent=claude')
+
+        expect(response.status).toBe(200)
+        expect((await response.json() as { status: string }).status).toBe('failed')
+        expect(cacheAgentModelsForSessionCalls).toEqual([])
+    })
+
+    it('rejects flavor mismatch and inactive cache miss', async () => {
+        const { app: mismatchApp } = createApp(createSession())
+        const mismatch = await mismatchApp.request('/api/sessions/session-1/models?agent=claude')
+        expect(mismatch.status).toBe(400)
+
+        const inactive = createSession({
+            active: false,
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'claude' }
+        })
+        const { app: inactiveApp } = createApp(inactive)
+        const cacheMiss = await inactiveApp.request('/api/sessions/session-1/models?agent=claude')
+        expect(cacheMiss.status).toBe(404)
+        expect(await cacheMiss.json()).toEqual({ error: 'No cached agent models available for this session' })
     })
 
     it('includes known namespace-scoped live terminal count in session summaries', async () => {

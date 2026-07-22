@@ -3,7 +3,7 @@ import type { CodexCollaborationMode, PermissionMode, Session } from '@hapi/prot
 import type { Store } from '../store'
 import { clampAliveTime } from './aliveTime'
 import { EventPublisher } from './eventPublisher'
-import { extractTodoWriteTodosFromMessageContent, TodosSchema } from './todos'
+import { replaySessionTodos, TodosSchema } from './todos'
 import { extractBackgroundTaskDelta } from './backgroundTasks'
 
 const QUEUED_MESSAGE_THINKING_GRACE_MS = 15_000
@@ -89,17 +89,19 @@ export class SessionCache {
 
         if (stored.todos === null && !this.todoBackfillAttemptedSessionIds.has(sessionId)) {
             this.todoBackfillAttemptedSessionIds.add(sessionId)
-            const messages = this.store.messages.getMessages(sessionId, 200)
-            for (let i = messages.length - 1; i >= 0; i -= 1) {
-                const message = messages[i]
-                const todos = extractTodoWriteTodosFromMessageContent(message.content)
-                if (todos) {
-                    const updated = this.store.sessions.setSessionTodos(sessionId, todos, message.createdAt, stored.namespace)
-                    if (updated) {
-                        stored = this.store.sessions.getSession(sessionId) ?? stored
-                    }
-                    break
+            const replay = replaySessionTodos(this.store.messages.getMessages(sessionId, 200))
+            if (replay) {
+                for (const issue of replay.issues) {
+                    console.warn(`Ignored backfill todo update: ${issue.reason}`)
                 }
+                const result = this.store.sessions.setSessionTodos(
+                    sessionId,
+                    replay.todos,
+                    replay.updatedAt,
+                    stored.namespace
+                )
+                if (result === 'applied') stored = this.store.sessions.getSession(sessionId) ?? stored
+                if (result === 'error') console.warn(`Failed to backfill session todos for ${sessionId}`)
             }
         }
 
@@ -636,12 +638,15 @@ export class SessionCache {
         }
 
         if (oldStored.todos !== null && oldStored.todosUpdatedAt !== null) {
-            this.store.sessions.setSessionTodos(
+            const result = this.store.sessions.setSessionTodos(
                 newSessionId,
                 oldStored.todos,
                 oldStored.todosUpdatedAt,
                 namespace
             )
+            if (result === 'error') {
+                console.warn(`Failed to preserve session todos during merge into ${newSessionId}`)
+            }
         }
 
         // Merge agentState: union requests/completedRequests from both sessions so pending

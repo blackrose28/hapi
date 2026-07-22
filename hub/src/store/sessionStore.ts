@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite'
 
 import type { StoredSession, VersionedUpdateResult } from './types'
+import type { SetSessionTodosResult } from './sessions'
 import {
     deleteSession,
     getOrCreateSession,
@@ -56,7 +57,7 @@ export class SessionStore {
         return updateSessionAgentState(this.db, id, agentState, expectedVersion, namespace)
     }
 
-    setSessionTodos(id: string, todos: unknown, todosUpdatedAt: number, namespace: string): boolean {
+    setSessionTodos(id: string, todos: unknown, todosUpdatedAt: number, namespace: string): SetSessionTodosResult {
         return setSessionTodos(this.db, id, todos, todosUpdatedAt, namespace)
     }
 

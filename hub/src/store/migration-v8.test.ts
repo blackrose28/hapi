@@ -5,6 +5,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Store } from './index'
 
+function addStoredMessage(store: Store, sessionId: string, content: unknown, localId?: string) {
+    const result = store.messages.addMessage(sessionId, content, localId)
+    expect(result.kind).toBe('inserted')
+    return result.message
+}
+
 /**
  * Tests for V7→V8 schema migration: adding invoked_at column to messages table.
  * All migration tests open a real Store to exercise the actual migration code path.
@@ -151,8 +157,8 @@ describe('Store V7→V8 migration: invoked_at column', () => {
     it('markMessagesInvoked sets invoked_at on matching messages', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const msg1 = store.messages.addMessage(session.id, 'hello', 'local-1')
-        const msg2 = store.messages.addMessage(session.id, 'world', 'local-2')
+        const msg1 = addStoredMessage(store, session.id, 'hello', 'local-1')
+        const msg2 = addStoredMessage(store, session.id, 'world', 'local-2')
 
         // Initially both have invokedAt = null (new messages added to fresh V8 DB)
         expect(store.messages.getMessages(session.id).map(m => m.invokedAt)).toEqual([null, null])
@@ -187,21 +193,21 @@ describe('Store V7→V8 migration: invoked_at column', () => {
     it('addMessage with localId leaves invoked_at NULL (ack path is messages-consumed)', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const msg = store.messages.addMessage(session.id, 'content', 'local-1')
+        const msg = addStoredMessage(store, session.id, 'content', 'local-1')
         expect(msg.invokedAt).toBeNull()
     })
 
     it('addMessage without localId sets invoked_at = created_at (no ack path)', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const msg = store.messages.addMessage(session.id, 'content')
+        const msg = addStoredMessage(store, session.id, 'content')
         expect(msg.invokedAt).toBe(msg.createdAt)
     })
 
     it('getUninvokedLocalMessages returns rows with localId and null invoked_at', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const queued = store.messages.addMessage(session.id, 'q', 'local-q')
+        const queued = addStoredMessage(store, session.id, 'q', 'local-q')
         store.messages.addMessage(session.id, 'no-localid')          // invoked_at = createdAt, excluded
         store.messages.addMessage(session.id, 'invoked', 'local-i')
         store.messages.markMessagesInvoked(session.id, ['local-i'], Date.now())
@@ -214,7 +220,7 @@ describe('Store V7→V8 migration: invoked_at column', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
         store.messages.addMessage(session.id, 'plain')                                // invoked_at set
-        const sent = store.messages.addMessage(session.id, 'sent', 'local-s')
+        const sent = addStoredMessage(store, session.id, 'sent', 'local-s')
         store.messages.markMessagesInvoked(session.id, ['local-s'], Date.now())
         expect(sent.invokedAt).toBeNull()  // value at insert; row has been updated since
         expect(store.messages.getUninvokedLocalMessages(session.id)).toEqual([])
@@ -258,9 +264,9 @@ describe('Store V8 byPosition pagination', () => {
     it('getMessagesByPosition returns messages in ascending order', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const msg1 = store.messages.addMessage(session.id, 'a', 'loc-1')
-        const msg2 = store.messages.addMessage(session.id, 'b', 'loc-2')
-        const msg3 = store.messages.addMessage(session.id, 'c', 'loc-3')
+        const msg1 = addStoredMessage(store, session.id, 'a', 'loc-1')
+        const msg2 = addStoredMessage(store, session.id, 'b', 'loc-2')
+        const msg3 = addStoredMessage(store, session.id, 'c', 'loc-3')
         // All start with null invokedAt; set different invokedAt values
         store.messages.markMessagesInvoked(session.id, ['loc-1'], 1000)
         store.messages.markMessagesInvoked(session.id, ['loc-2'], 2000)
@@ -274,9 +280,9 @@ describe('Store V8 byPosition pagination', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
         // Insert 3 messages: msg1 has low seq but high invokedAt (queued message that was consumed late)
-        const msg1 = store.messages.addMessage(session.id, 'queued', 'loc-q')
-        const msg2 = store.messages.addMessage(session.id, 'normal-1')  // no localId → invokedAt = createdAt
-        const msg3 = store.messages.addMessage(session.id, 'normal-2')  // no localId → invokedAt = createdAt
+        const msg1 = addStoredMessage(store, session.id, 'queued', 'loc-q')
+        const msg2 = addStoredMessage(store, session.id, 'normal-1')  // no localId → invokedAt = createdAt
+        const msg3 = addStoredMessage(store, session.id, 'normal-2')  // no localId → invokedAt = createdAt
 
         // Simulate: msg1 (seq=1) is invoked much later than msg2 and msg3
         store.messages.markMessagesInvoked(session.id, ['loc-q'], msg3.createdAt + 10_000)
@@ -293,7 +299,7 @@ describe('Store V8 byPosition pagination', () => {
         // Add 5 messages with distinct invokedAt timestamps
         const messages = []
         for (let i = 0; i < 5; i++) {
-            const msg = store.messages.addMessage(session.id, `msg-${i}`)
+            const msg = addStoredMessage(store, session.id, `msg-${i}`)
             messages.push(msg)
         }
 
@@ -329,7 +335,7 @@ describe('Store V8 byPosition pagination', () => {
             store.messages.addMessage(session.id, `normal-${i}`)
         }
         // Insert a queued message (low seq, but invoked much later)
-        const queued = store.messages.addMessage(session.id, 'queued', 'loc-q')
+        const queued = addStoredMessage(store, session.id, 'queued', 'loc-q')
         store.messages.markMessagesInvoked(session.id, ['loc-q'], Date.now() + 1_000_000)
 
         // The queued message should appear in first page (highest position_at)
@@ -409,7 +415,7 @@ describe('Store V8 byPosition pagination', () => {
 
         // Queued message lands first → low createdAt; invoked_at stays NULL,
         // so its position_at = createdAt (the lowest in the session).
-        const queued = store.messages.addMessage(session.id, 'queued', 'local-q')
+        const queued = addStoredMessage(store, session.id, 'queued', 'local-q')
 
         // Add enough later (auto-invoked) messages to push the queued row out
         // of a 3-row latest page.
@@ -433,9 +439,9 @@ describe('Store V8 byPosition pagination', () => {
     it('getMessagesByPosition ascending order: pageRows[0] is the oldest in the page', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const m1 = store.messages.addMessage(session.id, 'm1')
-        const m2 = store.messages.addMessage(session.id, 'm2')
-        const m3 = store.messages.addMessage(session.id, 'm3')
+        const m1 = addStoredMessage(store, session.id, 'm1')
+        const m2 = addStoredMessage(store, session.id, 'm2')
+        const m3 = addStoredMessage(store, session.id, 'm3')
 
         const page = store.messages.getMessagesByPosition(session.id, 10)
         expect(page).toHaveLength(3)

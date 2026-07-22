@@ -69,6 +69,39 @@ describe('SDKToLogConverter', () => {
             expect(logMessage?.type).toBe('user')
             expect((logMessage as any).message.content).toHaveLength(2)
         })
+
+        it('preserves the SDK structured tool_use_result beside human-readable tool result text', () => {
+            const structuredResult = {
+                task: { id: '42', subject: 'Implement session tasks' }
+            }
+            const sdkMessage: SDKUserMessage = {
+                type: 'user',
+                tool_use_result: structuredResult,
+                message: {
+                    role: 'user',
+                    content: [{
+                        type: 'tool_result',
+                        tool_use_id: 'task-create-1',
+                        content: 'Task #42 created successfully'
+                    }]
+                }
+            }
+
+            const logMessage = converter.convert(sdkMessage)
+
+            expect(logMessage).toMatchObject({
+                type: 'user',
+                toolUseResult: structuredResult,
+                message: {
+                    role: 'user',
+                    content: [{
+                        type: 'tool_result',
+                        tool_use_id: 'task-create-1',
+                        content: 'Task #42 created successfully'
+                    }]
+                }
+            })
+        })
     })
 
     describe('Assistant messages', () => {

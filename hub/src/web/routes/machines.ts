@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { isKnownFlavor } from '@hapi/protocol'
 import type { SyncEngine } from '../../sync/syncEngine'
 import type { WebAppEnv } from '../middleware/auth'
 import { requireMachine, requireCapability, type RestCapabilityResolver } from './guards'
@@ -148,6 +149,31 @@ export function createMachinesRoutes(
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to list Codex models'
             }, 500)
+        }
+    })
+
+    app.get('/machines/:id/models', async (c) => {
+        const engine = getSyncEngine()
+        if (!engine) {
+            return c.json({ error: 'Not connected' }, 503)
+        }
+
+        const machineId = c.req.param('id')
+        const machine = requireMachine(c, engine, machineId)
+        if (machine instanceof Response) {
+            return machine
+        }
+
+        const agent = c.req.query('agent')
+        if (!isKnownFlavor(agent)) {
+            return c.json({ error: 'Invalid agent' }, 400)
+        }
+        const cwd = c.req.query('cwd')?.trim() || undefined
+
+        try {
+            return c.json(await engine.listAgentModelsForMachine(machineId, agent, cwd))
+        } catch {
+            return c.json({ error: 'Failed to list agent models' }, 500)
         }
     })
 

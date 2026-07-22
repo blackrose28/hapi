@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/types'
 import type { Store, StoredSession } from '../../../store'
 import type { SyncEvent } from '../../../sync/syncEngine'
-import { extractTodoWriteTodosFromMessageContent } from '../../../sync/todos'
+import { extractSessionTodoUpdates, reduceSessionTodos, TodosSchema } from '../../../sync/todos'
 import { extractTeamStateFromMessageContent, applyTeamStateDelta } from '../../../sync/teams'
 import { extractBackgroundTaskDelta } from '../../../sync/backgroundTasks'
 import { shouldRecordSessionActivity } from '../../../sync/sessionActivity'
@@ -125,7 +125,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
         const { sid, localId } = parsed.data
         const raw = parsed.data.message
 
-        const content = typeof raw === 'string'
+        const incomingContent = typeof raw === 'string'
             ? (() => {
                 try {
                     return JSON.parse(raw) as unknown
@@ -142,16 +142,41 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
         }
         const session = sessionAccess.value
 
-        const msg = store.messages.addMessage(sid, content, localId)
+        const addResult = store.messages.addMessage(sid, incomingContent, localId)
+        if (addResult.kind === 'duplicate') return
+        const msg = addResult.message
+        const content = msg.content
         if (shouldRecordSessionActivity(content)) {
             onSessionActivity?.(sid, msg.createdAt)
         }
 
-        const todos = extractTodoWriteTodosFromMessageContent(content)
-        if (todos) {
-            const updated = store.sessions.setSessionTodos(sid, todos, msg.createdAt, session.namespace)
-            if (updated) {
-                onWebappEvent?.({ type: 'session-updated', sessionId: sid, data: { sid } })
+        const recentMessageContents = store.messages
+            .getMessages(sid, 200, msg.seq)
+            .map((message) => message.content)
+        const extraction = extractSessionTodoUpdates(content, recentMessageContents)
+        for (const issue of extraction.issues) {
+            console.warn(`Ignored ${issue.source} session todo update: ${issue.reason}`)
+        }
+
+        if (extraction.updates.length > 0) {
+            const latest = store.sessions.getSession(sid)
+            const currentTodos = latest?.todos === null
+                ? null
+                : (() => {
+                    const parsedTodos = TodosSchema.safeParse(latest?.todos)
+                    return parsedTodos.success ? parsedTodos.data : null
+                })()
+            const reduction = reduceSessionTodos(currentTodos, extraction.updates)
+            if (reduction.kind === 'rejected') {
+                console.warn(`Ignored invalid session todo reduction: ${reduction.reason}`)
+            } else if (reduction.kind === 'changed') {
+                const updatedAt = Math.max(msg.createdAt, (latest?.todosUpdatedAt ?? msg.createdAt - 1) + 1)
+                const result = store.sessions.setSessionTodos(sid, reduction.todos, updatedAt, session.namespace)
+                if (result === 'applied') {
+                    onWebappEvent?.({ type: 'session-updated', sessionId: sid, data: { sid } })
+                } else if (result === 'error') {
+                    console.warn(`Failed to persist session todos for ${sid}`)
+                }
             }
         }
 

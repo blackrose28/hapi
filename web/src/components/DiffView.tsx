@@ -10,6 +10,7 @@ export function DiffView(props: {
     newString: string
     filePath?: string
     variant?: 'preview' | 'inline'
+    overflowMode?: 'contained' | 'parent-scroll'
 }) {
     const { t } = useTranslation()
     const variant = props.variant ?? 'preview'
@@ -31,6 +32,7 @@ export function DiffView(props: {
             oldString={props.oldString}
             newString={props.newString}
             filePath={props.filePath}
+            overflowMode={props.overflowMode ?? 'contained'}
         />
     )
 
@@ -89,18 +91,23 @@ function DiffInlineView(props: {
     oldString: string
     newString: string
     filePath?: string
+    overflowMode: 'contained' | 'parent-scroll'
 }) {
     const diff = useMemo(() => diffLines(props.oldString, props.newString), [props.oldString, props.newString])
+    const parentScroll = props.overflowMode === 'parent-scroll'
 
     return (
-        <div className="overflow-hidden rounded-md border border-[var(--app-border)] bg-[var(--app-subtle-bg)]">
+        <div className={cn(
+            'rounded-md border border-[var(--app-border)] bg-[var(--app-subtle-bg)]',
+            parentScroll ? 'overflow-visible' : 'overflow-hidden'
+        )}>
             {props.filePath ? (
                 <div className="border-b border-[var(--app-border)] bg-[var(--app-subtle-bg)] px-2 py-1 text-xs text-[var(--app-hint)] truncate">
                     {props.filePath}
                 </div>
             ) : null}
 
-            <div className="font-mono text-xs">
+            <div className={cn('font-mono text-xs', parentScroll && 'min-w-max')}>
                 {diff.map((part, i) => {
                     const lines = part.value.split('\n')
                     if (lines.length > 0 && lines[lines.length - 1] === '') {
@@ -116,7 +123,10 @@ function DiffInlineView(props: {
                     return (
                         <div key={i} className={className}>
                             {lines.map((line, j) => (
-                                <div key={j} className="whitespace-pre-wrap px-2">
+                                <div
+                                    key={j}
+                                    className={cn(parentScroll ? 'whitespace-pre' : 'whitespace-pre-wrap', 'px-2')}
+                                >
                                     {prefix} {line}
                                 </div>
                             ))}

@@ -5,6 +5,7 @@ import type {
     SyncEvent as ProtocolSyncEvent,
     WorktreeMetadata
 } from '@hapi/protocol/types'
+import type { AgentModelCatalogResult } from '@hapi/protocol'
 
 export type {
     AgentState,
@@ -162,6 +163,8 @@ export type TeamMessagesResponse = {
 }
 
 export type MachinesResponse = { machines: Machine[] }
+export type { AgentModelCatalogResult } from '@hapi/protocol'
+export type AgentModelsResponse = AgentModelCatalogResult
 export type MachinePathsExistsResponse = { exists: Record<string, boolean> }
 
 export type MachineDirectoryEntry = {

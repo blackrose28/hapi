@@ -70,6 +70,81 @@ describe('machines routes', () => {
         expect(await response.json()).toEqual({ error: 'Machine not found' })
     })
 
+    it('forwards a generic Claude model catalog request for an online machine', async () => {
+        const machine = createMachine()
+        const calls: Array<{ machineId: string; agent: string; cwd?: string }> = []
+        const engine = {
+            getMachine: () => machine,
+            listAgentModelsForMachine: async (machineId: string, agent: string, cwd?: string) => {
+                calls.push({ machineId, agent, cwd })
+                return {
+                    status: 'dynamic' as const,
+                    models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
+                    source: 'gateway:example.test/v1'
+                }
+            }
+        } as Partial<SyncEngine>
+
+        const app = new Hono<WebAppEnv>()
+        app.use('*', async (c, next) => {
+            c.set('organizationId', 'default')
+            await next()
+        })
+        app.route('/api', createMachinesRoutes(() => engine as SyncEngine, allowAllCapabilities))
+
+        const response = await app.request('/api/machines/machine-1/models?agent=claude&cwd=%2Frepo')
+
+        expect(response.status).toBe(200)
+        expect(calls).toEqual([{ machineId: 'machine-1', agent: 'claude', cwd: '/repo' }])
+        expect(await response.json()).toEqual({
+            status: 'dynamic',
+            models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
+            source: 'gateway:example.test/v1'
+        })
+    })
+
+    it.each([
+        ['/api/machines/machine-1/models', 'missing'],
+        ['/api/machines/machine-1/models?agent=unknown', 'invalid']
+    ])('rejects a %s agent query', async (url) => {
+        const machine = createMachine()
+        const engine = {
+            getMachine: () => machine
+        } as Partial<SyncEngine>
+        const app = new Hono<WebAppEnv>()
+        app.use('*', async (c, next) => {
+            c.set('organizationId', 'default')
+            await next()
+        })
+        app.route('/api', createMachinesRoutes(() => engine as SyncEngine, allowAllCapabilities))
+
+        const response = await app.request(url)
+
+        expect(response.status).toBe(400)
+        expect(await response.json()).toEqual({ error: 'Invalid agent' })
+    })
+
+    it('sanitizes generic model RPC failures', async () => {
+        const machine = createMachine()
+        const engine = {
+            getMachine: () => machine,
+            listAgentModelsForMachine: async () => {
+                throw new Error('secret-token')
+            }
+        } as Partial<SyncEngine>
+        const app = new Hono<WebAppEnv>()
+        app.use('*', async (c, next) => {
+            c.set('organizationId', 'default')
+            await next()
+        })
+        app.route('/api', createMachinesRoutes(() => engine as SyncEngine, allowAllCapabilities))
+
+        const response = await app.request('/api/machines/machine-1/models?agent=claude')
+
+        expect(response.status).toBe(500)
+        expect(await response.json()).toEqual({ error: 'Failed to list agent models' })
+    })
+
     it('returns Codex models for an online machine', async () => {
         const machine = createMachine()
         const engine = {

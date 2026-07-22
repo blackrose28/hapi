@@ -25,4 +25,8 @@ describe('mobile dashboard CSS', () => {
         expect(dashboardCss).toMatch(/@media \(min-width: 768px\)[\s\S]*\.db-pinned--compact\s+\.aui-md\s*\{[\s\S]*font-size:\s*0\.8125rem\s*!important;/)
         expect(dashboardCss).toMatch(/@media \(min-width: 768px\)[\s\S]*\.db-pinned--compact\s+\.aui-md\s*\{[\s\S]*line-height:\s*1\.15rem\s*!important;/)
     })
+
+    it('does not style the task badge as an icon action', () => {
+        expect(dashboardCss).not.toContain('.db-pinned__compact-action--tasks')
+    })
 })

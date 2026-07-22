@@ -11,6 +11,7 @@ import { truncate } from '@/lib/toolInputUtils'
 export function formatTaskChildLabel(
     child: ToolCallBlock,
     metadata: SessionMetadataSummary | null,
+    t?: (key: string, params?: Record<string, string | number>) => string,
 ): string {
     const presentation = getToolPresentation({
         toolName: child.tool.name,
@@ -19,6 +20,7 @@ export function formatTaskChildLabel(
         childrenCount: child.children.length,
         description: child.tool.description,
         metadata,
+        t,
     })
 
     if (presentation.subtitle) {
@@ -38,5 +40,5 @@ export function TaskStateIcon(props: { state: ToolCallBlock['tool']['state'] }):
     if (props.state === 'pending') {
         return <span className="text-amber-600">🔐</span>
     }
-    return <span className="text-amber-600 animate-pulse">●</span>
+    return <span className="text-amber-600 animate-pulse motion-reduce:animate-none">●</span>
 }

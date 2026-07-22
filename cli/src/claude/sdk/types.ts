@@ -17,6 +17,7 @@ export interface SDKMessage {
 export interface SDKUserMessage extends SDKMessage {
     type: 'user'
     parent_tool_use_id?: string
+    tool_use_result?: unknown
     message: {
         role: 'user'
         content: string | Array<{

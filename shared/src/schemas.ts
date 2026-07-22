@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CachedAgentModelCatalogSchema } from './agentModels'
 import { CODEX_COLLABORATION_MODES, PERMISSION_MODES } from './modes'
 
 export const PermissionModeSchema = z.enum(PERMISSION_MODES)
@@ -74,6 +75,7 @@ export const MetadataSchema = z.object({
     flavor: z.string().nullish(),
     worktree: WorktreeMetadataSchema.optional(),
     lastUserRequest: z.string().optional(),
+    cachedAgentModels: CachedAgentModelCatalogSchema.optional(),
     cachedCodexModels: CachedCodexModelsSchema.optional(),
     cachedOpencodeModels: CachedOpencodeModelsSchema.optional()
 })

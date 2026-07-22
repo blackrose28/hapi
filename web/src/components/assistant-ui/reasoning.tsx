@@ -1,7 +1,8 @@
-import { useState, useEffect, type FC, type PropsWithChildren } from 'react'
+import { useEffect, useId, useState, type FC, type PropsWithChildren, type ReactNode } from 'react'
 import { useMessage } from '@assistant-ui/react'
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/use-translation'
 import { defaultComponents, MARKDOWN_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from '@/components/assistant-ui/markdown-text'
 
 function ChevronIcon(props: { className?: string; open?: boolean }) {
@@ -16,8 +17,10 @@ function ChevronIcon(props: { className?: string; open?: boolean }) {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
             className={cn(
-                'transition-transform duration-200',
+                'transition-transform duration-200 motion-reduce:transition-none',
                 props.open ? 'rotate-90' : '',
                 props.className
             )}
@@ -29,7 +32,10 @@ function ChevronIcon(props: { className?: string; open?: boolean }) {
 
 function ShimmerDot() {
     return (
-        <span className="inline-block w-1.5 h-1.5 bg-current rounded-full animate-pulse" />
+        <span
+            aria-hidden="true"
+            className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-pulse motion-reduce:animate-none"
+        />
     )
 }
 
@@ -47,12 +53,108 @@ export const Reasoning: FC = () => {
     )
 }
 
+type ReasoningDisclosureProps = {
+    label: string
+    ariaLabel: string
+    isStreaming: boolean
+    presentation?: 'standalone' | 'group-row'
+    duration?: string
+    durationAriaLabel?: string
+    statusLabel?: string
+    children: ReactNode
+}
+
+export function ReasoningDisclosure(props: ReasoningDisclosureProps) {
+    const [isOpen, setIsOpen] = useState(false)
+    const contentId = useId()
+    const durationDescriptionId = useId()
+    const groupRow = props.presentation === 'group-row'
+    const describedBy = props.duration && props.durationAriaLabel
+        ? durationDescriptionId
+        : undefined
+
+    useEffect(() => {
+        if (props.isStreaming) {
+            setIsOpen(true)
+        }
+    }, [props.isStreaming])
+
+    return (
+        <div
+            data-reasoning-layout={groupRow ? 'group-row' : 'standalone'}
+            className={cn(
+                'aui-reasoning-group',
+                groupRow ? 'w-full' : 'my-1'
+            )}
+        >
+            <button
+                type="button"
+                data-running={groupRow ? (props.isStreaming ? 'true' : 'false') : undefined}
+                aria-expanded={isOpen}
+                aria-controls={contentId}
+                aria-label={props.ariaLabel}
+                aria-describedby={describedBy}
+                onClick={() => setIsOpen((value) => !value)}
+                className={cn(
+                    'cursor-pointer select-none items-center gap-1.5 rounded-[11px] px-2 text-xs font-medium text-[var(--app-hint)] transition-colors hover:text-[var(--app-fg)] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]',
+                    groupRow ? 'activity-row flex min-h-[37px] w-full text-left' : 'inline-flex min-h-8'
+                )}
+            >
+                <ChevronIcon open={isOpen} />
+                <span className={cn(groupRow && 'min-w-0 flex-1 truncate')}>{props.label}</span>
+                {props.duration ? (
+                    <>
+                        <span
+                            aria-hidden="true"
+                            className="shrink-0 font-mono text-[10px] text-[var(--app-hint)]"
+                        >
+                            {props.duration}
+                        </span>
+                        {props.durationAriaLabel ? (
+                            <span id={durationDescriptionId} className="sr-only">
+                                {props.durationAriaLabel}
+                            </span>
+                        ) : null}
+                    </>
+                ) : null}
+                {groupRow && props.statusLabel ? (
+                    <span
+                        role="status"
+                        aria-label={props.statusLabel}
+                        className={cn(
+                            'shrink-0',
+                            props.isStreaming ? 'text-[var(--app-hint)]' : 'text-emerald-600'
+                        )}
+                    >
+                        {props.isStreaming ? <ShimmerDot /> : <span aria-hidden="true">✓</span>}
+                        <span className="sr-only">{props.statusLabel}</span>
+                    </span>
+                ) : props.isStreaming ? <ShimmerDot /> : null}
+            </button>
+
+            <div
+                id={contentId}
+                hidden={!isOpen}
+                data-reasoning-body
+                className={cn(
+                    'transition-opacity duration-200 motion-reduce:transition-none',
+                    isOpen ? 'opacity-100' : 'opacity-0'
+                )}
+            >
+                <div className={cn(groupRow ? 'px-6 pb-2 pt-1' : 'pl-4 pt-1')}>
+                    {props.children}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 /**
  * Wraps consecutive reasoning parts in a collapsible container.
  * Shows shimmer effect while reasoning is streaming.
  */
 export const ReasoningGroup: FC<PropsWithChildren> = ({ children }) => {
-    const [isOpen, setIsOpen] = useState(false)
+    const { t } = useTranslation()
 
     // Check if reasoning is still streaming
     const message = useMessage()
@@ -60,43 +162,13 @@ export const ReasoningGroup: FC<PropsWithChildren> = ({ children }) => {
         && message.content.length > 0
         && message.content[message.content.length - 1]?.type === 'reasoning'
 
-    // Auto-expand while streaming
-    useEffect(() => {
-        if (isStreaming) {
-            setIsOpen(true)
-        }
-    }, [isStreaming])
-
     return (
-        <div className="aui-reasoning-group my-2">
-            <button
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className={cn(
-                    'flex items-center gap-1.5 text-xs font-medium',
-                    'text-[var(--app-hint)] hover:text-[var(--app-fg)]',
-                    'transition-colors cursor-pointer select-none'
-                )}
-            >
-                <ChevronIcon open={isOpen} />
-                <span>Reasoning</span>
-                {isStreaming && (
-                    <span className="flex items-center gap-1 ml-1 text-[var(--app-hint)]">
-                        <ShimmerDot />
-                    </span>
-                )}
-            </button>
-
-            <div
-                className={cn(
-                    'overflow-hidden transition-all duration-200 ease-in-out',
-                    isOpen ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'
-                )}
-            >
-                <div className="pl-4 pt-2 border-l-2 border-[var(--app-border)] ml-0.5">
-                    {children}
-                </div>
-            </div>
-        </div>
+        <ReasoningDisclosure
+            label={t('tool.title.reasoning')}
+            ariaLabel={isStreaming ? t('reasoning.streaming') : t('reasoning.toggle')}
+            isStreaming={isStreaming}
+        >
+            {children}
+        </ReasoningDisclosure>
     )
 }

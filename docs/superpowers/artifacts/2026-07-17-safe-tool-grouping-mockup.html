@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Safe tool grouping — approved mockup</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f6f7f9;color:#20242b;font-family:Inter,ui-sans-serif,system-ui,sans-serif}.page{max-width:920px;margin:auto;padding:32px 20px}.label{margin:24px 0 8px;color:#7b8492;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.chat{width:100%;max-width:600px}.reason{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:2px 3px;border:0;border-radius:5px;background:transparent;color:#6d7684;font-size:12px;font-weight:600;cursor:pointer}.reason:hover{background:#eceff3;color:#20242b}.reason-body{padding:3px 3px 8px 19px;color:#66707e;font-size:12px;line-height:1.55}.answer{padding:3px;font-size:14px;line-height:1.6}.tool-group{margin:10px 0;border:1px solid #d8dde5;border-radius:10px;background:#fff;overflow:hidden}.tool-group>summary{display:flex;align-items:center;gap:9px;min-height:42px;padding:0 12px;cursor:pointer;list-style:none}.tool-group>summary::-webkit-details-marker{display:none}.tool-group>summary:before{content:'›';color:#7b8492;font-size:16px}.tool-group[open]>summary:before{transform:rotate(90deg)}.tool-group>summary b{font-size:12px}.badge{padding:2px 6px;border-radius:999px;background:#eef1f4;color:#707987;font-size:11px;white-space:nowrap}.summary{min-width:0;flex:1;overflow:hidden;color:#737c89;font:11px ui-monospace,SFMono-Regular,monospace;text-overflow:ellipsis;white-space:nowrap}.status{width:8px;height:8px;border-radius:50%;background:#36b874}.rows{padding:5px 8px 8px;border-top:1px solid #e1e5eb}.row{display:flex;align-items:center;gap:8px;min-height:34px;padding:0 6px;border-radius:6px;color:#20242b;font-size:12px}.row:hover{background:#f1f4f7}.icon{width:15px;flex:0 0 auto;text-align:center;color:#77808c}.detail{min-width:0;flex:1;overflow:hidden;color:#747d8a;font:11px ui-monospace,SFMono-Regular,monospace;text-overflow:ellipsis;white-space:nowrap}.check{color:#28a867}.action{color:#a66609}.files{margin:-1px 22px 7px;padding-left:9px;border-left:2px solid #e1e5eb;color:#747d8a;font:11px/1.55 ui-monospace,SFMono-Regular,monospace}.inline{margin:2px 6px 8px;border:1px solid #d8dde5;border-radius:7px;overflow:hidden}.inline>summary{padding:7px 9px;background:#f0f2f5;color:#68717e;font-size:11px;cursor:pointer}.terminal{width:100%;max-height:300px;overflow:auto;padding:10px;background:#171a21;color:#dbe3ef;font:11px/1.5 ui-monospace,SFMono-Regular,monospace;white-space:pre}.dim{color:#8c9bb0}.diff{max-height:300px;overflow:auto;background:#fff;font:11px/1.5 ui-monospace,SFMono-Regular,monospace;white-space:pre}.minus,.plus{display:block;padding:1px 9px}.minus{background:#ffe9ea;color:#b53e47}.plus{background:#e7f7ee;color:#23794a}.note{max-width:600px;margin-top:24px;padding:12px 14px;border-left:3px solid #4c7cf3;background:#eaf0ff;color:#586273;font-size:12px;line-height:1.55}@media(max-width:640px){.page{padding:20px 12px}.chat{max-width:100%}.tool-group{width:100%}}@media(prefers-color-scheme:dark){body{background:#17191d;color:#edf0f4}.reason{color:#9ba4b1}.reason:hover{background:#292d33;color:#fff}.reason-body,.summary,.detail,.files{color:#929ba8}.answer{color:#edf0f4}.tool-group{border-color:#3a3f47;background:#22252a}.badge{background:#30343b;color:#a7afba}.rows{border-color:#343941}.row{color:#edf0f4}.row:hover{background:#2b2f35}.inline{border-color:#3a3f47}.inline>summary{background:#2b2f35;color:#a9b1bd}.diff{background:#202329}.minus{background:#48272b;color:#ffb8bd}.plus{background:#1d3b2c;color:#a6edc1}.note{background:#202d4b;color:#bbc8e9}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>Approved safe tool grouping</h1>
+    <p>Visual source of truth: text không box; reasoning disclosure gọn; nhóm tool tối đa 600px; output cao tối đa 300px.</p>
+    <section class="chat">
+      <div class="label">Reasoning hoàn tất — mặc định đóng</div>
+      <button class="reason" aria-expanded="false"><span>›</span><span>Reasoning</span></button>
+      <div class="answer"><b>Đã xác định nguyên nhân:</b> stream dữ liệu được giữ nguyên; chỉ lớp trình bày tool thay đổi.</div>
+
+      <div class="label">Nhóm hoàn tất — mặc định đóng</div>
+      <details class="tool-group">
+        <summary><b>4 thao tác đã hoàn tất</b><span class="badge">14:32 · 8s</span><span class="summary">Đọc tệp · Terminal · Apply Changes · Diff</span><i class="status"></i></summary>
+      </details>
+
+      <div class="label">Nhóm đang xem — hàng gọn và output nội tuyến</div>
+      <details class="tool-group" open>
+        <summary><b>4 thao tác đã hoàn tất</b><span class="badge">14:32 · 8s</span><span class="summary">Đọc tệp · Terminal · Apply Changes · Diff</span><i class="status"></i></summary>
+        <div class="rows">
+          <div class="row"><span class="icon">◫</span><b>Đọc tệp</b><span class="detail">/web/src/components/ToolCard.tsx</span><span class="check">✓</span></div>
+          <div class="row"><span class="icon">▸</span><b>Terminal</b><span class="detail">bun run test src/components/…</span><span class="check">✓</span><span>⌄</span></div>
+          <details class="inline" open><summary>Terminal output · max-height 300px</summary><div class="terminal"><span class="dim">$ bun run test src/components/ToolCard/ToolCard.test.tsx --reporter=verbose</span>
+
+✓ ToolCard presentation hierarchy
+  ✓ preserves text and reasoning siblings
+  ✓ keeps CLI output in DOM order
+  ✓ opens long terminal result
+
+Test Files  106 passed (106)
+Tests       663 passed (663)
+Duration    27.76s
+
+… output dài tiếp tục và cuộn trong vùng này …
+… dòng rất dài không wrap mà dùng horizontal scrolling để giữ nguyên định dạng terminal …</div></details>
+          <div class="row"><span class="icon">◇</span><b>Apply Changes</b><span class="detail">3 file đã thay đổi</span><span class="check">✓</span></div>
+          <div class="files">ToolCard.tsx<br>assistant-runtime.ts<br>ToolCard.test.tsx</div>
+          <div class="row"><span class="icon action">◇</span><b>Diff</b><span class="badge">Xem thay đổi</span><span class="detail">ToolCard.tsx</span><span class="check">✓</span><span>⌄</span></div>
+          <details class="inline" open><summary>web/src/components/ToolCard/ToolCard.tsx</summary><div class="diff"><span class="minus">- full-width reasoning card</span><span class="plus">+ compact reasoning disclosure</span><span class="plus">+ presentation-only ToolGroup</span></div></details>
+        </div>
+      </details>
+
+      <div class="label">Reasoning đang stream — tự mở, không box</div>
+      <button class="reason" aria-expanded="true"><span>⌄</span><span>Reasoning</span><span style="color:#9b7de5">●</span></button>
+      <div class="reason-body">Đang đối chiếu content parts để bảo đảm reasoning, text, CLI output và tool đều xuất hiện đúng một lần…</div>
+      <div class="answer">Phản hồi agent tiếp tục hiển thị trực tiếp trong luồng chat, không bị nhóm tool che mất.</div>
+    </section>
+    <div class="note"><b>Bất biến:</b> group là presentation-only. Text/reasoning/CLI/event/team mention luôn đứng nguyên vị trí; unknown/MCP/Agent/Task/Plan/permission/question đứng riêng.</div>
+  </main>
+</body>
+</html>

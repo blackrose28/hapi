@@ -235,7 +235,7 @@ it('renders original session settings from the member config Session tab', async
 
     expect(await screen.findByText(/These settings affect the original session/i)).toBeInTheDocument()
     expect(screen.getByText(/Permission Mode/i)).toBeInTheDocument()
-    expect(screen.getByText(/Model/i)).toBeInTheDocument()
+    expect(await screen.findByText(/^Model$/i)).toBeInTheDocument()
 })
 
 it('shows live session status in members and opens the direct chat for a member', () => {

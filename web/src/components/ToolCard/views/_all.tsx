@@ -17,21 +17,31 @@ import { getInputStringAny } from '@/lib/toolInputUtils'
 export type ToolViewProps = {
     block: ToolCallBlock
     metadata: SessionMetadataSummary | null
-    surface?: 'inline' | 'dialog'
+    surface?: 'inline' | 'dialog' | 'group-output'
+    t?: (key: string, params?: Record<string, string | number>) => string
 }
 
 export type ToolViewComponent = ComponentType<ToolViewProps>
 
-const SkillFullView: ToolViewComponent = ({ block }: ToolViewProps) => {
+function viewText(
+    t: ToolViewProps['t'],
+    key: string,
+    fallback: string,
+    params?: Record<string, string | number>
+): string {
+    return t?.(key, params) ?? fallback
+}
+
+const SkillFullView: ToolViewComponent = ({ block, t }: ToolViewProps) => {
     const skillName = getInputStringAny(block.tool.input, ['skill'])
     return (
         <div className="text-sm text-[var(--app-fg)]">
-            {skillName ?? 'Unknown skill'}
+            {skillName ?? viewText(t, 'tool.detail.unknownSkill', 'Unknown skill')}
         </div>
     )
 }
 
-const AgentFullView: ToolViewComponent = ({ block }: ToolViewProps) => {
+const AgentFullView: ToolViewComponent = ({ block, t }: ToolViewProps) => {
     const input = block.tool.input
     const description = getInputStringAny(input, ['description'])
     const subagentType = getInputStringAny(input, ['subagent_type'])
@@ -43,8 +53,10 @@ const AgentFullView: ToolViewComponent = ({ block }: ToolViewProps) => {
                 <div className="text-[var(--app-fg)]">{description}</div>
             )}
             <div className="flex gap-3 text-[var(--app-hint)]">
-                {subagentType && <span>Type: {subagentType}</span>}
-                {runInBackground && <span>Background</span>}
+                {subagentType && (
+                    <span>{viewText(t, 'tool.detail.agentType', `Type: ${subagentType}`, { type: subagentType })}</span>
+                )}
+                {runInBackground && <span>{viewText(t, 'tool.detail.background', 'Background')}</span>}
             </div>
         </div>
     )
@@ -76,7 +88,8 @@ export const toolFullViewRegistry: Record<string, ToolViewComponent> = {
     ExitPlanMode: ExitPlanModeView,
     ask_user_question: AskUserQuestionView,
     exit_plan_mode: ExitPlanModeView,
-    request_user_input: RequestUserInputView
+    request_user_input: RequestUserInputView,
+    update_plan: UpdatePlanView
 }
 
 export function getToolViewComponent(toolName: string): ToolViewComponent | null {

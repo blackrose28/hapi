@@ -1,0 +1,261 @@
+.session-provider-tasks {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 0;
+    gap: 5px;
+}
+
+.session-task-badge {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: 20px;
+    gap: 5px;
+    padding: 0 7px;
+    border: 1px solid #3c4655;
+    border-radius: 6px;
+    background: #20252d;
+    color: #c6d0df;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.session-task-badge:hover {
+    border-color: #566275;
+    background: #272d36;
+    color: #eef3fb;
+    transform: translateY(-1px);
+}
+
+.session-task-badge:focus-visible {
+    outline: 2px solid #8c7dff;
+    outline-offset: 2px;
+}
+
+.session-task-badge__dot {
+    width: 5px;
+    height: 5px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 5%);
+}
+
+.session-task-badge--active {
+    border-color: rgb(140 125 255 / 42%);
+    background: rgb(140 125 255 / 10%);
+    color: #c7c0ff;
+}
+
+.session-task-badge--active .session-task-badge__dot {
+    background: #8c7dff;
+    box-shadow: 0 0 0 3px rgb(140 125 255 / 14%);
+    animation: session-task-pulse 1.8s ease-in-out infinite;
+}
+
+.session-task-badge--pending {
+    border-color: rgb(215 163 74 / 38%);
+    background: rgb(215 163 74 / 9%);
+    color: #e6bd73;
+}
+
+.session-task-badge--pending .session-task-badge__dot {
+    background: #d7a34a;
+}
+
+.session-task-badge--completed {
+    border-color: rgb(70 211 154 / 34%);
+    background: rgb(70 211 154 / 8%);
+    color: #79dfb6;
+}
+
+.session-task-badge--completed .session-task-badge__dot {
+    background: #46d39a;
+}
+
+.session-task-dialog {
+    --session-task-surface: #f8fafc;
+    --session-task-text: #1f2937;
+    --session-task-border: #d8dee8;
+    --session-task-shadow: rgb(15 23 42 / 18%);
+    --session-task-outline: rgb(15 23 42 / 5%);
+    --session-task-track: #e2e8f0;
+    --session-task-divider: #e5eaf0;
+    --session-task-line: #d8e0e9;
+    --session-task-row-hover: #f1f5f9;
+    --session-task-dot-border: #64748b;
+    --session-task-muted: #64748b;
+    --session-task-active: #6552c7;
+    --session-task-pending: #94600d;
+    --session-task-completed: #147557;
+    width: calc(100vw - 24px);
+    max-width: 440px;
+    border-color: var(--session-task-border);
+    border-radius: 14px;
+    background: var(--session-task-surface);
+    color: var(--session-task-text);
+    box-shadow: 0 24px 64px var(--session-task-shadow), 0 0 0 1px var(--session-task-outline);
+}
+
+[data-theme="dark"] .session-task-dialog {
+    --session-task-surface: #181c21;
+    --session-task-text: #e7ebf1;
+    --session-task-border: #2b3038;
+    --session-task-shadow: rgb(0 0 0 / 45%);
+    --session-task-outline: rgb(255 255 255 / 2%);
+    --session-task-track: #2c313b;
+    --session-task-divider: #252a31;
+    --session-task-line: #303640;
+    --session-task-row-hover: #1e232a;
+    --session-task-dot-border: #5c6675;
+    --session-task-muted: #838d9c;
+    --session-task-active: #a99eff;
+    --session-task-pending: #d7a34a;
+    --session-task-completed: #46b98b;
+}
+
+.session-task-progress {
+    margin-top: 14px;
+    margin-bottom: 18px;
+}
+
+.session-task-progress__track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--session-task-track);
+}
+
+.session-task-progress__fill {
+    height: 100%;
+    border-radius: inherit;
+    transition: width 280ms ease;
+}
+
+.session-task-progress__fill--active {
+    background: linear-gradient(90deg, #7566ee, #9b8fff);
+}
+
+.session-task-progress__fill--pending {
+    background: linear-gradient(90deg, #b9822d, #dfb35f);
+}
+
+.session-task-progress__fill--completed {
+    background: linear-gradient(90deg, #2db77f, #5ee2ad);
+}
+
+.session-task-timeline {
+    max-height: 60vh;
+    margin: 0;
+    padding: 0 4px 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    list-style: none;
+}
+
+.session-task-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    min-height: 48px;
+    gap: 8px;
+    padding: 10px 6px;
+    border-bottom: 1px solid var(--session-task-divider);
+    border-radius: 7px;
+    transition: background 150ms ease;
+}
+
+.session-task-row:last-child {
+    border-bottom-color: transparent;
+}
+
+.session-task-row:not(:last-child)::before {
+    position: absolute;
+    top: 24px;
+    bottom: -1px;
+    left: 12px;
+    width: 1px;
+    background: var(--session-task-line);
+    content: '';
+}
+
+.session-task-row:hover {
+    background: var(--session-task-row-hover);
+}
+
+.session-task-row__dot {
+    position: relative;
+    z-index: 1;
+    width: 7px;
+    height: 7px;
+    margin-top: 6px;
+    margin-left: 3px;
+    border: 2px solid var(--session-task-dot-border);
+    border-radius: 999px;
+    background: var(--session-task-surface);
+}
+
+.session-task-row--in_progress .session-task-row__dot {
+    border-color: #8c7dff;
+    background: #8c7dff;
+    box-shadow: 0 0 0 3px rgb(140 125 255 / 12%);
+}
+
+.session-task-row--pending .session-task-row__dot {
+    border-color: #d7a34a;
+}
+
+.session-task-row--completed .session-task-row__dot {
+    border-color: #46d39a;
+    background: #46d39a;
+}
+
+.session-task-row__status {
+    margin-top: 3px;
+    color: var(--session-task-muted);
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+.session-task-row--in_progress .session-task-row__status {
+    color: var(--session-task-active);
+}
+
+.session-task-row--pending .session-task-row__status {
+    color: var(--session-task-pending);
+}
+
+.session-task-row--completed .session-task-row__status {
+    color: var(--session-task-completed);
+}
+
+@keyframes session-task-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 2px rgb(140 125 255 / 10%);
+    }
+
+    50% {
+        box-shadow: 0 0 0 5px rgb(140 125 255 / 20%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .session-task-badge,
+    .session-task-progress__fill,
+    .session-task-row {
+        transition: none;
+    }
+
+    .session-task-badge--active .session-task-badge__dot {
+        animation: none;
+    }
+}
+
+@media (max-width: 375px) {
+    .session-task-dialog {
+        padding: 18px;
+    }
+}

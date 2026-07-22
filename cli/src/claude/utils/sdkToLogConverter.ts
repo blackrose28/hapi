@@ -174,7 +174,10 @@ export class SDKToLogConverter {
                 logMessage = {
                     ...baseFields,
                     type: 'user',
-                    message: userMsg.message
+                    message: userMsg.message,
+                    ...(userMsg.tool_use_result === undefined
+                        ? {}
+                        : { toolUseResult: userMsg.tool_use_result })
                 }
 
                 // Check if this is a tool result and add mode if available

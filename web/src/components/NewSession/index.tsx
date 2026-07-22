@@ -5,6 +5,7 @@ import { usePlatform } from '@/hooks/usePlatform'
 import { useMachinePathsExists } from '@/hooks/useMachinePathsExists'
 import { useSpawnSession } from '@/hooks/mutations/useSpawnSession'
 import { useCodexModels } from '@/hooks/queries/useCodexModels'
+import { useAgentModels } from '@/hooks/queries/useAgentModels'
 import { useOpencodeModelsForCwd } from '@/hooks/queries/useOpencodeModelsForCwd'
 import { useSessions } from '@/hooks/queries/useSessions'
 import { useActiveSuggestions, type Suggestion } from '@/hooks/useActiveSuggestions'
@@ -116,11 +117,23 @@ export function NewSession(props: {
         () => (machineId ? props.machines.find((machine) => machine.id === machineId) ?? null : null),
         [machineId, props.machines]
     )
+    const trimmedDirectory = directory.trim()
+    const deferredDirectory = useDeferredValue(trimmedDirectory)
     const codexModelsState = useCodexModels({
         api: props.api,
         machineId,
         enabled: agent === 'codex' && Boolean(machineId)
     })
+    const claudeModelsState = useAgentModels({
+        api: props.api,
+        agent: 'claude',
+        machineId,
+        cwd: deferredDirectory,
+        enabled: agent === 'claude' && Boolean(machineId) && Boolean(deferredDirectory)
+    })
+    useEffect(() => {
+        setModel('auto')
+    }, [machineId, deferredDirectory])
     const [opencodeSelectedModel, setOpencodeSelectedModel] = useState<string | null>(null)
     const runnerSpawnError = useMemo(
         () => formatRunnerSpawnError(selectedMachine),
@@ -139,14 +152,25 @@ export function NewSession(props: {
         }
         return options
     }, [codexModelsState.models, model])
+    const claudeModelOptions = useMemo(() => {
+        const options = [
+            { value: 'auto', label: 'Default' },
+            ...claudeModelsState.models.map((claudeModel) => ({
+                value: claudeModel.id,
+                label: claudeModel.displayName
+            }))
+        ]
+        if (model !== 'auto' && !options.some((option) => option.value === model)) {
+            options.splice(1, 0, { value: model, label: model })
+        }
+        return options
+    }, [claudeModelsState.models, model])
 
     const recentPaths = useMemo(
         () => getRecentPaths(machineId),
         [getRecentPaths, machineId]
     )
 
-    const trimmedDirectory = directory.trim()
-    const deferredDirectory = useDeferredValue(trimmedDirectory)
     const allPaths = useDirectorySuggestions(machineId, sessions, recentPaths)
 
     const pathsToCheck = useMemo(
@@ -459,12 +483,21 @@ export function NewSession(props: {
                 <ModelSelector
                     agent={agent}
                     model={model}
-                    options={agent === 'codex' ? codexModelOptions : undefined}
-                    isDisabled={isFormDisabled || (agent === 'codex' && Boolean(codexModelsState.error))}
-                    isLoading={agent === 'codex' && codexModelsState.isLoading}
+                    options={agent === 'codex'
+                        ? codexModelOptions
+                        : agent === 'claude'
+                            ? claudeModelOptions
+                            : undefined}
+                    isDisabled={isFormDisabled
+                        || (agent === 'codex' && Boolean(codexModelsState.error))
+                        || (agent === 'claude' && claudeModelsState.isLoading)}
+                    isLoading={(agent === 'codex' && codexModelsState.isLoading)
+                        || (agent === 'claude' && claudeModelsState.isLoading)}
                     error={agent === 'codex' && codexModelsState.error
                         ? `${t('newSession.model.loadFailed')}: ${codexModelsState.error}`
-                        : null}
+                        : agent === 'claude' && claudeModelsState.error
+                            ? `${t('newSession.agentModelsLoadFailed')}: ${claudeModelsState.error}`
+                            : null}
                     onModelChange={setModel}
                 />
             )}

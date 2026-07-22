@@ -1,10 +1,24 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import type { ToolCallBlock } from '@/chat/types'
-import { ChecklistList, extractTodoChecklist, extractUpdatePlanChecklist } from '@/components/ToolCard/checklist'
+import { ChecklistList, extractTodoChecklist, extractUpdatePlanChecklist, getChecklistProgress } from '@/components/ToolCard/checklist'
 import { getToolPresentation } from '@/components/ToolCard/knownTools'
-import { getToolViewComponent } from '@/components/ToolCard/views/_all'
+import { getToolFullViewComponent, getToolViewComponent } from '@/components/ToolCard/views/_all'
 import { UpdatePlanView } from '@/components/ToolCard/views/UpdatePlanView'
+import { I18nProvider } from '@/lib/i18n-context'
+import en from '@/lib/locales/en'
+import viVN from '@/lib/locales/vi-VN'
+import zhCN from '@/lib/locales/zh-CN'
+
+afterEach(() => cleanup())
+
+const fiveSteps = [
+    { step: 'A', status: 'completed' },
+    { step: 'B', status: 'completed' },
+    { step: 'C', status: 'completed' },
+    { step: 'D', status: 'in_progress' },
+    { step: 'E', status: 'pending' }
+]
 
 function makeUpdatePlanBlock(input: unknown, result?: unknown): ToolCallBlock {
     return {
@@ -136,16 +150,18 @@ describe('update_plan tool presentation', () => {
 describe('UpdatePlanView', () => {
     it('renders checklist rows with status styling', () => {
         render(
-            <UpdatePlanView
-                block={makeUpdatePlanBlock({
-                    plan: [
-                        { step: 'Reproduce web build failure', status: 'completed' },
-                        { step: 'Trace broken build path', status: 'in_progress' },
-                        { step: 'Summarize fix', status: 'unknown_status' }
-                    ]
-                })}
-                metadata={null}
-            />
+            <I18nProvider>
+                <UpdatePlanView
+                    block={makeUpdatePlanBlock({
+                        plan: [
+                            { step: 'Reproduce web build failure', status: 'completed' },
+                            { step: 'Trace broken build path', status: 'in_progress' },
+                            { step: 'Summarize fix', status: 'unknown_status' }
+                        ]
+                    })}
+                    metadata={null}
+                />
+            </I18nProvider>
         )
 
         const completed = screen.getByText(/Reproduce web build failure/)
@@ -161,6 +177,63 @@ describe('UpdatePlanView', () => {
     it('is registered as the compact tool view', () => {
         expect(getToolViewComponent('update_plan')).toBe(UpdatePlanView)
     })
+
+    it('calculates rounded checklist progress', () => {
+        expect(getChecklistProgress([
+            { text: 'A', status: 'completed' },
+            { text: 'B', status: 'completed' },
+            { text: 'C', status: 'in_progress' }
+        ])).toEqual({ completed: 2, total: 3, percent: 67 })
+    })
+
+    it('shows progress and at most three rows inline', () => {
+        render(
+            <I18nProvider>
+                <UpdatePlanView
+                    block={makeUpdatePlanBlock({ plan: fiveSteps })}
+                    metadata={null}
+                    surface="inline"
+                />
+            </I18nProvider>
+        )
+
+        expect(screen.getByRole('progressbar', { name: 'Plan progress' })).toHaveAttribute(
+            'aria-valuenow',
+            '60'
+        )
+        expect(screen.getByText('3 / 5 steps')).toBeInTheDocument()
+        expect(screen.getByText('60%')).toBeInTheDocument()
+        expect(screen.getByText('+2 more')).toBeInTheDocument()
+        expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    })
+
+    it('shows every row in the dialog and is registered as the full view', () => {
+        render(
+            <I18nProvider>
+                <UpdatePlanView
+                    block={makeUpdatePlanBlock({ plan: fiveSteps })}
+                    metadata={null}
+                    surface="dialog"
+                />
+            </I18nProvider>
+        )
+
+        expect(screen.getAllByRole('listitem')).toHaveLength(5)
+        expect(screen.queryByText('+2 more')).not.toBeInTheDocument()
+        expect(getToolFullViewComponent('update_plan')).toBe(UpdatePlanView)
+    })
+
+    it('defines every new plan and diff count label in all locales', () => {
+        const dictionaries: Array<Record<string, string>> = [en, viVN, zhCN]
+        const keys = ['tool.planProgress', 'tool.stepsProgress', 'tool.moreItems', 'tool.moreFiles']
+
+        for (const dictionary of dictionaries) {
+            for (const key of keys) {
+                expect(dictionary[key]).toEqual(expect.any(String))
+                expect(dictionary[key].trim().length).toBeGreaterThan(0)
+            }
+        }
+    })
 })
 
 describe('ChecklistList', () => {
@@ -174,5 +247,7 @@ describe('ChecklistList', () => {
         )
 
         expect(screen.getByText(/\(empty\)/)).toBeInTheDocument()
+        expect(screen.getByRole('list')).toBeInTheDocument()
+        expect(screen.getByRole('listitem')).toBeInTheDocument()
     })
 })

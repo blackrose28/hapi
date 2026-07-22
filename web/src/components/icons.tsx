@@ -61,4 +61,27 @@ export function CheckIcon(props: IconProps) {
     )
 }
 
+export function PlusIcon(props: IconProps) {
+    return createIcon(<path d="M12 5v14M5 12h14" />, props, 2)
+}
+
+export function MinusIcon(props: IconProps) {
+    return createIcon(<path d="M5 12h14" />, props, 2)
+}
+
+export function CodeIcon(props: IconProps) {
+    return createIcon(<path d="m8 9-3 3 3 3m8-6 3 3-3 3m-3-9-2 12" />, props, 2)
+}
+
+export function FitIcon(props: IconProps) {
+    return createIcon(<path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5M8 8h8v8H8z" />, props)
+}
+
+export function FullscreenIcon(props: IconProps) {
+    return createIcon(<path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5" />, props, 2)
+}
+
+export function ExitFullscreenIcon(props: IconProps) {
+    return createIcon(<path d="M3 8h5V3m13 5h-5V3M3 16h5v5m13-5h-5v5" />, props, 2)
+}
 

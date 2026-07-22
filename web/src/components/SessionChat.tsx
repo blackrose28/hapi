@@ -29,6 +29,7 @@ import { TeamPanel } from '@/components/TeamPanel'
 import { usePlatform } from '@/hooks/usePlatform'
 import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { useCodexModels } from '@/hooks/queries/useCodexModels'
+import { useAgentModels } from '@/hooks/queries/useAgentModels'
 import { useOpencodeModels } from '@/hooks/queries/useOpencodeModels'
 import { useSessionTeamMentions } from '@/hooks/queries/useSessionTeamMentions'
 import { useVoiceOptional } from '@/lib/voice-context'
@@ -89,7 +90,7 @@ export function SessionChat(props: {
     const blocksByIdRef = useRef<Map<string, ChatBlock>>(new Map())
     const [forceScrollToken, setForceScrollToken] = useState(0)
     const [outlineOpen, setOutlineOpen] = useState(false)
-    const agentFlavor = props.session.metadata?.flavor ?? null
+    const agentFlavor = props.session.metadata?.flavor ?? 'claude'
     const controlledByUser = props.session.agentState?.controlledByUser === true
     const codexCollaborationModeSupported = agentFlavor === 'codex' && !controlledByUser
     const codexModelsState = useCodexModels({
@@ -97,7 +98,14 @@ export function SessionChat(props: {
         sessionId: props.session.id,
         enabled: agentFlavor === 'codex' && !controlledByUser
     })
+    const claudeModelsState = useAgentModels({
+        api: props.api,
+        agent: 'claude',
+        sessionId: props.session.id,
+        enabled: agentFlavor === 'claude'
+    })
     const [codexErrorDismissed, setCodexErrorDismissed] = useState(false)
+    const [claudeErrorDismissed, setClaudeErrorDismissed] = useState(false)
     const codexModelOptions = useMemo(() => {
         if (agentFlavor !== 'codex') {
             return undefined
@@ -112,6 +120,18 @@ export function SessionChat(props: {
         }
         return options
     }, [agentFlavor, codexModelsState.models])
+    const claudeModelOptions = useMemo(() => {
+        if (agentFlavor !== 'claude') {
+            return undefined
+        }
+        return [
+            { value: null, label: 'Default' },
+            ...claudeModelsState.models.map((claudeModel) => ({
+                value: claudeModel.id,
+                label: claudeModel.displayName
+            }))
+        ]
+    }, [agentFlavor, claudeModelsState.models])
     const opencodeModelsState = useOpencodeModels({
         api: props.api,
         sessionId: props.session.id,
@@ -563,6 +583,23 @@ export function SessionChat(props: {
                         </div>
                     ) : null}
 
+                    {agentFlavor === 'claude' && claudeModelsState.error && !claudeErrorDismissed ? (
+                        <div className="px-3 pb-2">
+                            <div className="mx-auto flex w-full max-w-full items-center justify-between gap-3 rounded-md bg-[var(--app-subtle-bg)] p-3 text-sm text-red-500">
+                                <span className="min-w-0 flex-1">
+                                    {t('session.agentModelsLoadFailed')}: {claudeModelsState.error}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="shrink-0 rounded border border-[var(--app-border)] px-2 py-1 text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)]"
+                                    onClick={() => setClaudeErrorDismissed(true)}
+                                >
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
+
                     <div className="px-3">
                         <TeamMentionQueueBar
                             requests={teamMentionRequests}
@@ -592,6 +629,8 @@ export function SessionChat(props: {
                         availableModelOptions={
                             agentFlavor === 'codex'
                                 ? codexModelOptions
+                                : agentFlavor === 'claude'
+                                    ? claudeModelOptions
                                 : agentFlavor === 'opencode'
                                     ? opencodeModelOptions
                                     : undefined
@@ -615,7 +654,11 @@ export function SessionChat(props: {
                         onModelChange={
                             agentFlavor === 'codex'
                                 ? (!controlledByUser && !codexModelsError && !readOnly ? handleModelChange : undefined)
-                                : readOnly ? undefined : handleModelChange
+                                : readOnly
+                                    ? undefined
+                                    : agentFlavor === 'claude' && claudeModelsState.isLoading
+                                        ? undefined
+                                        : handleModelChange
                         }
                         onModelReasoningEffortChange={
                             (agentFlavor === 'codex' || agentFlavor === 'opencode') && !controlledByUser && !readOnly

@@ -3,6 +3,20 @@ import type { AgentMessage } from '@/agent/types';
 import { AcpMessageHandler } from './AcpMessageHandler';
 import { ACP_SESSION_UPDATE_TYPES } from './constants';
 
+const OPEN_CODE_EMPTY_PLAN_UPDATE = {
+    sessionUpdate: 'plan',
+    entries: []
+} as const;
+
+const OPEN_CODE_FULL_PLAN_UPDATE = {
+    sessionUpdate: 'plan',
+    entries: [
+        { content: 'Inspect the repository', priority: 'high', status: 'completed' },
+        { content: 'Implement the change', priority: 'medium', status: 'in_progress' },
+        { content: 'Run verification', priority: 'low', status: 'pending' }
+    ]
+} as const;
+
 function getToolResult(messages: AgentMessage[], id: string): Extract<AgentMessage, { type: 'tool_result' }> {
     const result = messages.find((message): message is Extract<AgentMessage, { type: 'tool_result' }> =>
         message.type === 'tool_result' && message.id === id
@@ -785,6 +799,83 @@ describe('AcpMessageHandler', () => {
         });
 
         expect(messages).toHaveLength(0);
+    });
+
+    describe('ACP plan updates (OpenCode path)', () => {
+        it('forwards an empty ACP plan', () => {
+            const messages: AgentMessage[] = [];
+            const handler = new AcpMessageHandler((message) => messages.push(message));
+
+            handler.handleUpdate(OPEN_CODE_EMPTY_PLAN_UPDATE);
+
+            expect(messages).toEqual([{ type: 'plan', items: [] }]);
+        });
+
+        it('rejects a partially malformed ACP plan atomically', () => {
+            const messages: AgentMessage[] = [];
+            const handler = new AcpMessageHandler((message) => messages.push(message));
+
+            handler.handleUpdate({
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.plan,
+                entries: [
+                    { content: 'Valid', priority: 'medium', status: 'pending' },
+                    { content: '', priority: 'medium', status: 'pending' }
+                ]
+            });
+
+            expect(messages).toEqual([]);
+        });
+
+        it.each([
+            ['null', null],
+            ['a non-array object', { content: 'not-an-array' }]
+        ])('rejects ACP plan entries when they are %s', (_label, entries) => {
+            const messages: AgentMessage[] = [];
+            const handler = new AcpMessageHandler((message) => messages.push(message));
+
+            handler.handleUpdate({
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.plan,
+                entries
+            });
+
+            expect(messages).toEqual([]);
+        });
+
+        it('preserves full ACP plan order, status, and priority', () => {
+            const messages: AgentMessage[] = [];
+            const handler = new AcpMessageHandler((message) => messages.push(message));
+
+            handler.handleUpdate(OPEN_CODE_FULL_PLAN_UPDATE);
+
+            expect(messages).toEqual([{
+                type: 'plan',
+                items: [
+                    { content: 'Inspect the repository', priority: 'high', status: 'completed' },
+                    { content: 'Implement the change', priority: 'medium', status: 'in_progress' },
+                    { content: 'Run verification', priority: 'low', status: 'pending' }
+                ]
+            }]);
+        });
+
+        it('flushes buffered reasoning and text before the plan in display order', () => {
+            const messages: AgentMessage[] = [];
+            const handler = new AcpMessageHandler((message) => messages.push(message));
+
+            handler.handleUpdate({
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentMessageChunk,
+                content: { type: 'text', text: 'Visible answer' }
+            });
+            handler.handleUpdate({
+                sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentThoughtChunk,
+                content: { type: 'text', text: 'Private reasoning' }
+            });
+            handler.handleUpdate(OPEN_CODE_FULL_PLAN_UPDATE);
+
+            expect(messages.map((message) => message.type)).toEqual(['reasoning', 'text', 'plan']);
+            expect(messages[0]).toEqual({ type: 'reasoning', text: 'Private reasoning' });
+            expect(messages[1]).toEqual({ type: 'text', text: 'Visible answer' });
+            expect(messages[2]).toMatchObject({ type: 'plan' });
+        });
     });
 
     describe('tool_call_update content normalization (Gemini/OpenCode path)', () => {

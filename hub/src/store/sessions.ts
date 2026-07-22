@@ -190,15 +190,26 @@ export function updateSessionAgentState(
     })
 }
 
+export type SetSessionTodosResult = 'applied' | 'unchanged' | 'stale' | 'error'
+
 export function setSessionTodos(
     db: Database,
     id: string,
     todos: unknown,
     todosUpdatedAt: number,
     namespace: string
-): boolean {
+): SetSessionTodosResult {
     try {
         const json = todos === null || todos === undefined ? null : JSON.stringify(todos)
+        const current = db.prepare(`
+            SELECT todos, todos_updated_at AS todosUpdatedAt
+            FROM sessions WHERE id = ? AND namespace = ?
+        `).get(id, namespace) as { todos: string | null; todosUpdatedAt: number | null } | undefined
+
+        if (!current) return 'error'
+        if (current.todosUpdatedAt !== null && current.todosUpdatedAt > todosUpdatedAt) return 'stale'
+        if (current.todos === json) return 'unchanged'
+
         const result = db.prepare(`
             UPDATE sessions
             SET todos = @todos,
@@ -207,7 +218,7 @@ export function setSessionTodos(
                 seq = seq + 1
             WHERE id = @id
               AND namespace = @namespace
-              AND (todos_updated_at IS NULL OR todos_updated_at < @todos_updated_at)
+              AND (todos_updated_at IS NULL OR todos_updated_at <= @todos_updated_at)
         `).run({
             id,
             todos: json,
@@ -216,9 +227,9 @@ export function setSessionTodos(
             namespace
         })
 
-        return result.changes === 1
+        return result.changes === 1 ? 'applied' : 'stale'
     } catch {
-        return false
+        return 'error'
     }
 }
 

@@ -1,3 +1,8 @@
+import {
+    AgentModelCatalogResultSchema,
+    type AgentFlavor,
+    type AgentModelCatalogResult
+} from '@hapi/protocol'
 import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/types'
 import type { Server } from 'socket.io'
 import type { RpcRegistry } from '../socket/rpcRegistry'
@@ -548,12 +553,38 @@ export class RpcGateway {
         return await this.machineRpc(machineId, 'listCodexModels', {}) as RpcListCodexModelsResponse
     }
 
+    async listAgentModelsForSession(
+        sessionId: string,
+        agent: AgentFlavor
+    ): Promise<AgentModelCatalogResult> {
+        return this.parseAgentModelCatalog(
+            await this.sessionRpc(sessionId, 'listAgentModels', { agent })
+        )
+    }
+
+    async listAgentModelsForMachine(
+        machineId: string,
+        agent: AgentFlavor,
+        cwd?: string
+    ): Promise<AgentModelCatalogResult> {
+        return this.parseAgentModelCatalog(
+            await this.machineRpc(machineId, 'listAgentModels', { agent, cwd })
+        )
+    }
+
     async listOpencodeModelsForSession(sessionId: string): Promise<RpcListOpencodeModelsResponse> {
         return await this.sessionRpc(sessionId, 'listOpencodeModels', {}) as RpcListOpencodeModelsResponse
     }
 
     async listOpencodeModelsForCwd(machineId: string, cwd: string): Promise<RpcListOpencodeModelsResponse> {
         return await this.machineRpc(machineId, 'listOpencodeModelsForCwd', { cwd }) as RpcListOpencodeModelsResponse
+    }
+
+    private parseAgentModelCatalog(value: unknown): AgentModelCatalogResult {
+        const parsed = AgentModelCatalogResultSchema.parse(value)
+        return parsed.error
+            ? { ...parsed, error: 'Agent model discovery failed' }
+            : parsed
     }
 
     private async sessionRpc(sessionId: string, method: string, params: unknown): Promise<unknown> {

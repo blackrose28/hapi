@@ -1,3 +1,4 @@
+export * from './agentModels'
 export * from './messages'
 export * from './flavors'
 export * from './models'

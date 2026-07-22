@@ -5,6 +5,12 @@ import { NewSession } from './index'
 
 const spawnSessionMock = vi.fn()
 const checkPathsExistsMock = vi.fn()
+let agentModelsState = {
+    models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
+    status: 'dynamic' as const,
+    isLoading: false,
+    error: null as string | null
+}
 
 vi.mock('@/lib/use-translation', () => ({
     useTranslation: () => ({ t: (key: string) => key })
@@ -50,6 +56,10 @@ vi.mock('@/hooks/queries/useCodexModels', () => ({
     useCodexModels: () => ({ models: [], isLoading: false, error: null })
 }))
 
+vi.mock('@/hooks/queries/useAgentModels', () => ({
+    useAgentModels: () => agentModelsState
+}))
+
 vi.mock('@/hooks/queries/useOpencodeModelsForCwd', () => ({
     useOpencodeModelsForCwd: () => ({
         availableModels: [],
@@ -81,6 +91,12 @@ describe('NewSession Codex resume', () => {
         vi.clearAllMocks()
         checkPathsExistsMock.mockResolvedValue({ '/repo': true })
         spawnSessionMock.mockResolvedValue({ type: 'success', sessionId: 'session-1' })
+        agentModelsState = {
+            models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
+            status: 'dynamic',
+            isLoading: false,
+            error: null
+        }
     })
 
     afterEach(() => {
@@ -147,6 +163,47 @@ describe('NewSession Codex resume', () => {
         fireEvent.click(screen.getByRole('checkbox', { name: /newSession.codexResume.title/ }))
 
         expect(screen.getByRole('button', { name: 'newSession.create' })).toBeDisabled()
+    })
+
+    it('keeps Claude model selection disabled while provider policy is loading', () => {
+        agentModelsState = { ...agentModelsState, isLoading: true }
+        render(
+            <NewSession
+                api={{} as never}
+                machines={[makeMachine()]}
+                initialMachineId="machine-1"
+                initialDirectory="/repo"
+                onSuccess={vi.fn()}
+                onCancel={vi.fn()}
+            />
+        )
+
+        expect(screen.getAllByRole('combobox')[1]).toBeDisabled()
+    })
+
+    it('resets a selected Claude model when the machine changes', async () => {
+        const secondMachine = {
+            ...makeMachine(),
+            id: 'machine-2',
+            metadata: { ...makeMachine().metadata!, host: 'second-host' }
+        }
+        render(
+            <NewSession
+                api={{} as never}
+                machines={[makeMachine(), secondMachine]}
+                initialMachineId="machine-1"
+                initialDirectory="/repo"
+                onSuccess={vi.fn()}
+                onCancel={vi.fn()}
+            />
+        )
+
+        const [machineSelect, modelSelect] = screen.getAllByRole('combobox')
+        fireEvent.change(modelSelect, { target: { value: 'claude-custom' } })
+        expect(modelSelect).toHaveValue('claude-custom')
+        fireEvent.change(machineSelect, { target: { value: 'machine-2' } })
+
+        await waitFor(() => expect(modelSelect).toHaveValue('auto'))
     })
 
 })

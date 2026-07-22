@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HAPI Premium Processing Cards — Approved Mockup</title>
+<style>
+  :root { color-scheme:dark; --border:rgba(255,255,255,.09); --muted:#92959d; }
+  * { box-sizing:border-box; }
+  body { max-width:1180px; margin:0 auto; padding:32px; color:#f0f1f3; background:#0d0e10; font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
+  h2 { margin:0 0 7px; font-size:24px; }
+  .subtitle { margin:0; color:var(--muted); line-height:1.55; }
+  button { font:inherit; }
+</style>
+<style>
+  @keyframes breathe { 0%,100%{opacity:.45;transform:scale(.92)} 50%{opacity:1;transform:scale(1.08)} }
+  @keyframes sweep { 0%{transform:translateX(-120%)} 100%{transform:translateX(340%)} }
+  .vip-shell { margin-top:18px; overflow:hidden; border:1px solid var(--border); border-radius:20px; background:#0f1012; box-shadow:0 30px 90px rgba(0,0,0,.20); }
+  .vip-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid rgba(255,255,255,.055); background:rgba(25,26,29,.92); }
+  .vip-toolbar strong { font-size:13px; letter-spacing:.01em; }
+  .vip-toolbar span { color:#868a93; font-size:10.5px; }
+  .scene { position:relative; min-height:800px; padding:34px; overflow:hidden; color:#f0f1f3; font-family:Inter,ui-sans-serif,system-ui,sans-serif; background:#111214; }
+  .scene:before { content:""; position:absolute; width:460px; height:460px; left:-130px; top:-220px; border-radius:50%; background:radial-gradient(circle,rgba(112,101,223,.13),transparent 66%); filter:blur(6px); pointer-events:none; }
+  .scene:after { content:""; position:absolute; width:420px; height:420px; right:-170px; bottom:-180px; border-radius:50%; background:radial-gradient(circle,rgba(36,185,145,.055),transparent 68%); pointer-events:none; }
+  .conversation { position:relative; z-index:1; width:min(100%,600px); display:flex; flex-direction:column; gap:11px; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+
+  .execution { position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.10); border-radius:16px; background:linear-gradient(145deg,rgba(255,255,255,.061),rgba(255,255,255,.027)); box-shadow:0 18px 48px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.025); }
+  .execution:before { content:""; position:absolute; z-index:2; left:12%; right:12%; top:-1px; height:1px; background:linear-gradient(90deg,transparent,#7f8cff 40%,#b48cf4 62%,transparent); box-shadow:0 0 18px rgba(133,136,245,.65); }
+  .execution:after { content:""; position:absolute; z-index:2; top:0; left:0; width:26%; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent); animation:sweep 4.2s ease-in-out infinite; }
+  .execution-header { min-height:47px; padding:0 14px; display:grid; grid-template-columns:16px minmax(0,1fr) auto; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,.065); }
+  .execution-header .chev { color:#b5b8bf; transform:rotate(90deg); font-size:15px; }
+  .execution-header strong { font-size:12px; font-weight:660; letter-spacing:.005em; }
+  .execution-header .live-copy { margin-left:5px; color:#999eaa; font-size:10px; font-weight:500; }
+  .execution-header .live-copy:before { content:""; display:inline-block; width:5px; height:5px; margin-right:6px; border-radius:50%; vertical-align:1px; background:#8995ff; box-shadow:0 0 10px rgba(137,149,255,.75); animation:breathe 2.2s ease-in-out infinite; }
+  .execution-header .group-elapsed { color:#a2a6af; font:600 9.5px ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  .execution-list { max-height:246px; overflow-y:auto; overscroll-behavior:contain; padding:7px 8px 10px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.16) transparent; mask-image:linear-gradient(to bottom,transparent 0,#000 7px,#000 calc(100% - 11px),transparent 100%); }
+  .execution-list::-webkit-scrollbar { width:4px; }
+  .execution-list::-webkit-scrollbar-thumb { border-radius:999px; background:rgba(255,255,255,.17); }
+  .activity { position:relative; min-height:37px; padding:0 8px; display:grid; grid-template-columns:18px minmax(0,1fr) auto 15px; align-items:center; gap:8px; border-radius:11px; color:#9b9fa8; font-size:11px; }
+  .activity + .activity { margin-top:1px; }
+  .activity:hover { color:#e7e9ed; background:rgba(255,255,255,.037); }
+  .activity.current { color:#f3f4f6; background:linear-gradient(90deg,rgba(118,126,219,.16),rgba(118,126,219,.045) 70%,transparent); box-shadow:inset 1px 0 0 rgba(148,155,255,.55); }
+  .activity .glyph { display:grid; place-items:center; color:#7e838d; }
+  .activity .label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-transform:none; letter-spacing:normal; }
+  .activity .label b { color:#f1f2f4; font-weight:600; }
+  .activity .detail { color:#7f848e; }
+  .activity time { color:#7f848d; font:9px ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  .check { color:#22d39c; font-size:10px; text-shadow:0 0 12px rgba(34,211,156,.25); }
+  .ring { width:8px; height:8px; border:1.5px solid rgba(255,255,255,.16); border-top-color:#929cff; border-radius:50%; box-shadow:0 0 9px rgba(146,156,255,.18); }
+
+  .context-card { position:relative; min-height:52px; padding:0 13px; display:grid; grid-template-columns:31px minmax(0,1fr) auto 16px; align-items:center; gap:11px; overflow:hidden; border:1px solid rgba(255,255,255,.075); border-radius:15px; background:linear-gradient(145deg,rgba(255,255,255,.047),rgba(255,255,255,.024)); box-shadow:0 13px 34px rgba(0,0,0,.10); transition:transform .18s ease,border-color .18s ease,background .18s ease; }
+  .context-card:before { content:""; position:absolute; inset:0; pointer-events:none; opacity:0; background:radial-gradient(circle at 8% 50%,rgba(var(--tone),.12),transparent 25%); transition:opacity .18s ease; }
+  .context-card:hover { transform:translateY(-1px); border-color:rgba(255,255,255,.125); background:linear-gradient(145deg,rgba(255,255,255,.061),rgba(255,255,255,.029)); }
+  .context-card:hover:before { opacity:1; }
+  .orb { position:relative; display:grid; place-items:center; width:31px; height:31px; border-radius:50%; color:rgb(var(--tone)); background:rgba(var(--tone),.105); box-shadow:inset 0 0 0 1px rgba(var(--tone),.09),0 0 22px rgba(var(--tone),.045); font-size:11px; }
+  .card-copy { position:relative; min-width:0; }
+  .card-title { color:#eceef1; font-size:11.5px; font-weight:620; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .card-sub { margin-top:3px; color:#858a94; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .card-meta { color:#868a93; font:9px ui-monospace,monospace; }
+  .arrow { color:#676c76; font-size:15px; }
+  .tool { --tone:132,145,255; }
+  .plan { --tone:181,135,241; }
+  .question { --tone:103,181,235; }
+  .permission-tone { --tone:233,179,94; }
+  .micro-progress { display:flex; align-items:center; gap:7px; }
+  .micro-progress span { width:60px; height:3px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.075); }
+  .micro-progress i { display:block; width:60%; height:100%; border-radius:99px; background:linear-gradient(90deg,#9c76dc,#c093f0); box-shadow:0 0 10px rgba(181,135,241,.24); }
+
+  .permission-card { align-items:start; grid-template-columns:31px minmax(0,1fr); padding-top:13px; padding-bottom:13px; background:linear-gradient(145deg,rgba(233,179,94,.065),rgba(255,255,255,.021)); }
+  .permission-content { min-width:0; }
+  .actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; margin-top:11px; }
+  .action { min-height:29px; padding:0 11px; border:1px solid rgba(255,255,255,.085); border-radius:999px; background:rgba(255,255,255,.026); color:#b3b6bd; font-size:9.5px; }
+  .action.primary { border-color:rgba(233,179,94,.26); background:linear-gradient(135deg,rgba(233,179,94,.15),rgba(233,179,94,.075)); color:#f1ca8c; box-shadow:0 6px 18px rgba(203,144,53,.06); }
+  .completed { min-height:43px; padding:0 13px; display:grid; grid-template-columns:16px minmax(0,1fr) auto; align-items:center; gap:8px; border:1px solid rgba(255,255,255,.065); border-radius:14px; background:rgba(255,255,255,.022); color:#a6a9b0; }
+  .completed strong { color:#d8dade; font-size:11.5px; font-weight:620; }
+  .completed time { color:#7e828b; font:9px ui-monospace,monospace; }
+
+  .principles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin-top:14px; }
+  .principle { padding:11px 12px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.014); }
+  .principle b { display:block; margin-bottom:4px; font-size:11px; }
+  .principle span { color:var(--muted); font-size:10px; line-height:1.45; }
+  .decision { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:14px; padding:13px 15px; border:1px solid var(--border); border-radius:13px; }
+  .decision p { margin:0; color:var(--muted); font-size:12px; }
+  .decision button { cursor:pointer; padding:9px 14px; border:0; border-radius:999px; background:linear-gradient(135deg,#737ee2,#9b72d1); color:white; font-weight:750; box-shadow:0 8px 22px rgba(116,106,219,.22); }
+  @media(prefers-reduced-motion:reduce){.execution:after,.live-copy:before{animation:none}.context-card{transition:none}}
+  @media(max-width:720px){.scene{padding:15px}.principles{grid-template-columns:1fr 1fr}.vip-toolbar{align-items:flex-start;flex-direction:column}}
+</style>
+
+<h2>Premium Direction — Quiet Intelligence</h2>
+<p class="subtitle">“Wow” bằng độ tinh tế và cảm giác hệ thống đang sống. Total elapsed của group đang chạy hiển thị và cập nhật live ở mép phải.</p>
+
+<div class="vip-shell">
+  <div class="vip-toolbar"><strong>HAPI Agent Feed · Signature System</strong><span>Dark theme · 600px · lossless · scrollable</span></div>
+  <div class="scene">
+    <div class="conversation">
+      <div class="execution">
+        <div class="execution-header"><span class="chev">›</span><span><strong>12 activities running</strong><span class="live-copy">live</span></span><time class="group-elapsed">21m 04s</time></div>
+        <div class="execution-list">
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Inspecting MCP client code and diffs</span><time>&lt;0.1s</time><span class="check">✓</span></div>
+          <div class="activity current"><span class="glyph">▣</span><span class="label"><b>Terminal</b>&nbsp; <span class="detail mono">sed -n '220,920p' backend/app…</span></span><time>21m 00s</time><span class="ring"></span></div>
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Mapping affected callers</span><time>2.4s</time><span class="check">✓</span></div>
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Reviewing request handling path</span><time>1.8s</time><span class="check">✓</span></div>
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Checking fallback behavior</span><time>0.9s</time><span class="check">✓</span></div>
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Comparing normalized output</span><time>1.2s</time><span class="check">✓</span></div>
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Reading provider metadata</span><time>0.7s</time><span class="check">✓</span></div>
+          <div class="activity"><span class="glyph">⌁</span><span class="label">Preparing final verification</span><time>—</time><span></span></div>
+        </div>
+      </div>
+
+      <div class="context-card tool">
+        <span class="orb">⌕</span><span class="card-copy"><span class="card-title">GitNexus · Impact analysis</span><span class="card-sub">MCPClient · 15 callers · high impact</span></span><span class="check">✓</span><span class="arrow">›</span>
+      </div>
+      <div class="context-card plan">
+        <span class="orb">☷</span><span class="card-copy"><span class="card-title">Plan updated</span><span class="card-sub">Patch activity cards and verify regression coverage</span></span><span class="micro-progress"><span><i></i></span><b class="card-meta">3/5</b></span><span class="arrow">›</span>
+      </div>
+      <div class="context-card question">
+        <span class="orb">?</span><span class="card-copy"><span class="card-title">Input requested</span><span class="card-sub">Choose the preferred processing-card density</span></span><span class="card-meta">waiting</span><span class="arrow">›</span>
+      </div>
+      <div class="context-card permission-card permission-tone">
+        <span class="orb">✦</span>
+        <span class="permission-content"><span class="card-title">Write permission required</span><span class="card-sub">Allow changes in web/src/components/ToolCard?</span><span class="actions"><button class="action">Deny</button><button class="action">Allow once</button><button class="action primary">Allow session</button></span></span>
+      </div>
+      <div class="completed"><span>›</span><strong>4 activities completed</strong><time>34.1s</time></div>
+    </div>
+  </div>
+</div>
+
+<div class="principles">
+  <div class="principle"><b>Live wall-clock total</b><span>Group đang chạy dùng now − first.startedAt; khi hoàn tất đóng băng tại last.completedAt.</span></div>
+  <div class="principle"><b>Context orbs</b><span>Icon tròn trở thành ngôn ngữ nhận diện chung cho Tool, Plan, Question và Permission.</span></div>
+  <div class="principle"><b>Calm hierarchy</b><span>Thông tin chính sáng, metadata lùi sâu; màu chỉ xuất hiện nơi có ý nghĩa.</span></div>
+  <div class="principle"><b>Premium motion</b><span>Spring nhẹ khi mở, 1px lift khi hover, pulse khi chạy; tôn trọng reduced motion.</span></div>
+</div>
+
+<div class="decision">
+  <p>Total luôn theo wall-clock của group, không cộng duration từng activity.</p>
+  <button data-choice="quiet-intelligence-live-total" onclick="toggleSelect(this)">Duyệt bản live total</button>
+</div>
+<script>
+  function toggleSelect(element) {
+    element.textContent = 'Quiet Intelligence · approved'
+  }
+</script>
+</body>
+</html>

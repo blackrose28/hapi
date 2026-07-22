@@ -141,19 +141,19 @@ function normalizeAcpToolContent(content: unknown): string | object | null {
     return diffBlock ?? parts.join('');
 }
 
-function normalizePlanEntries(entries: unknown): PlanItem[] {
-    if (!Array.isArray(entries)) return [];
+function normalizePlanEntries(entries: unknown): PlanItem[] | null {
+    if (!Array.isArray(entries)) return null;
 
     const items: PlanItem[] = [];
     for (const entry of entries) {
-        if (!isObject(entry)) continue;
+        if (!isObject(entry)) return null;
         const content = asString(entry.content);
         const priority = asString(entry.priority);
         const status = asString(entry.status);
 
-        if (!content) continue;
-        if (priority !== 'high' && priority !== 'medium' && priority !== 'low') continue;
-        if (status !== 'pending' && status !== 'in_progress' && status !== 'completed') continue;
+        if (!content) return null;
+        if (priority !== 'high' && priority !== 'medium' && priority !== 'low') return null;
+        if (status !== 'pending' && status !== 'in_progress' && status !== 'completed') return null;
 
         items.push({ content, priority, status });
     }
@@ -326,7 +326,7 @@ export class AcpMessageHandler {
             this.flushReasoning();
             this.flushText();
             const items = normalizePlanEntries(update.entries);
-            if (items.length > 0) {
+            if (items !== null) {
                 this.onMessage({ type: 'plan', items });
             }
         }

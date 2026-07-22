@@ -167,7 +167,7 @@ export class MessageService {
             }
         }
 
-        const msg = this.store.messages.addMessage(sessionId, content, payload.localId ?? undefined)
+        const { message: msg } = this.store.messages.addMessage(sessionId, content, payload.localId ?? undefined)
         this.onSessionActivity?.(sessionId, msg.createdAt)
 
         const update = {
@@ -224,7 +224,7 @@ export class MessageService {
             meta: payload.meta
         }
 
-        const msg = this.store.messages.addMessage(sessionId, content)
+        const { message: msg } = this.store.messages.addMessage(sessionId, content)
         this.onSessionActivity?.(sessionId, msg.createdAt)
 
         const update = {

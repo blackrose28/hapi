@@ -1,7 +1,7 @@
 import type { ToolCallMessagePartProps } from '@assistant-ui/react'
 import type { ChatBlock } from '@/chat/types'
 import type { ToolCallBlock } from '@/chat/types'
-import { isObject, safeStringify } from '@hapi/protocol'
+import { safeStringify } from '@hapi/protocol'
 import { getEventPresentation } from '@/chat/presentation'
 import { CodeBlock } from '@/components/CodeBlock'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
@@ -10,21 +10,21 @@ import { MessageStatusIndicator } from '@/components/AssistantChat/messages/Mess
 import { ToolCard } from '@/components/ToolCard/ToolCard'
 import { useHappyChatContext } from '@/components/AssistantChat/context'
 import { CliOutputBlock } from '@/components/CliOutputBlock'
-
-function isToolCallBlock(value: unknown): value is ToolCallBlock {
-    if (!isObject(value)) return false
-    if (value.kind !== 'tool-call') return false
-    if (typeof value.id !== 'string') return false
-    if (value.localId !== null && typeof value.localId !== 'string') return false
-    if (typeof value.createdAt !== 'number') return false
-    if (!Array.isArray(value.children)) return false
-    if (!isObject(value.tool)) return false
-    if (typeof value.tool.name !== 'string') return false
-    if (!('input' in value.tool)) return false
-    if (value.tool.description !== null && typeof value.tool.description !== 'string') return false
-    if (value.tool.state !== 'pending' && value.tool.state !== 'running' && value.tool.state !== 'completed' && value.tool.state !== 'error') return false
-    return true
-}
+import {
+    getActivityDurationMs,
+    isGroupableToolBlock,
+    isToolCallBlock
+} from '@/components/ToolCard/toolRunModel'
+import {
+    useActivityClock,
+    useFormattedActivityDuration,
+    useToolRunLayout
+} from '@/components/ToolCard/toolRunContext'
+import { getToolPresentation } from '@/components/ToolCard/knownTools'
+import { getToolResultViewComponent } from '@/components/ToolCard/views/_results'
+import { ReasoningDisclosure } from '@/components/assistant-ui/reasoning'
+import { useTranslation } from '@/lib/use-translation'
+import { cn } from '@/lib/utils'
 
 function isPendingPermissionBlock(block: ChatBlock): boolean {
     return block.kind === 'tool-call' && block.tool.permission?.status === 'pending'
@@ -159,7 +159,22 @@ function HappyNestedBlockList(props: {
 
 export function HappyToolMessage(props: ToolCallMessagePartProps) {
     const ctx = useHappyChatContext()
+    const { t } = useTranslation()
+    const layout = useToolRunLayout()
+    const grouped = layout.grouped
     const artifact = props.artifact
+    const standaloneCodexRunning = !grouped
+        && isToolCallBlock(artifact)
+        && artifact.tool.name === 'CodexReasoning'
+        && (artifact.tool.state === 'pending' || artifact.tool.state === 'running')
+    const standaloneNow = useActivityClock(standaloneCodexRunning)
+    const codexDurationMs = isToolCallBlock(artifact) && artifact.tool.name === 'CodexReasoning'
+        ? getActivityDurationMs(
+            { kind: 'tool', block: artifact },
+            grouped ? layout.now : standaloneNow
+        )
+        : null
+    const codexDuration = useFormattedActivityDuration(codexDurationMs)
 
     if (!isToolCallBlock(artifact)) {
         const argsText = typeof props.argsText === 'string' ? props.argsText.trim() : ''
@@ -168,7 +183,7 @@ export function HappyToolMessage(props: ToolCallMessagePartProps) {
         const resultText = hasResult ? safeStringify(props.result) : ''
 
         return (
-            <div className="py-1 min-w-0 max-w-full overflow-x-hidden">
+            <div className={cn(!grouped && 'py-1', 'min-w-0 max-w-full overflow-x-hidden')}>
                 <div className="rounded-xl bg-[var(--app-secondary-bg)] p-3 shadow-sm">
                     <div className="flex items-center gap-2 text-xs">
                         <div className="font-mono text-[var(--app-hint)]">
@@ -199,11 +214,69 @@ export function HappyToolMessage(props: ToolCallMessagePartProps) {
     }
 
     const block = artifact
+    const isCodexReasoning = block.tool.name === 'CodexReasoning'
+        && block.tool.state !== 'error'
+        && block.tool.permission === undefined
+        && block.children.length === 0
+
+    if (isCodexReasoning) {
+        const presentation = getToolPresentation({
+            toolName: block.tool.name,
+            input: block.tool.input,
+            result: block.tool.result,
+            childrenCount: block.children.length,
+            description: block.tool.description,
+            metadata: ctx.metadata,
+            t
+        })
+        const ResultView = getToolResultViewComponent(block.tool.name)
+        const isStreaming = block.tool.state === 'pending' || block.tool.state === 'running'
+        return (
+            <div
+                data-codex-reasoning
+                data-tool-block-id={block.id}
+                className={cn(!grouped && 'py-1', 'min-w-0 max-w-full overflow-x-hidden')}
+            >
+                <ReasoningDisclosure
+                    label={presentation.title}
+                    ariaLabel={presentation.title}
+                    isStreaming={isStreaming}
+                    presentation={grouped ? 'group-row' : 'standalone'}
+                    duration={codexDuration?.compact}
+                    durationAriaLabel={codexDuration
+                        ? t('tool.group.activityDuration', {
+                            duration: codexDuration.accessible
+                        })
+                        : undefined}
+                    statusLabel={grouped
+                        ? t(isStreaming ? 'tool.status.running' : 'tool.status.completed')
+                        : undefined}
+                >
+                    <ResultView
+                        block={block}
+                        metadata={ctx.metadata}
+                        surface="group-output"
+                        t={t}
+                    />
+                </ReasoningDisclosure>
+            </div>
+        )
+    }
+
     const isTask = block.tool.name === 'Task'
     const taskChildren = isTask ? splitTaskChildren(block) : null
+    const standaloneCompact = !grouped && isGroupableToolBlock(block)
+    const compact = grouped || standaloneCompact
 
     return (
-        <div className="py-1 min-w-0 max-w-full overflow-x-hidden">
+        <div
+            data-tool-singleton-compact={standaloneCompact ? '' : undefined}
+            className={cn(
+                !grouped && 'py-1',
+                'min-w-0 max-w-full overflow-x-hidden',
+                standaloneCompact && 'w-full max-w-[600px]'
+            )}
+        >
             <ToolCard
                 api={ctx.api}
                 sessionId={ctx.sessionId}
@@ -211,6 +284,7 @@ export function HappyToolMessage(props: ToolCallMessagePartProps) {
                 disabled={ctx.disabled}
                 onDone={ctx.onRefresh}
                 block={block}
+                displayMode={compact ? 'group-row' : 'card'}
             />
             {block.children.length > 0 ? (
                 isTask ? (

@@ -7,6 +7,7 @@ import type {
     EditorGitListBranchesResponse,
     EditorGitStashListResponse,
     EditorProjectsResponse,
+    AgentModelsResponse,
     CodexCollaborationMode,
     DeleteUploadResponse,
     ListDirectoryResponse,
@@ -38,6 +39,7 @@ import type {
     TeamMentionRequest,
     TeamChatMessage
 } from '@/types/api'
+import type { AgentFlavor } from '@hapi/protocol'
 
 type ApiClientOptions = {
     baseUrl?: string
@@ -585,6 +587,29 @@ export class ApiClient {
     async getSessionCodexModels(sessionId: string): Promise<CodexModelsResponse> {
         return await this.request<CodexModelsResponse>(
             `/api/sessions/${encodeURIComponent(sessionId)}/codex-models`
+        )
+    }
+
+    async getMachineAgentModels(
+        machineId: string,
+        agent: AgentFlavor,
+        cwd?: string
+    ): Promise<AgentModelsResponse> {
+        const params = new URLSearchParams({ agent })
+        if (cwd) {
+            params.set('cwd', cwd)
+        }
+        return await this.request<AgentModelsResponse>(
+            `/api/machines/${encodeURIComponent(machineId)}/models?${params.toString()}`
+        )
+    }
+
+    async getSessionAgentModels(
+        sessionId: string,
+        agent: AgentFlavor
+    ): Promise<AgentModelsResponse> {
+        return await this.request<AgentModelsResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/models?agent=${encodeURIComponent(agent)}`
         )
     }
 

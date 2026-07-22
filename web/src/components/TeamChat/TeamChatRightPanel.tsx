@@ -10,6 +10,7 @@ import { compareSessionGroupOrder } from '@/lib/session-group-order'
 import { queryKeys } from '@/lib/query-keys'
 import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { useCodexModels } from '@/hooks/queries/useCodexModels'
+import { useAgentModels } from '@/hooks/queries/useAgentModels'
 import { useOpencodeModels } from '@/hooks/queries/useOpencodeModels'
 import { getModelOptionsForFlavor } from '@/components/AssistantChat/modelOptions'
 import { getClaudeComposerEffortOptions } from '@/components/AssistantChat/claudeEffortOptions'
@@ -320,13 +321,19 @@ function TeamMemberLoadedSessionSettings(props: {
     error: string | null
     setError: (error: string | null) => void
 }) {
-    const agentFlavor = props.session.metadata?.flavor ?? null
+    const agentFlavor = props.session.metadata?.flavor ?? 'claude'
     const controlledByUser = props.session.agentState?.controlledByUser === true
     const codexCollaborationModeSupported = agentFlavor === 'codex' && !controlledByUser
     const codexModelsState = useCodexModels({
         api: props.api,
         sessionId: props.session.id,
         enabled: agentFlavor === 'codex' && !controlledByUser
+    })
+    const claudeModelsState = useAgentModels({
+        api: props.api,
+        agent: 'claude',
+        sessionId: props.session.id,
+        enabled: agentFlavor === 'claude'
     })
     const codexModelOptions = useMemo(() => {
         if (agentFlavor !== 'codex') return undefined
@@ -335,6 +342,16 @@ function TeamMemberLoadedSessionSettings(props: {
             label: codexModel.displayName
         }))
     }, [agentFlavor, codexModelsState.models])
+    const claudeModelOptions = useMemo(() => {
+        if (agentFlavor !== 'claude') return undefined
+        return [
+            { value: null, label: 'Default' },
+            ...claudeModelsState.models.map((claudeModel) => ({
+                value: claudeModel.id,
+                label: claudeModel.displayName
+            }))
+        ]
+    }, [agentFlavor, claudeModelsState.models])
     const opencodeModelsState = useOpencodeModels({
         api: props.api,
         sessionId: props.session.id,
@@ -369,8 +386,18 @@ function TeamMemberLoadedSessionSettings(props: {
     const permissionModeOptions = useMemo(() => getPermissionModeOptionsForFlavor(agentFlavor), [agentFlavor])
     const collaborationModeOptions = useMemo(() => agentFlavor === 'codex' ? getCodexCollaborationModeOptions() : [], [agentFlavor])
     const modelOptions = useMemo(
-        () => getModelOptionsForFlavor(agentFlavor, model, agentFlavor === 'codex' ? codexModelOptions : agentFlavor === 'opencode' ? opencodeModelOptions : undefined),
-        [agentFlavor, model, codexModelOptions, opencodeModelOptions]
+        () => getModelOptionsForFlavor(
+            agentFlavor,
+            model,
+            agentFlavor === 'codex'
+                ? codexModelOptions
+                : agentFlavor === 'claude'
+                    ? claudeModelOptions
+                    : agentFlavor === 'opencode'
+                        ? opencodeModelOptions
+                        : undefined
+        ),
+        [agentFlavor, model, codexModelOptions, claudeModelOptions, opencodeModelOptions]
     )
     const modelReasoningEffortOptions = useMemo(
         () => agentFlavor === 'codex'
@@ -380,6 +407,9 @@ function TeamMemberLoadedSessionSettings(props: {
     )
     const claudeEffortOptions = useMemo(() => getClaudeComposerEffortOptions(effort), [effort])
     const codexModelsError = props.session.active ? codexModelsState.error : null
+    const agentModelsError = props.session.active && agentFlavor === 'claude'
+        ? claudeModelsState.error
+        : null
 
     const runSessionSetting = async (action: () => Promise<void>) => {
         props.setError(null)
@@ -413,6 +443,11 @@ function TeamMemberLoadedSessionSettings(props: {
                     Provider model discovery is unavailable right now. Existing session model is preserved.
                 </div>
             ) : null}
+            {agentModelsError ? (
+                <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-secondary-bg)] p-3 text-xs text-[var(--app-hint)]">
+                    Provider model discovery is unavailable right now. Fallback Claude models remain available.
+                </div>
+            ) : null}
             {hasSettings ? (
                 <div className="overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-card-bg,var(--app-bg))]">
                     <SessionComposerSettingsPanel
@@ -424,7 +459,12 @@ function TeamMemberLoadedSessionSettings(props: {
                         effort={effort}
                         showCollaborationSettings={Boolean(codexCollaborationModeSupported && collaborationModeOptions.length > 0)}
                         showPermissionSettings={permissionModeOptions.length > 0}
-                        showModelSettings={Boolean(supportsModelChange(agentFlavor) && modelOptions.length > 0 && !(agentFlavor === 'codex' && (controlledByUser || codexModelsError)))}
+                        showModelSettings={Boolean(
+                            supportsModelChange(agentFlavor)
+                            && modelOptions.length > 0
+                            && !(agentFlavor === 'codex' && (controlledByUser || codexModelsError))
+                            && !(agentFlavor === 'claude' && claudeModelsState.isLoading)
+                        )}
                         showModelReasoningEffortSettings={Boolean((agentFlavor === 'codex' || agentFlavor === 'opencode') && !controlledByUser && modelReasoningEffortOptions.length > 0)}
                         showEffortSettings={supportsEffort(agentFlavor)}
                         collaborationModeOptions={collaborationModeOptions}

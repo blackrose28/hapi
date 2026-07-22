@@ -7,6 +7,7 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
+import type { AgentFlavor, AgentModelCatalogResult } from '@hapi/protocol'
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant } from '../store'
@@ -980,6 +981,40 @@ export class SyncEngine {
 
     async listCodexModelsForMachine(machineId: string): Promise<RpcListCodexModelsResponse> {
         return await this.rpcGateway.listCodexModelsForMachine(machineId)
+    }
+
+    async listAgentModelsForSession(
+        sessionId: string,
+        agent: AgentFlavor
+    ): Promise<AgentModelCatalogResult> {
+        return await this.rpcGateway.listAgentModelsForSession(sessionId, agent)
+    }
+
+    async listAgentModelsForMachine(
+        machineId: string,
+        agent: AgentFlavor,
+        cwd?: string
+    ): Promise<AgentModelCatalogResult> {
+        return await this.rpcGateway.listAgentModelsForMachine(machineId, agent, cwd)
+    }
+
+    cacheAgentModelsForSession(
+        sessionId: string,
+        agent: AgentFlavor,
+        result: AgentModelCatalogResult
+    ): void {
+        if (result.status !== 'dynamic' && result.status !== 'fallback') {
+            return
+        }
+        this.sessionCache.cacheSessionMetadata(sessionId, {
+            cachedAgentModels: {
+                agent,
+                status: result.status,
+                models: result.models,
+                source: result.source,
+                cachedAt: Date.now()
+            }
+        })
     }
 
     // -----------------------------------------------------------------------

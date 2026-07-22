@@ -197,7 +197,7 @@ type TraceChildRowProps = {
 
 function TraceChildRow({ child, metadata, expanded, onToggle }: TraceChildRowProps) {
     const { t } = useTranslation()
-    const label = formatTaskChildLabel(child, metadata)
+    const label = formatTaskChildLabel(child, metadata, t)
     const FullInputView = getToolFullViewComponent(child.tool.name)
     const ResultView = getToolResultViewComponent(child.tool.name)
 
@@ -220,14 +220,14 @@ function TraceChildRow({ child, metadata, expanded, onToggle }: TraceChildRowPro
                     <div>
                         <div className="mb-1 text-xs font-medium text-[var(--app-hint)]">{t('tool.input')}</div>
                         {FullInputView ? (
-                            <FullInputView block={child} metadata={metadata} />
+                            <FullInputView block={child} metadata={metadata} t={t} />
                         ) : (
                             <CodeBlock code={safeStringify(child.tool.input)} language="json" />
                         )}
                     </div>
                     <div>
                         <div className="mb-1 text-xs font-medium text-[var(--app-hint)]">{t('tool.result')}</div>
-                        <ResultView block={child} metadata={metadata} />
+                        <ResultView block={child} metadata={metadata} t={t} />
                     </div>
                 </div>
             )}

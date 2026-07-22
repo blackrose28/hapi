@@ -5,6 +5,12 @@ import { SessionChat } from './SessionChat'
 
 const navigateMock = vi.fn()
 const onSendMock = vi.fn()
+const useAgentModelsMock = vi.hoisted(() => vi.fn(() => ({
+    models: [],
+    status: 'fallback',
+    isLoading: false,
+    error: null
+})))
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
 vi.mock('@tanstack/react-router', () => ({
@@ -53,6 +59,10 @@ vi.mock('@/hooks/queries/useSessionTeamMentions', () => ({
 
 vi.mock('@/hooks/queries/useCodexModels', () => ({
     useCodexModels: () => ({ models: [], error: null })
+}))
+
+vi.mock('@/hooks/queries/useAgentModels', () => ({
+    useAgentModels: useAgentModelsMock
 }))
 
 vi.mock('@/hooks/queries/useOpencodeModels', () => ({
@@ -245,5 +255,16 @@ describe('SessionChat Codex goal header control', () => {
             call.some((arg: unknown) => String(arg).includes('Encountered two children with the same key'))
         )
         expect(duplicateKeyWarnings).toEqual([])
+    })
+
+    it('treats legacy sessions without an explicit flavor as Claude', () => {
+        renderChat(makeSession({
+            metadata: { path: '/repo', host: 'host', machineId: 'machine-1' }
+        }))
+
+        expect(useAgentModelsMock).toHaveBeenCalledWith(expect.objectContaining({
+            agent: 'claude',
+            enabled: true
+        }))
     })
 })

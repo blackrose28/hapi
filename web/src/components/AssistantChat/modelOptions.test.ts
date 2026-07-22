@@ -16,6 +16,19 @@ describe('getModelOptionsForFlavor', () => {
         expect(options.some((o) => o.value === 'opus')).toBe(true)
     })
 
+    it('uses a dynamic Claude catalog and preserves an unknown current model', () => {
+        const options = getModelOptionsForFlavor('claude', 'claude-legacy', [
+            { value: null, label: 'Default' },
+            { value: 'claude-custom', label: 'Claude Custom' }
+        ])
+
+        expect(options).toEqual([
+            { value: null, label: 'Default' },
+            { value: 'claude-legacy', label: 'claude-legacy' },
+            { value: 'claude-custom', label: 'Claude Custom' }
+        ])
+    })
+
     it('includes custom Gemini model from env/config in options', () => {
         const options = getModelOptionsForFlavor('gemini', 'gemini-custom-experiment')
         expect(options.some((o) => o.value === 'gemini-custom-experiment')).toBe(true)

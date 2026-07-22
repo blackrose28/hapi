@@ -1,6 +1,7 @@
 import { getPermissionModesForFlavor, isPermissionModeAllowedForFlavor, supportsModelChange, toSessionSummary } from '@hapi/protocol'
 import { CodexCollaborationModeSchema, PermissionModeSchema } from '@hapi/protocol/schemas'
 import { Hono } from 'hono'
+import { isKnownFlavor } from '@hapi/protocol'
 import { z } from 'zod'
 import type { SyncEngine, Session } from '../../sync/syncEngine'
 import type { WebAppEnv } from '../middleware/auth'
@@ -712,6 +713,50 @@ export function createSessionsRoutes(
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to list Codex models'
             }, 500)
+        }
+    })
+
+    app.get('/sessions/:id/models', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine)
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const agent = c.req.query('agent')
+        if (!isKnownFlavor(agent)) {
+            return c.json({ error: 'Invalid agent' }, 400)
+        }
+
+        const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
+        if (flavor !== agent) {
+            return c.json({ error: 'Agent models are only available for matching sessions' }, 400)
+        }
+
+        if (!sessionResult.session.active) {
+            const cached = sessionResult.session.metadata?.cachedAgentModels
+            if (!cached || cached.agent !== agent) {
+                return c.json({ error: 'No cached agent models available for this session' }, 404)
+            }
+            return c.json({
+                status: cached.status,
+                models: cached.models,
+                source: cached.source
+            })
+        }
+
+        try {
+            const result = await engine.listAgentModelsForSession(sessionResult.sessionId, agent)
+            if (result.status === 'dynamic' || result.status === 'fallback') {
+                engine.cacheAgentModelsForSession(sessionResult.sessionId, agent, result)
+            }
+            return c.json(result)
+        } catch {
+            return c.json({ error: 'Failed to list agent models' }, 500)
         }
     })
 
