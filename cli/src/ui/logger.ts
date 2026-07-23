@@ -65,14 +65,15 @@ class Logger {
   debug(message: string, ...args: unknown[]): void {
     this.logToFile(`[${this.localTimezoneTimestamp()}]`, message, ...args)
 
-    // NOTE: @kirill does not think its a good ideas,
-    // as it will break us using claude in interactive mode.
-    // Instead simply open the debug file in a new editor window.
-    //
-    // Also log to console in development mode
-    // if (process.env.DEBUG) {
-    //   this.logToConsole('debug', '', message, ...args)
-    // }
+    // Echo to console under DEBUG, but only when there's no interactive TUI to
+    // corrupt (per @kirill's note above): either this is the runner itself
+    // (no TUI, ever), or stdout isn't a TTY (e.g. a session spawned by the
+    // runner with piped stdio - also no TUI, since ink no-ops without a TTY).
+    // Local file logging is a no-op (see logToFile), so this is currently the
+    // only way to observe debug output live.
+    if (process.env.DEBUG && (configuration.isRunnerProcess || !process.stdout.isTTY)) {
+      this.logToConsole('debug', '', message, ...args)
+    }
   }
 
   debugLargeJson(

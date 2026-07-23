@@ -5,10 +5,12 @@
  */
 
 import { FileHandle } from 'node:fs/promises'
-import { readFile, writeFile, mkdir, open, unlink, rename, stat } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, open, unlink, rename, rm, stat } from 'node:fs/promises'
 import { existsSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs'
 import { configuration } from '@/configuration'
 import { isProcessAlive } from '@/utils/process';
+import { getCliArgs } from '@/utils/cliArgs';
+import { readRunnerProfileState, resolveRunnerProfilePaths, writeRunnerProfileState, type RunnerProfilePaths } from '@/runner/profile';
 
 interface Settings {
   // This ID is used as the actual database ID on the server
@@ -159,9 +161,57 @@ export async function clearMachineId(): Promise<void> {
 }
 
 /**
+ * Resolve the profile name identifying the current process, if any:
+ * either `runner start-sync --profile <name>` on the CLI (the runner itself,
+ * when invoked directly rather than via the `runner start` wrapper that
+ * pre-sets HAPI_HOME), or HAPI_RUNNER_PROFILE (set by the runner on every
+ * session it spawns - see run.ts's spawnHappyCLI env block).
+ */
+function resolveActiveRunnerProfileName(): string | undefined {
+  const args = getCliArgs();
+  if (args[0] === 'runner') {
+    const idx = args.indexOf('--profile');
+    if (idx >= 0 && args[idx + 1]) {
+      return args[idx + 1];
+    }
+    const eqArg = args.find((arg) => arg.startsWith('--profile='));
+    if (eqArg) {
+      return eqArg.slice('--profile='.length);
+    }
+  }
+  return process.env.HAPI_RUNNER_PROFILE?.trim() || undefined;
+}
+
+/**
+ * Resolve the profile-scoped state paths for the current process, if a
+ * profile is identifiable. This must match run.ts's own resolution
+ * (`readRunnerProfile(HAPI_PROFILE_BASE_HOME ?? configuration.happyHomeDir, profile)`)
+ * so the runner's actual state file and this process's view of it agree -
+ * this is what `notifyRunnerSessionStarted` and friends were missing,
+ * causing every runner-spawned session to report "no state file found".
+ */
+function resolveActiveRunnerProfilePaths(): RunnerProfilePaths | null {
+  const profileName = resolveActiveRunnerProfileName();
+  if (!profileName) {
+    return null;
+  }
+  const profileBaseHome = process.env.HAPI_PROFILE_BASE_HOME ?? configuration.happyHomeDir;
+  try {
+    return resolveRunnerProfilePaths(profileBaseHome, profileName);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Read runner state from local file
  */
 export async function readRunnerState(): Promise<RunnerLocallyPersistedState | null> {
+  const profilePaths = resolveActiveRunnerProfilePaths();
+  if (profilePaths) {
+    return await readRunnerProfileState<RunnerLocallyPersistedState>(profilePaths);
+  }
+
   try {
     if (!existsSync(configuration.runnerStateFile)) {
       return null;
@@ -176,9 +226,14 @@ export async function readRunnerState(): Promise<RunnerLocallyPersistedState | n
 }
 
 /**
- * Write runner state to local file (synchronously for atomic operation)
+ * Write runner state to local file (profile-scoped when a profile is active)
  */
-export function writeRunnerState(state: RunnerLocallyPersistedState): void {
+export async function writeRunnerState(state: RunnerLocallyPersistedState): Promise<void> {
+  const profilePaths = resolveActiveRunnerProfilePaths();
+  if (profilePaths) {
+    await writeRunnerProfileState(profilePaths, state);
+    return;
+  }
   writeFileSync(configuration.runnerStateFile, JSON.stringify(state, null, 2), 'utf-8');
 }
 
@@ -186,6 +241,17 @@ export function writeRunnerState(state: RunnerLocallyPersistedState): void {
  * Clean up runner state file and lock file
  */
 export async function clearRunnerState(): Promise<void> {
+  const profilePaths = resolveActiveRunnerProfilePaths();
+  if (profilePaths) {
+    try {
+      await rm(profilePaths.stateFile, { force: true });
+      await rm(profilePaths.lockFile, { force: true });
+    } catch {
+      // Lock file might be held by running runner, ignore error
+    }
+    return;
+  }
+
   if (existsSync(configuration.runnerStateFile)) {
     await unlink(configuration.runnerStateFile);
   }

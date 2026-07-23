@@ -445,6 +445,17 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
           stderrTail = appendTail(stderrTail, data);
         });
 
+        // stdout is piped (not inherited - the child has no TTY) but nothing
+        // else reads it, so it would otherwise sit invisible and risk filling
+        // the OS pipe buffer. Forward it under DEBUG so the child's own debug
+        // logs (which echo to console when !isTTY, see logger.ts) are visible
+        // in the runner's terminal instead of silently discarded.
+        happyProcess.stdout?.on('data', (data) => {
+          if (process.env.DEBUG) {
+            process.stdout.write(`[CHILD ${happyProcess?.pid}] ${data}`);
+          }
+        });
+
         let spawnErrorBeforePidCheck: Error | null = null;
         const captureSpawnErrorBeforePidCheck = (error: Error) => {
           spawnErrorBeforePidCheck = error;
