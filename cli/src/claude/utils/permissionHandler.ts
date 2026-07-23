@@ -311,9 +311,11 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
 
         let toolCallId = this.resolveToolCallId(toolName, input);
         if (!toolCallId) { // What if we got permission before tool call
+            logger.debug(`[permission:resolve] no match on first attempt for ${toolName}, input=${JSON.stringify(input)}, retrying in 1s`);
             await delay(1000);
             toolCallId = this.resolveToolCallId(toolName, input);
             if (!toolCallId) {
+                logger.debug(`[permission:resolve] still no match after retry for ${toolName}, known tool calls=${JSON.stringify(this.toolCalls.map(c => ({ id: c.id, name: c.name, input: c.input, used: c.used })))}`);
                 throw new Error(`Could not resolve tool call ID for ${toolName}`);
             }
         }
@@ -412,6 +414,7 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
             if (assistantMsg.message && assistantMsg.message.content) {
                 for (const block of assistantMsg.message.content) {
                     if (block.type === 'tool_use') {
+                        logger.debug(`[permission:track] recorded tool_use id=${block.id} name=${block.name} input=${JSON.stringify(block.input)}`);
                         this.toolCalls.push({
                             id: block.id!,
                             name: block.name!,

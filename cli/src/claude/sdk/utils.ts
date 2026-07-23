@@ -120,7 +120,6 @@ export function getDefaultClaudeCodePath(): string {
 export function logDebug(message: string): void {
     if (process.env.DEBUG) {
         logger.debug(message)
-        console.log(message)
     }
 }
 

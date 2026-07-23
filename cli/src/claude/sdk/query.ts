@@ -120,6 +120,8 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
                             break
                         }
 
+                        logDebug(`[transport:recv] ${line}`)
+
                         if (message.type === 'control_response') {
                             const controlResponse = message as SDKControlResponse
                             const handler = this.pendingControlResponses.get(controlResponse.response.request_id)
@@ -215,6 +217,8 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
         const controller = new AbortController()
         this.cancelControllers.set(request.request_id, controller)
 
+        logDebug(`[transport:can_use_tool] request_id=${request.request_id} tool=${request.request.tool_name} input=${JSON.stringify(request.request.input)}`)
+
         try {
             const response = await this.processControlRequest(request, controller.signal)
             if (this.promptFailure || controller.signal.aborted || !this.childStdin?.writable) {
@@ -228,6 +232,7 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
                     response
                 }
             }
+            logDebug(`[transport:can_use_tool] request_id=${request.request_id} tool=${request.request.tool_name} result=${JSON.stringify(response)}`)
             this.childStdin.write(JSON.stringify(controlResponse) + '\n')
         } catch (error) {
             if (this.promptFailure || controller.signal.aborted || !this.childStdin?.writable) {
@@ -241,6 +246,7 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
                     error: error instanceof Error ? error.message : String(error)
                 }
             }
+            logDebug(`[transport:can_use_tool] request_id=${request.request_id} tool=${request.request.tool_name} error=${controlErrorResponse.response.error}`)
             this.childStdin.write(JSON.stringify(controlErrorResponse) + '\n')
         } finally {
             this.cancelControllers.delete(request.request_id)

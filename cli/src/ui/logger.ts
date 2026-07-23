@@ -1,12 +1,15 @@
 /**
  * Design decisions:
- * - Local file logging is disabled to avoid unbounded disk growth.
+ * - Local file logging only happens when DEBUG is set. HAPI can run many
+ *   long-lived agent/runner processes, and writing per-process debug logs
+ *   unconditionally caused unbounded growth under ~/.hapi/logs - so file
+ *   writes are opt-in via DEBUG rather than removed outright.
  * - Use info for logs that are useful to the user - this is our UI
  */
 
 import chalk from 'chalk'
 import { configuration } from '@/configuration'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { appendFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { readRunnerState } from '@/persistence'
 
@@ -44,10 +47,21 @@ function getSessionLogPath(): string {
 
 class Logger {
   private dangerouslyUnencryptedServerLoggingUrl: string | undefined
+  // Once stdout's pipe reader is gone (e.g. an orphaned session that outlived
+  // the runner that spawned it), every write fails with EPIPE. Without this
+  // guard, callers just keep calling console.log and the process pegs a CPU
+  // core retrying writes to a pipe that will never accept them again.
+  private stdoutBroken = false
 
   constructor(
     public readonly logFilePath = getSessionLogPath()
   ) {
+    process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') {
+        this.stdoutBroken = true
+      }
+    })
+
     // Remote logging enabled only when explicitly set with API URL
     if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING
       && process.env.HAPI_API_URL) {
@@ -147,32 +161,48 @@ class Logger {
   }
   
   private logToConsole(level: 'debug' | 'error' | 'info' | 'warn', prefix: string, message: string, ...args: unknown[]): void {
-    switch (level) {
-      case 'debug': {
-        console.log(chalk.gray(prefix), message, ...args)
-        break
-      }
+    // 'error' goes to stderr, a separate pipe from the one that breaks here -
+    // only stdout-bound levels need the broken-pipe guard.
+    if (this.stdoutBroken && level !== 'error') {
+      return
+    }
 
-      case 'error': {
-        console.error(chalk.red(prefix), message, ...args)
-        break
-      }
+    try {
+      switch (level) {
+        case 'debug': {
+          console.log(chalk.gray(prefix), message, ...args)
+          break
+        }
 
-      case 'info': {
-        console.log(chalk.blue(prefix), message, ...args)
-        break
-      }
+        case 'error': {
+          console.error(chalk.red(prefix), message, ...args)
+          break
+        }
 
-      case 'warn': {
-        console.log(chalk.yellow(prefix), message, ...args)
-        break
-      }
+        case 'info': {
+          console.log(chalk.blue(prefix), message, ...args)
+          break
+        }
 
-      default: {
-        this.debug('Unknown log level:', level)
-        console.log(chalk.blue(prefix), message, ...args)
-        break
+        case 'warn': {
+          console.log(chalk.yellow(prefix), message, ...args)
+          break
+        }
+
+        default: {
+          this.debug('Unknown log level:', level)
+          console.log(chalk.blue(prefix), message, ...args)
+          break
+        }
       }
+    } catch (err) {
+      // A synchronous EPIPE throw means the pipe is gone - stop trying rather
+      // than let callers keep retrying writes that will never succeed.
+      if ((err as NodeJS.ErrnoException)?.code === 'EPIPE' && level !== 'error') {
+        this.stdoutBroken = true
+        return
+      }
+      throw err
     }
   }
 
@@ -213,11 +243,16 @@ class Logger {
       })
     }
     
-    // Intentionally do not write local log files. HAPI can run many long-lived
-    // agent/runner processes, and per-process debug logs have caused unbounded
-    // growth under ~/.hapi/logs. Keep this method as the single sink for debug
-    // calls so callers do not need to know whether local file logs exist.
-    void logLine
+    // Opt-in file logging: only write when DEBUG is set, so normal runs never
+    // grow ~/.hapi/logs. Fail silently on write errors to avoid disturbing
+    // the session - a broken log write should never break a Claude session.
+    if (process.env.DEBUG) {
+      try {
+        appendFileSync(this.logFilePath, logLine)
+      } catch {
+        // Ignore - logging must never crash the session
+      }
+    }
   }
 }
 
