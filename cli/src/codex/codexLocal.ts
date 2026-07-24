@@ -4,7 +4,7 @@ import { spawnWithTerminalGuard } from '@/utils/spawnWithTerminalGuard';
 import {
     buildMcpServerConfigArgs,
     buildDeveloperInstructionsArg,
-    buildSessionStartHookConfigArgs
+    buildCodexHookConfigArgs
 } from './utils/codexMcpConfig';
 import { codexSystemPrompt } from './utils/systemPrompt';
 import type { ReasoningEffort } from './appServerTypes';
@@ -147,7 +147,7 @@ export async function codexLocal(opts: {
     }
 
     if (opts.sessionHook) {
-        args.push(...buildSessionStartHookConfigArgs(opts.sessionHook.port, opts.sessionHook.token));
+        args.push(...buildCodexHookConfigArgs(opts.sessionHook.port, opts.sessionHook.token));
     }
 
     // Add developer instructions (system prompt)

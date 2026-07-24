@@ -590,6 +590,12 @@ export default {
   'toolGroup.rowStatus.running': 'Đang chạy',
   'toolGroup.rowStatus.pending': 'Chờ xử lý',
   'toolGroup.rowStatus.error': 'Lỗi',
+  'toolGroup.codex.exploring': 'Đang khám phá',
+  'toolGroup.codex.explored': 'Đã khám phá',
+  'toolGroup.codex.read': 'Đọc',
+  'toolGroup.codex.list': 'Liệt kê',
+  'toolGroup.codex.search': 'Tìm kiếm',
+  'toolGroup.codex.searchIn': '{query} trong {path}',
 
   // Composer buttons
   'composer.settings': 'Cài đặt',

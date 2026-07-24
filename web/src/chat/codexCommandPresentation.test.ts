@@ -8,7 +8,6 @@ function block(input: unknown): ToolCallBlock {
         id: 'tool-1',
         localId: null,
         createdAt: 1,
-        invokedAt: null,
         tool: {
             id: 'tool-1',
             name: 'CodexBash',
@@ -17,8 +16,6 @@ function block(input: unknown): ToolCallBlock {
             createdAt: 1,
             startedAt: 1,
             completedAt: 2,
-            execStartedAt: null,
-            execCompletedAt: null,
             description: null
         },
         children: []

@@ -47,6 +47,7 @@ export type CodexMessage = {
 
 export type CodexConversionResult = {
     sessionId?: string;
+    turnId?: string;
     messages?: CodexMessage[];
     userMessage?: string;
     userActivity?: true;
@@ -98,6 +99,11 @@ function extractCallId(payload: Record<string, unknown>): string | null {
     }
 
     return null;
+}
+
+function extractResponseItemTurnId(payload: Record<string, unknown>): string | null {
+    const metadata = asRecord(payload.internal_chat_message_metadata_passthrough);
+    return metadata ? asString(metadata.turn_id) ?? asString(metadata.turnId) : null;
 }
 
 export function convertCodexEvent(rawEvent: unknown): CodexConversionResult | null {
@@ -267,7 +273,9 @@ export function convertCodexEvent(rawEvent: unknown): CodexConversionResult | nu
             if (!name || !callId) {
                 return null;
             }
+            const turnId = extractResponseItemTurnId(payloadRecord);
             return {
+                ...(turnId ? { turnId } : {}),
                 messages: [{
                     type: 'tool-call',
                     name,
@@ -283,7 +291,9 @@ export function convertCodexEvent(rawEvent: unknown): CodexConversionResult | nu
             if (!callId) {
                 return null;
             }
+            const turnId = extractResponseItemTurnId(payloadRecord);
             return {
+                ...(turnId ? { turnId } : {}),
                 messages: [{
                     type: 'tool-call-result',
                     callId,
