@@ -800,36 +800,34 @@ function SessionListSearch(props: {
     const [datePickerOpen, setDatePickerOpen] = useState(false)
     const hasDateRange = Boolean(props.customStart && props.customEnd)
     return (
-        <div className="px-3 pb-2">
-            <div className="flex items-center gap-2">
-                <div className="relative min-w-0 flex-1">
-                    <div className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--app-hint)]">
-                        <SearchIcon className="h-3.5 w-3.5" />
-                    </div>
-                    <input
-                        type="search"
-                        value={props.value}
-                        onChange={(event) => props.onChange(event.target.value)}
-                        placeholder={t('sessions.search.placeholder')}
-                        className="w-full appearance-none rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] py-1.5 pl-8 pr-8 text-sm text-[var(--app-fg)] outline-none transition-colors placeholder:text-[var(--app-hint)] focus:border-[var(--app-link)] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
-                    />
-                    {props.value ? (
-                        <button
-                            type="button"
-                            onClick={() => props.onChange('')}
-                            className="absolute inset-y-0 right-2 flex items-center rounded p-0.5 text-[var(--app-hint)] hover:text-[var(--app-fg)]"
-                            title={t('sessions.search.clear')}
-                        >
-                            <XIcon className="h-3.5 w-3.5" />
-                        </button>
-                    ) : null}
+        <div className="px-2 pb-2">
+            <div className="relative min-w-0">
+                <div className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[var(--app-hint)]">
+                    <SearchIcon className="h-3.5 w-3.5" />
                 </div>
-                <div className="relative shrink-0">
+                <input
+                    type="search"
+                    value={props.value}
+                    onChange={(event) => props.onChange(event.target.value)}
+                    placeholder={t('sessions.search.placeholder')}
+                    className="w-full appearance-none rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] py-1.5 pl-8 pr-16 text-sm text-[var(--app-fg)] outline-none transition-colors placeholder:text-[var(--app-hint)] focus:border-[var(--app-link)] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                />
+                {props.value ? (
+                    <button
+                        type="button"
+                        onClick={() => props.onChange('')}
+                        className="absolute inset-y-0 right-9 flex items-center rounded p-0.5 text-[var(--app-hint)] hover:text-[var(--app-fg)]"
+                        title={t('sessions.search.clear')}
+                    >
+                        <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                ) : null}
+                <div className="absolute inset-y-0 right-0 flex items-stretch">
                     <button
                         type="button"
                         onClick={() => setDatePickerOpen(open => !open)}
                         className={cn(
-                            'relative rounded-lg p-2 transition-colors hover:bg-[var(--app-subtle-bg)]',
+                            'relative flex items-center rounded-r-lg rounded-l-md px-2 transition-colors hover:bg-[var(--app-subtle-bg)]',
                             hasDateRange ? 'text-[var(--app-link)]' : 'text-[var(--app-hint)]'
                         )}
                         title={hasDateRange ? `${props.customStart} – ${props.customEnd}` : t('sessions.timeFilter.label')}
@@ -1486,33 +1484,87 @@ export function SessionList(props: {
                             {/* Sessions */}
                             <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
                                 <div className="collapsible-inner">
-                                <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
-                                    {visibleGroupSessions.map((s) => (
-                                        <SessionItem
-                                            key={s.id}
-                                            session={s}
-                                            onSelect={props.onSelect}
-                                            showPath={false}
-                                            api={api}
-                                            selected={s.id === selectedSessionId}
-                                            showDetailedStatus={showDetailedStatus}
-                                        />
-                                    ))}
-                                    {group.sessions.length > sessionPreviewLimit && (hiddenSessionCount > 0 || canCollapseSessions) ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => hiddenSessionCount > 0
-                                                ? showMoreSessions(group)
-                                                : collapseSessionGroup(group)}
-                                            className={cn(
-                                                'ml-2.5 mr-2 my-1 rounded-md px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]',
-                                                hiddenSessionCount > 0 && 'border border-dashed border-[var(--app-border)]'
-                                            )}
-                                        >
-                                            {hiddenSessionCount > 0
-                                                ? t('sessions.group.showMore', { n: showMoreCount })
-                                                : t('sessions.group.showLess')}
-                                ) : null}
+
+                                <div className="flex flex-col ml-3.5 pl-1 mt-0.5">
+                                    {mg.projectGroups.map((group) => {
+                                        const isCollapsed = isGroupCollapsed(group)
+                                        const visibleGroupSessions = getVisibleGroupSessions(group)
+                                        const hiddenSessionCount = group.sessions.length - visibleGroupSessions.length
+                                        const canCollapseSessions = getGroupVisibleCount(group) > sessionPreviewLimit
+                                        const showMoreCount = Math.min(sessionPreviewLimit, hiddenSessionCount)
+                                        const canStartInGroupDirectory = group.directory !== 'Other'
+                                        return (
+                                            <div key={group.key}>
+                                                <div
+                                                    className="group/project sticky top-0 z-10 flex items-center gap-2 px-1 py-1.5 text-left rounded-lg transition-colors hover:bg-[var(--app-subtle-bg)] cursor-pointer min-w-0 w-full select-none"
+                                                    onClick={() => toggleGroup(group.key, isCollapsed)}
+                                                    title={group.directory}
+                                                >
+                                                    <ChevronIcon className="h-3.5 w-3.5 text-[var(--app-hint)] shrink-0" collapsed={isCollapsed} />
+                                                    <span className="font-medium text-sm truncate flex-1">
+                                                        {group.displayName}
+                                                    </span>
+                                                    <CopyPathButton path={group.directory} className="opacity-0 group-hover/project:opacity-100 transition-opacity duration-150" />
+                                                    {onNewSessionInDirectory && canStartInGroupDirectory ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                onNewSessionInDirectory({
+                                                                    machineId: group.machineId,
+                                                                    directory: group.directory
+                                                                })
+                                                            }}
+                                                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--app-hint)] opacity-70 transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-link)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                                                            title={t('sessions.group.new')}
+                                                            aria-label={t('sessions.group.new')}
+                                                        >
+                                                            <PlusIcon className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    ) : null}
+                                                    <span className="text-[11px] tabular-nums text-[var(--app-hint)] shrink-0">
+                                                        ({group.sessions.length})
+                                                    </span>
+                                                </div>
+
+                                                {/* Level 3: Sessions */}
+                                                <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
+                                                    <div className="collapsible-inner">
+                                                    <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
+                                                        {visibleGroupSessions.map((s) => (
+                                                            <SessionItem
+                                                                key={s.id}
+                                                                session={s}
+                                                                onSelect={props.onSelect}
+                                                                showPath={false}
+                                                                api={api}
+                                                                selected={s.id === selectedSessionId}
+                                                                showDetailedStatus={showDetailedStatus}
+                                                            />
+                                                        ))}
+                                                        {!isFiltering && group.sessions.length > sessionPreviewLimit && (hiddenSessionCount > 0 || canCollapseSessions) ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => hiddenSessionCount > 0
+                                                                    ? showMoreSessions(group)
+                                                                    : collapseSessionGroup(group)}
+                                                                className={cn(
+                                                                    'mx-2 my-1 rounded-md px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]',
+                                                                    hiddenSessionCount > 0 && 'border border-dashed border-[var(--app-border)]'
+                                                                )}
+                                                            >
+                                                                {hiddenSessionCount > 0
+                                                                    ? t('sessions.group.showMore', { n: showMoreCount })
+                                                                    : t('sessions.group.showLess')}
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+>>>>>>> 72476b9c (fix(web): align session sidebar content widths (#1098))
                                 </div>
                                 </div>
                             </div>
