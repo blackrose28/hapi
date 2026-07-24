@@ -314,11 +314,22 @@ body {
     }
 }
 
+<<<<<<< HEAD
 /* Keep the session list scrollbar on the left at every viewport size. */
 .session-list-scrollbar-left {
     direction: rtl;
     scrollbar-gutter: stable;
 }
+=======
+/* Desktop sidebar: use custom width from CSS variable.
+   Kept in sync with the Tailwind `split` breakpoint (see tailwind.config.ts)
+   so the sidebar width/resize applies as soon as the split view appears on
+   compact tablets. */
+@media (min-width: 920px) {
+    .desktop-scrollbar-left {
+        direction: rtl;
+    }
+>>>>>>> 81934cf3 (fix(web): use dedicated split breakpoint for compact tablets (#1141))
 
 .session-list-scrollbar-left > * {
     direction: ltr;
@@ -332,11 +343,7 @@ body {
 /* Desktop sidebar: use custom width from CSS variable. */
 @media (min-width: 920px) {
     div[style*="--sidebar-w"] {
-        width: var(--sidebar-w) !important;
-    }
-}
-    div[style*="--sidebar-w"] {
-        width: var(--sidebar-w) !important;
+        width: min(var(--sidebar-w), calc(100vw - 424px)) !important;
     }
 }
 
