@@ -719,6 +719,8 @@ function SessionDateRangePicker(props: {
                     </button>
                 ) : null}
 =======
+=======
+>>>>>>> 0834dc09 (feat(web): indicate session activity in date picker (#1103))
     onChange: (start: string, end: string) => void
     onClose: () => void
 }) {
@@ -773,17 +775,24 @@ function SessionDateRangePicker(props: {
                     const value = formatDateValue(date)
                     const isEndpoint = value === props.start || value === props.end
                     const isInRange = Boolean(props.start && props.end && value > props.start && value < props.end)
+                    const hasSessionActivity = props.sessionActivityDates.has(value)
+                    const dateLabel = date.toLocaleDateString()
+                    const activityLabel = hasSessionActivity
+                        ? t('sessions.timeFilter.dayWithActivity', { date: dateLabel })
+                        : dateLabel
                     return (
                         <button
                             key={value}
                             type="button"
                             onClick={() => selectDate(value)}
-                            aria-label={date.toLocaleDateString()}
+                            aria-label={activityLabel}
+                            title={hasSessionActivity ? activityLabel : undefined}
                             className={cn(
                                 'h-8 rounded-lg text-xs transition-colors',
                                 isEndpoint && 'bg-[var(--app-link)] text-white',
                                 isInRange && 'bg-[var(--app-link)]/15 text-[var(--app-link)]',
-                                !isEndpoint && !isInRange && 'hover:bg-[var(--app-subtle-bg)]'
+                                !isEndpoint && !isInRange && hasSessionActivity && 'text-[var(--app-fg)] hover:bg-[var(--app-subtle-bg)]',
+                                !isEndpoint && !isInRange && !hasSessionActivity && 'text-[var(--app-hint)] hover:bg-[var(--app-subtle-bg)]'
                             )}
                         >
                             {index + 1}
@@ -814,6 +823,7 @@ function SessionListSearch(props: {
     onChange: (value: string) => void
     customStart: string
     customEnd: string
+    sessionActivityDates: ReadonlySet<string>
     onDateRangeChange: (start: string, end: string) => void
 }) {
     const { t } = useTranslation()
@@ -865,6 +875,7 @@ function SessionListSearch(props: {
                             <SessionDateRangePicker
                                 start={props.customStart}
                                 end={props.customEnd}
+                                sessionActivityDates={props.sessionActivityDates}
                                 onChange={props.onDateRangeChange}
                                 onClose={() => setDatePickerOpen(false)}
                             />
