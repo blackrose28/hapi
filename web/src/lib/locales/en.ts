@@ -618,6 +618,12 @@ const en = {
   'toolGroup.rowStatus.running': 'Running',
   'toolGroup.rowStatus.pending': 'Pending',
   'toolGroup.rowStatus.error': 'Error',
+  'toolGroup.codex.exploring': 'Exploring',
+  'toolGroup.codex.explored': 'Explored',
+  'toolGroup.codex.read': 'Read',
+  'toolGroup.codex.list': 'List',
+  'toolGroup.codex.search': 'Search',
+  'toolGroup.codex.searchIn': '{query} in {path}',
 
   // Composer buttons
   'composer.settings': 'Settings',
