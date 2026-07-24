@@ -101,8 +101,10 @@ function CodexImportIcon(props: { className?: string }) {
             strokeLinejoin="round"
             className={props.className}
         >
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <path d="M21 3v6h-6" />
+            {/* 中文注释：导入图标使用“下载进托盘”样式，与刷新按钮的循环箭头区分开，避免两个相邻按钮看起来一样。 */}
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
     )
 }
@@ -172,68 +174,6 @@ function getMachineTitle(machine: Machine): string {
 }
 
 function SessionsPage() {
-<<<<<<< HEAD
-=======
-    const { api } = useAppContext()
-    const navigate = useNavigate()
-    const queryClient = useQueryClient()
-    const pathname = useLocation({ select: location => location.pathname })
-    const matchRoute = useMatchRoute()
-    const { t } = useTranslation()
-    const { addToast } = useToast()
-    const { sessions, isLoading, error, refetch } = useSessions(api)
-    const { machines } = useMachines(api, true)
-    const [isSyncingCodexSession, setIsSyncingCodexSession] = useState(false)
-    const [codexSessions, setCodexSessions] = useState<CodexLocalSessionSummary[]>([])
-    const [codexImportMachineId, setCodexImportMachineId] = useState<string | null>(null)
-    const [isLoadingCodexSessions, setIsLoadingCodexSessions] = useState(false)
-    const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false)
-    const [isRestartingCodexDesktop, setIsRestartingCodexDesktop] = useState(false)
-    const [pendingDuplicateSessionIds, setPendingDuplicateSessionIds] = useState<string[]>([])
-    const [pendingDuplicateHapiSessionIds, setPendingDuplicateHapiSessionIds] = useState<string[]>([])
-    const [duplicateSessionGroups, setDuplicateSessionGroups] = useState<CodexDuplicateSessionGroup[]>([])
-    const [isDuplicateMergeConfirmOpen, setIsDuplicateMergeConfirmOpen] = useState(false)
-    const [isMergingDuplicateSessions, setIsMergingDuplicateSessions] = useState(false)
-    const [codexImportWorkDirectoryOverride, setCodexImportWorkDirectoryOverride] = useState<string | null>(null)
-
-    const handleRefresh = useCallback(() => {
-        void (async () => {
-            try {
-                await refetch()
-                addToast({
-                    title: t('sessions.refresh.success.title'),
-                    body: t('sessions.refresh.success.body'),
-                    sessionId: '',
-                    url: ''
-                })
-            } catch (error) {
-                addToast({
-                    title: t('sessions.refresh.failed.title'),
-                    body: error instanceof Error ? error.message : t('dialog.error.default'),
-                    sessionId: '',
-                    url: ''
-                })
-            }
-        })()
-    }, [addToast, refetch, t])
-
-    const projectCount = useMemo(() => new Set(sessions.map(s =>
-        s.metadata?.worktree?.basePath ?? s.metadata?.path ?? 'Other'
-    )).size, [sessions])
-    const machineLabelsById = useMemo(() => {
-        const labels: Record<string, string> = {}
-        for (const machine of machines) {
-            labels[machine.id] = getMachineTitle(machine)
-        }
-        return labels
-    }, [machines])
-    const machinesById = useMemo(() => {
-        const byId: Record<string, typeof machines[number]> = {}
-        for (const machine of machines) {
-            byId[machine.id] = machine
-        }
-        return byId
-    }, [machines])
     const sessionMatch = matchRoute({ to: '/sessions/$sessionId', fuzzy: true })
     const selectedSessionId = sessionMatch && sessionMatch.sessionId !== 'new' ? sessionMatch.sessionId : null
     const selectedSession = useMemo(
