@@ -83,8 +83,11 @@ class Logger {
     // corrupt (per @kirill's note above): either this is the runner itself
     // (no TUI, ever), or stdout isn't a TTY (e.g. a session spawned by the
     // runner with piped stdio - also no TUI, since ink no-ops without a TTY).
-    // Local file logging is a no-op (see logToFile), so this is currently the
-    // only way to observe debug output live.
+    // logToConsole silently no-ops the !isTTY case anyway (see its comment) -
+    // that path's pipe has no guaranteed reader, so file logging (logToFile,
+    // above) is the actual persistence mechanism for it. This call only ever
+    // produces visible output when isRunnerProcess is true and it's genuinely
+    // attached to a TTY (e.g. `hapi runner start` run in a foreground shell).
     if (process.env.DEBUG && (configuration.isRunnerProcess || !process.stdout.isTTY)) {
       this.logToConsole('debug', '', message, ...args)
     }
@@ -164,6 +167,23 @@ class Logger {
     // 'error' goes to stderr, a separate pipe from the one that breaks here -
     // only stdout-bound levels need the broken-pipe guard.
     if (this.stdoutBroken && level !== 'error') {
+      return
+    }
+
+    // The stdoutBroken guard above only helps for the *second* write onward -
+    // it relies on console.log() either throwing synchronously or the async
+    // stdout 'error' handler firing before the next call. Neither is
+    // guaranteed: when stdout is piped with no reader (an orphaned session,
+    // or any headless/remote launch), a single console.log() can hang
+    // forever retrying the write at the runtime level, never returning to
+    // let the try/catch below or the 'error' event run. That freezes the
+    // whole process - not even SIGTERM gets processed, since the event loop
+    // never gets a tick back (confirmed live: 65k+ retried writes/2.5s on a
+    // stuck session, unresponsive to SIGTERM, only SIGKILL worked).
+    // A real TTY can't get into that state the same way, so only allow the
+    // console echo when one is actually attached; file logging (logToFile)
+    // already covers persistence for the piped/headless case.
+    if (level !== 'error' && !process.stdout.isTTY) {
       return
     }
 
