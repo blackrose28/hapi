@@ -15,8 +15,9 @@ import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
  * We match on the specific structure rather than a broad type allowlist to
  * avoid accidentally suppressing legitimate assistant JSON.
  *
- * Only called for text whose first non-whitespace char is '{', so the fast-path
- * for normal prose has zero overhead.
+ * Surrounding whitespace is tolerated: the envelope is also checked at the
+ * text-flush boundary, where it may have been reassembled from chunks that
+ * carried a leading newline or indentation.
  */
 export function isInternalEventJson(text: string): boolean {
     const start = firstNonWhitespaceIndex(text);
