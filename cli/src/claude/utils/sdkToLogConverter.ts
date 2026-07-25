@@ -33,6 +33,23 @@ type PermissionResponse = {
 }
 
 /**
+ * SDK message types that must never reach the session log.
+ *
+ * The `default:` branch of convert() deliberately passes unknown SDK message
+ * types through so new signals stay visible while we learn to render them.
+ * Types listed here are the exception: they carry no conversation content, so
+ * passing them through only surfaces the raw `{ type: 'output', data: ... }`
+ * envelope as a text blob in the web UI (the normalizer has no branch for
+ * them and falls back to stringifying).
+ *
+ * - `tool_progress`: periodic heartbeat while a tool runs long
+ *   (`heartbeat: true`, `elapsed_time_seconds`, `parent_tool_use_id`).
+ */
+const SUPPRESSED_SDK_MESSAGE_TYPES = new Set<string>([
+    'tool_progress'
+])
+
+/**
  * Get current git branch for the working directory
  */
 function getGitBranch(cwd: string): string | undefined {
@@ -145,6 +162,13 @@ export class SDKToLogConverter {
     convert(sdkMessage: SDKMessage): RawJSONLines | null {
         if (sdkMessage.type === 'rate_limit_event') {
             return this.convertRateLimitEvent(sdkMessage)
+        }
+
+        // Drop before any UUID-chain bookkeeping: these messages carry a
+        // parent_tool_use_id, so falling through would rewrite
+        // sidechainLastUUID and reparent the next real sidechain message.
+        if (SUPPRESSED_SDK_MESSAGE_TYPES.has(sdkMessage.type)) {
+            return null
         }
 
         const uuid = randomUUID()

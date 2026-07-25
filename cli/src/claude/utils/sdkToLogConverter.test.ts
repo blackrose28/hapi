@@ -437,6 +437,72 @@ describe('SDKToLogConverter', () => {
             expect(warning!.parentUuid).toBe(user!.uuid)
             expect(assistant!.parentUuid).toBe(warning!.uuid)
         })
+
+        it('should drop tool_progress heartbeats instead of passing them through', () => {
+            const logMessage = converter.convert({
+                type: 'tool_progress',
+                tool_use_id: 'toolu_abc',
+                tool_name: 'Bash',
+                parent_tool_use_id: 'toolu_parent',
+                elapsed_time_seconds: 30,
+                heartbeat: true,
+                session_id: 'test-session-123'
+            } as unknown as SDKMessage)
+
+            expect(logMessage).toBeNull()
+        })
+
+        it('should not reparent sidechain messages when tool_progress is suppressed', () => {
+            const prompt = converter.convertSidechainUserMessage('toolu_parent', 'do the thing')
+
+            converter.convert({
+                type: 'tool_progress',
+                tool_use_id: 'toolu_abc',
+                parent_tool_use_id: 'toolu_parent',
+                elapsed_time_seconds: 30,
+                heartbeat: true
+            } as unknown as SDKMessage)
+
+            const sidechainReply = converter.convert({
+                type: 'assistant',
+                parent_tool_use_id: 'toolu_parent',
+                message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] }
+            } as unknown as SDKMessage)
+
+            expect(sidechainReply!.parentUuid).toBe(prompt.uuid)
+            expect(sidechainReply!.isSidechain).toBe(true)
+        })
+
+        it('should not break the main parent chain when tool_progress is suppressed', () => {
+            const user = converter.convert({
+                type: 'user',
+                message: { role: 'user', content: 'hi' }
+            } as SDKUserMessage)
+
+            converter.convert({
+                type: 'tool_progress',
+                tool_use_id: 'toolu_abc',
+                elapsed_time_seconds: 60,
+                heartbeat: true
+            } as unknown as SDKMessage)
+
+            const assistant = converter.convert({
+                type: 'assistant',
+                message: { role: 'assistant', content: [{ type: 'text', text: 'hello' }] }
+            } as SDKAssistantMessage)
+
+            expect(assistant!.parentUuid).toBe(user!.uuid)
+        })
+
+        it('should still pass unknown message types through', () => {
+            const logMessage = converter.convert({
+                type: 'some_future_signal',
+                payload: { hello: 'world' }
+            } as unknown as SDKMessage)
+
+            expect(logMessage).toBeTruthy()
+            expect(logMessage!.type).toBe('some_future_signal')
+        })
     })
 
     describe('Convenience function', () => {

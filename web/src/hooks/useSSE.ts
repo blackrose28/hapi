@@ -430,6 +430,12 @@ export function useSSE(options: {
             return patched
         }
 
+        const invalidateSessionAgentModels = (sessionId: string) => {
+            // A session that just went active may have been queried for models while it
+            // was still starting up (and thus disabled) — refetch now that it can answer.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.sessionAgentModelsBase(sessionId) })
+        }
+
         const removeSessionSummary = (sessionId: string) => {
             queryClient.setQueryData<SessionsResponse | undefined>(queryKeys.sessions, (previous) => {
                 if (!previous) {
@@ -516,28 +522,38 @@ export function useSSE(options: {
                     removeSessionSummary(event.sessionId)
                     void queryClient.removeQueries({ queryKey: queryKeys.session(event.sessionId) })
                     clearMessageWindow(event.sessionId)
-                } else if (isSessionRecord(event.data) && event.data.id === event.sessionId) {
-                    queryClient.setQueryData<SessionResponse>(queryKeys.session(event.sessionId), { session: event.data })
-                    upsertSessionSummary(event.data)
                 } else {
-                    const patch = getSessionPatch(event.data)
-                    if (patch) {
-                        const detailPatched = patchSessionDetail(event.sessionId, patch)
-                        const summaryPatched = patchSessionSummary(event.sessionId, patch)
+                    const wasActive = queryClient.getQueryData<SessionResponse>(queryKeys.session(event.sessionId))?.session.active ?? false
 
-                        if (!detailPatched) {
-                            queueSessionDetailInvalidation(event.sessionId)
-                        }
-                        if (!summaryPatched) {
-                            queueSessionListInvalidation()
-                        }
-                        if (hasUnknownSessionPatchKeys(event.data)) {
-                            queueSessionDetailInvalidation(event.sessionId)
-                            queueSessionListInvalidation()
+                    if (isSessionRecord(event.data) && event.data.id === event.sessionId) {
+                        queryClient.setQueryData<SessionResponse>(queryKeys.session(event.sessionId), { session: event.data })
+                        upsertSessionSummary(event.data)
+                        if (event.data.active && !wasActive) {
+                            invalidateSessionAgentModels(event.sessionId)
                         }
                     } else {
-                        queueSessionDetailInvalidation(event.sessionId)
-                        queueSessionListInvalidation()
+                        const patch = getSessionPatch(event.data)
+                        if (patch) {
+                            const detailPatched = patchSessionDetail(event.sessionId, patch)
+                            const summaryPatched = patchSessionSummary(event.sessionId, patch)
+
+                            if (!detailPatched) {
+                                queueSessionDetailInvalidation(event.sessionId)
+                            }
+                            if (!summaryPatched) {
+                                queueSessionListInvalidation()
+                            }
+                            if (hasUnknownSessionPatchKeys(event.data)) {
+                                queueSessionDetailInvalidation(event.sessionId)
+                                queueSessionListInvalidation()
+                            }
+                            if (patch.active && !wasActive) {
+                                invalidateSessionAgentModels(event.sessionId)
+                            }
+                        } else {
+                            queueSessionDetailInvalidation(event.sessionId)
+                            queueSessionListInvalidation()
+                        }
                     }
                 }
             }

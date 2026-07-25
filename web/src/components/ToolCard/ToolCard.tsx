@@ -28,12 +28,18 @@ import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
 import { TraceSection } from '@/components/ToolCard/trace'
 import { LockIcon } from '@/components/ToolCard/icons'
-import { getActivityDurationMs, getToolExpansionKind } from '@/components/ToolCard/toolRunModel'
+import {
+    formatActivityDuration,
+    getActivityDurationMs,
+    getToolExpansionKind
+} from '@/components/ToolCard/toolRunModel'
 import {
     useActivityClock,
     useFormattedActivityDuration,
+    useToolProgressEntry,
     useToolRunLayout
 } from '@/components/ToolCard/toolRunContext'
+import { getToolProgressStalenessMs } from '@/chat/toolProgressStore'
 
 const SURFACE_CLASS = {
     neutral: '[--processing-surface-tint:var(--app-tool-neutral-surface)] border-[var(--app-border)]',
@@ -348,6 +354,17 @@ function ToolCardInner(props: ToolCardProps) {
         layout.grouped ? layout.now : standaloneNow
     )
     const activityDuration = useFormattedActivityDuration(activityDurationMs)
+    // Per-tool heartbeat staleness. Task cards only for now: a subagent can be
+    // silent for minutes, so "still running" vs "stuck" is genuinely ambiguous
+    // there. Absent heartbeats (local sessions, post-reload) render nothing.
+    const toolIsRunning = props.block.tool.state === 'running'
+    const progressEntry = useToolProgressEntry(props.sessionId, props.block.tool.id)
+    const progressStalenessMs = toolName === 'Task' && toolIsRunning
+        ? getToolProgressStalenessMs(progressEntry, layout.grouped ? layout.now : standaloneNow)
+        : null
+    const staleProgressLabel = progressStalenessMs === null
+        ? null
+        : formatActivityDuration(progressStalenessMs)
     const stateLabel = t(`tool.status.${props.block.tool.state}`)
     const durationLabel = activityDuration
         ? t('tool.group.activityDuration', { duration: activityDuration.accessible })
@@ -450,6 +467,15 @@ function ToolCardInner(props: ToolCardProps) {
                                         className="shrink-0 font-mono text-[10px] text-[var(--app-hint)]"
                                     >
                                         {activityDuration.compact}
+                                    </span>
+                                ) : null}
+                                {staleProgressLabel ? (
+                                    <span
+                                        data-tool-progress-stale
+                                        aria-label={t('tool.progress.staleLabel', { duration: staleProgressLabel })}
+                                        className="shrink-0 font-mono text-[10px] italic text-[var(--app-hint)] opacity-70"
+                                    >
+                                        {t('tool.progress.stale', { duration: staleProgressLabel })}
                                     </span>
                                 ) : null}
                                 <span role="status" aria-label={stateLabel} className={stateColor}>
@@ -575,6 +601,15 @@ function ToolCardInner(props: ToolCardProps) {
                                 {durationLabel}
                             </span>
                         </>
+                    ) : null}
+                    {staleProgressLabel ? (
+                        <span
+                            data-tool-progress-stale
+                            aria-label={t('tool.progress.staleLabel', { duration: staleProgressLabel })}
+                            className="shrink-0 font-mono text-[11px] italic text-[var(--app-hint)] opacity-70"
+                        >
+                            {t('tool.progress.stale', { duration: staleProgressLabel })}
+                        </span>
                     ) : null}
                     <span aria-hidden="true" className={stateColor}>
                         <StatusIcon state={props.block.tool.state} />

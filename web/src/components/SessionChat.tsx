@@ -102,6 +102,7 @@ export function SessionChat(props: {
         api: props.api,
         agent: 'claude',
         sessionId: props.session.id,
+        sessionActive: props.session.active,
         enabled: agentFlavor === 'claude'
     })
     const [codexErrorDismissed, setCodexErrorDismissed] = useState(false)

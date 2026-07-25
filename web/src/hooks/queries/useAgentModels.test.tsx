@@ -52,6 +52,7 @@ describe('useAgentModels', () => {
             api,
             agent: 'claude',
             sessionId: 'session-1',
+            sessionActive: true,
             machineId: 'machine-1',
             enabled: true
         }), { wrapper: createWrapper() })
@@ -59,6 +60,33 @@ describe('useAgentModels', () => {
         await waitFor(() => expect(result.current.status).toBe('unsupported'))
         expect(result.current.error).toBeNull()
         expect(getSessionAgentModels).toHaveBeenCalledWith('session-1', 'claude')
+    })
+
+    it('does not fetch session models until the session is active', async () => {
+        const getSessionAgentModels = vi.fn(async () => ({
+            status: 'unsupported' as const,
+            models: [{ id: 'sonnet', displayName: 'Sonnet' }],
+            source: 'static'
+        }))
+        const api = { getSessionAgentModels } as unknown as ApiClient
+
+        const { result, rerender } = renderHook(
+            (props: { sessionActive: boolean }) => useAgentModels({
+                api,
+                agent: 'claude',
+                sessionId: 'session-1',
+                sessionActive: props.sessionActive,
+                enabled: true
+            }),
+            { wrapper: createWrapper(), initialProps: { sessionActive: false } }
+        )
+
+        expect(result.current.status).toBe('fallback')
+        expect(getSessionAgentModels).not.toHaveBeenCalled()
+
+        rerender({ sessionActive: true })
+
+        await waitFor(() => expect(getSessionAgentModels).toHaveBeenCalledWith('session-1', 'claude'))
     })
 
     it('surfaces failed catalog status without losing fallback models', async () => {
@@ -75,6 +103,7 @@ describe('useAgentModels', () => {
             api,
             agent: 'claude',
             sessionId: 'session-1',
+            sessionActive: true,
             enabled: true
         }), { wrapper: createWrapper() })
 

@@ -15,7 +15,7 @@ import { clearDraftsAfterSend } from '@/lib/clearDraftsAfterSend'
 import { compareSessionGroupOrder } from '@/lib/session-group-order'
 import { SessionChat } from '@/components/SessionChat'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import type { ApiClient } from '@/api/client'
+import { ApiError, type ApiClient } from '@/api/client'
 import type { SessionSummary, AttachmentMetadata, Machine } from '@/types/api'
 import { useTranslation } from '@/lib/use-translation'
 import { getArchiveAllDescription, getArchiveSessionDescription, getTotalKnownTerminalLiveCount } from '@/lib/archiveConfirmation'
@@ -1256,6 +1256,7 @@ export function Dashboard({ api }: DashboardProps) {
             return true
         } catch (err) {
             console.error('Archive failed:', err)
+            window.alert(err instanceof ApiError && err.code ? err.code : t('dashboard.archiveFailed'))
             return false
         }
     }, [api, queryClient, sessions, t])
@@ -1269,6 +1270,7 @@ export function Dashboard({ api }: DashboardProps) {
             return true
         } catch (err) {
             console.error('Delete failed:', err)
+            window.alert(err instanceof ApiError && err.code ? err.code : t('dashboard.deleteFailed'))
             return false
         }
     }, [api, queryClient, t])
@@ -1298,13 +1300,16 @@ export function Dashboard({ api }: DashboardProps) {
         if (!api || !pendingConfirm) return
         const { action, targetSessions } = pendingConfirm
         setPendingConfirm(null)
-        if (action === 'archive') {
-            await Promise.allSettled(targetSessions.map(s => api.archiveSession(s.id)))
-        } else {
-            await Promise.allSettled(targetSessions.map(s => api.deleteSession(s.id)))
+        const results = action === 'archive'
+            ? await Promise.allSettled(targetSessions.map(s => api.archiveSession(s.id)))
+            : await Promise.allSettled(targetSessions.map(s => api.deleteSession(s.id)))
+        const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+        if (failures.length > 0) {
+            console.error(`${action === 'archive' ? 'Archive' : 'Delete'} failed for ${failures.length} session(s):`, failures.map(f => f.reason))
+            window.alert(t(action === 'archive' ? 'dashboard.bulkArchiveFailed' : 'dashboard.bulkDeleteFailed', { n: failures.length }))
         }
         await queryClient.invalidateQueries({ queryKey: queryKeys.sessions })
-    }, [api, pendingConfirm, queryClient])
+    }, [api, pendingConfirm, queryClient, t])
 
     const handleCopyPath = useCallback((project: string, groupSessions: SessionSummary[]) => {
         const path = groupSessions[0]?.metadata?.worktree?.basePath ?? groupSessions[0]?.metadata?.path ?? project

@@ -1,8 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import {
     formatActivityDuration,
     formatActivityDurationValue
 } from '@/components/ToolCard/toolRunModel'
+import {
+    getToolProgress,
+    subscribeToToolProgress,
+    type ToolProgressEntry
+} from '@/chat/toolProgressStore'
 import { useTranslation } from '@/lib/use-translation'
 
 type ToolRunLayout = {
@@ -38,6 +43,21 @@ export function useActivityClock(active: boolean): number {
     }, [active])
 
     return now
+}
+
+/**
+ * Subscribe to the ephemeral heartbeat entry for one tool call. Returns null when
+ * no heartbeat has ever arrived for it — the normal case for local-mode sessions
+ * and for anything rendered after a reload.
+ */
+export function useToolProgressEntry(sessionId: string, toolUseId: string): ToolProgressEntry | null {
+    const subscribe = useCallback(
+        (listener: () => void) => subscribeToToolProgress(sessionId, toolUseId, listener),
+        [sessionId, toolUseId]
+    )
+    const getSnapshot = useCallback(() => getToolProgress(sessionId, toolUseId), [sessionId, toolUseId])
+
+    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
 export function useFormattedActivityDuration(durationMs: number | null): {

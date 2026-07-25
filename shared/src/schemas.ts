@@ -384,6 +384,16 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
     SessionChangedSchema.extend({
         type: z.literal('messages-invalidated')
     }),
+    // Per-tool liveness heartbeat while a tool is still executing. Ephemeral by
+    // design: never persisted as a message, and safe to drop — clients treat its
+    // absence as "no information", not as "tool stopped".
+    SessionChangedSchema.extend({
+        type: z.literal('tool-progress'),
+        toolUseId: z.string(),
+        parentToolUseId: z.string().nullable().optional(),
+        toolName: z.string().optional(),
+        elapsedSeconds: z.number().optional()
+    }),
     SessionChangedSchema.extend({
         type: z.literal('session-ended'),
         reason: z.enum(['completed', 'terminated', 'error']).optional()

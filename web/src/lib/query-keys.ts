@@ -35,6 +35,7 @@ export const queryKeys = {
     ] as const,
     slashCommands: (sessionId: string) => ['slash-commands', sessionId] as const,
     sessionCodexModels: (sessionId: string) => ['session-codex-models', sessionId] as const,
+    sessionAgentModelsBase: (sessionId: string) => ['session-agent-models', sessionId] as const,
     sessionAgentModels: (sessionId: string, agent: string) => ['session-agent-models', sessionId, agent] as const,
     sessionOpencodeModels: (sessionId: string) => ['session-opencode-models', sessionId] as const,
     machineOpencodeModelsForCwd: (machineId: string, cwd: string) => ['machine-opencode-models', machineId, cwd] as const,

@@ -214,6 +214,13 @@ export class SSEManager {
             return connection.all || connection.sessionId === event.sessionId
         }
 
+        if (event.type === 'tool-progress') {
+            // Only a client actually watching this session can use per-tool liveness.
+            // Dashboard ('all') subscribers would get a 30s drip per running tool
+            // they never render.
+            return connection.sessionId === event.sessionId
+        }
+
         if (connection.all) {
             return true
         }

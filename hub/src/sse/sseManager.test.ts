@@ -246,4 +246,61 @@ describe('SSEManager namespace filtering', () => {
 
         expect(received).toEqual(['admin'])
     })
+
+    it('delivers tool-progress only to subscribers watching that session', () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        const received: string[] = []
+        for (const input of [
+            { id: 'watching', all: false, sessionId: 's1' },
+            { id: 'other-session', all: false, sessionId: 's2' },
+            { id: 'dashboard', all: true, sessionId: null }
+        ]) {
+            manager.subscribe({
+                ...input,
+                namespace: 'org-1',
+                membershipId: input.id,
+                authorize: () => true,
+                send: () => { received.push(input.id) },
+                sendHeartbeat: () => {}
+            })
+        }
+
+        manager.broadcast({
+            type: 'tool-progress',
+            namespace: 'org-1',
+            sessionId: 's1',
+            toolUseId: 'toolu_1',
+            parentToolUseId: null,
+            toolName: 'Bash',
+            elapsedSeconds: 30
+        })
+
+        expect(received).toEqual(['watching'])
+    })
+
+    it('does not deliver tool-progress when the session is not authorized', () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        const received: string[] = []
+
+        manager.subscribe({
+            id: 'watching',
+            namespace: 'org-1',
+            membershipId: 'watching',
+            all: false,
+            sessionId: 's1',
+            authorize: () => false,
+            send: () => { received.push('watching') },
+            sendHeartbeat: () => {}
+        })
+
+        manager.broadcast({
+            type: 'tool-progress',
+            namespace: 'org-1',
+            sessionId: 's1',
+            toolUseId: 'toolu_1',
+            parentToolUseId: null
+        })
+
+        expect(received).toEqual([])
+    })
 })

@@ -383,6 +383,17 @@ export interface ClientToServerEvents {
         collaborationMode?: CodexCollaborationMode
     }) => void
     'session-end': (data: { sid: string; time: number; reason?: SessionEndReason }) => void
+    /**
+     * Per-tool liveness heartbeat, emitted volatile: a heartbeat that could not be
+     * delivered immediately is worthless, so it must never be buffered and replayed.
+     */
+    'tool-progress': (data: {
+        sid: string
+        toolUseId: string
+        parentToolUseId?: string | null
+        toolName?: string
+        elapsedSeconds?: number
+    }) => void
     'messages-consumed': (data: { sid: string; localIds: string[] }) => void
     'update-metadata': (data: { sid: string; expectedVersion: number; metadata: unknown }, cb: (answer: {
         result: 'error'

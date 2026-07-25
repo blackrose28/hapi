@@ -7,6 +7,7 @@ import { backoff } from '@/utils/time'
 import { apiValidationError } from '@/utils/errorUtils'
 import { AsyncLock } from '@/utils/lock'
 import type { RawJSONLines } from '@/claude/types'
+import type { ToolProgressSignal } from '@/claude/utils/toolProgress'
 import { configuration } from '@/configuration'
 import { AGENT_MESSAGE_PAYLOAD_TYPE } from "@hapi/protocol"
 import type { MarkTeamMentionNoActionInput, ReportToTeamInput, SessionEndReason, TeamChatMessage, TeamMentionRequest } from '@hapi/protocol'
@@ -604,6 +605,21 @@ export class ApiSessionClient extends EventEmitter {
     emitMessagesConsumed(localIds: string[]): void {
         if (localIds.length === 0) return
         this.socket.emit('messages-consumed', { sid: this.sessionId, localIds })
+    }
+
+    /**
+     * Forward a per-tool liveness heartbeat. Volatile on purpose: a heartbeat is
+     * only meaningful the moment it is sent, so dropping it while disconnected is
+     * correct — replaying a stale one later would claim liveness that never was.
+     */
+    emitToolProgress(signal: ToolProgressSignal): void {
+        this.socket.volatile.emit('tool-progress', {
+            sid: this.sessionId,
+            toolUseId: signal.toolUseId,
+            parentToolUseId: signal.parentToolUseId,
+            ...(signal.toolName === undefined ? {} : { toolName: signal.toolName }),
+            ...(signal.elapsedSeconds === undefined ? {} : { elapsedSeconds: signal.elapsedSeconds })
+        })
     }
 
     sendSessionDeath(reason?: SessionEndReason): void {

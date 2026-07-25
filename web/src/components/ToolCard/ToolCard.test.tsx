@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiClient } from '@/api/client'
 import type { ToolCallBlock, ToolPermission } from '@/chat/types'
+import { recordToolProgress, resetToolProgressStore } from '@/chat/toolProgressStore'
 import { I18nProvider } from '@/lib/i18n-context'
 import en from '@/lib/locales/en'
 import viVN from '@/lib/locales/vi-VN'
@@ -845,6 +846,8 @@ describe('ToolCard presentation hierarchy', () => {
             'tool.group.live',
             'tool.group.activityDuration',
             'tool.group.totalDuration',
+            'tool.progress.stale',
+            'tool.progress.staleLabel',
             'tool.duration.seconds',
             'tool.duration.lessThanSeconds',
             'tool.group.showOutput',
@@ -864,5 +867,112 @@ describe('ToolCard presentation hierarchy', () => {
         expect(viVN['tool.group.showOutput']).toBe('Hiện kết quả')
         expect(viVN['tool.group.hideOutput']).toBe('Ẩn kết quả')
         expect(viVN['tool.group.outputRegion']).toBe('Kết quả của {tool}')
+    })
+})
+
+describe('ToolCard tool-progress staleness', () => {
+    const STALE_AT = 200_000
+
+    function makeRunningTask() {
+        return makeToolBlock('Task', { description: 'audit the parser' }, undefined, {
+            state: 'running',
+            startedAt: 1000,
+            completedAt: null
+        })
+    }
+
+    beforeEach(() => {
+        localStorage.clear()
+        resetToolProgressStore()
+        vi.useFakeTimers()
+        vi.setSystemTime(STALE_AT)
+    })
+
+    afterEach(() => {
+        cleanup()
+        vi.useRealTimers()
+        resetToolProgressStore()
+    })
+
+    it('flags a running Task whose heartbeats went quiet', () => {
+        recordToolProgress('session-1', 'tool-Task', { at: STALE_AT - 100_000 })
+
+        renderTool(makeRunningTask())
+
+        expect(screen.getByText('no update for 1m 40s')).toHaveAccessibleName(
+            'No progress reported for 1m 40s — the subagent may be stuck'
+        )
+    })
+
+    it.each([
+        ['vi-VN', 'không cập nhật trong 1m 40s'],
+        ['zh-CN', '1m 40s 无更新']
+    ] as const)('localizes the staleness hint in %s', (locale, expected) => {
+        recordToolProgress('session-1', 'tool-Task', { at: STALE_AT - 100_000 })
+
+        renderTool(makeRunningTask(), { locale })
+
+        expect(screen.getByText(expected)).toBeVisible()
+    })
+
+    it('stays silent while heartbeats are still arriving', () => {
+        recordToolProgress('session-1', 'tool-Task', { at: STALE_AT - 30_000 })
+
+        const { container } = renderTool(makeRunningTask())
+
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
+    })
+
+    it('stays silent when no heartbeat was ever received (local-mode session)', () => {
+        const { container } = renderTool(makeRunningTask())
+
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
+    })
+
+    it('ignores heartbeats recorded for a different session', () => {
+        recordToolProgress('session-2', 'tool-Task', { at: STALE_AT - 100_000 })
+
+        const { container } = renderTool(makeRunningTask())
+
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
+    })
+
+    it('stays silent once the Task has completed', () => {
+        recordToolProgress('session-1', 'tool-Task', { at: STALE_AT - 100_000 })
+
+        const { container } = renderTool(makeToolBlock('Task', { description: 'audit the parser' }, undefined, {
+            state: 'completed',
+            startedAt: 1000,
+            completedAt: 50_000
+        }))
+
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
+    })
+
+    it('does not flag non-Task tools in this slice', () => {
+        recordToolProgress('session-1', 'tool-Bash', { at: STALE_AT - 100_000 })
+
+        const { container } = renderTool(makeToolBlock('Bash', { command: 'sleep 600' }, undefined, {
+            state: 'running',
+            startedAt: 1000,
+            completedAt: null
+        }))
+
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
+    })
+
+    it('appears as the clock crosses the threshold and clears on the next heartbeat', () => {
+        recordToolProgress('session-1', 'tool-Task', { at: STALE_AT })
+
+        const { container } = renderTool(makeRunningTask())
+
+        act(() => vi.advanceTimersByTime(89_000))
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
+
+        act(() => vi.advanceTimersByTime(2_000))
+        expect(container.querySelector('[data-tool-progress-stale]')).not.toBeNull()
+
+        act(() => recordToolProgress('session-1', 'tool-Task'))
+        expect(container.querySelector('[data-tool-progress-stale]')).toBeNull()
     })
 })

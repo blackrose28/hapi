@@ -13,6 +13,7 @@ import { useVisibilityReporter } from '@/hooks/useVisibilityReporter'
 import { queryKeys } from '@/lib/query-keys'
 import { AppContextProvider } from '@/lib/app-context'
 import { clearMessageWindow, fetchLatestMessages } from '@/lib/message-window-store'
+import { clearToolProgressEntries, recordToolProgress } from '@/chat/toolProgressStore'
 import { useAppGoBack } from '@/hooks/useAppGoBack'
 import { useTranslation } from '@/lib/use-translation'
 import { VoiceProvider } from '@/lib/voice-context'
@@ -192,6 +193,10 @@ function AppInner() {
         setSseDisconnected(false)
         setSseDisconnectReason(null)
 
+        // Tool heartbeats are only delivered while subscribed to that session, so
+        // anything recorded before this connection is unverifiable now, not stale.
+        clearToolProgressEntries()
+
         // Increment token to track this specific connection
         const token = ++syncTokenRef.current
 
@@ -234,6 +239,14 @@ function AppInner() {
     }, [])
 
     const handleSseEvent = useCallback((event: SyncEvent) => {
+        if (event.type === 'tool-progress') {
+            // Ephemeral: goes to the tool-progress store only, never into query
+            // caches or the message window.
+            recordToolProgress(event.sessionId, event.toolUseId, {
+                elapsedSeconds: event.elapsedSeconds ?? null
+            })
+            return
+        }
         if (event.type === 'shared-hub-updated') {
             window.dispatchEvent(new CustomEvent('hapi:shared-hub-updated', { detail: event }))
             return

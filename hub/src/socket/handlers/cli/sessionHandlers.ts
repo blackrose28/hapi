@@ -56,6 +56,14 @@ const updateStateSchema = z.object({
     agentState: z.unknown().nullable()
 })
 
+const toolProgressSchema = z.object({
+    sid: z.string(),
+    toolUseId: z.string().min(1),
+    parentToolUseId: z.string().nullable().optional(),
+    toolName: z.string().optional(),
+    elapsedSeconds: z.number().finite().nonnegative().optional()
+})
+
 export type SessionHandlersDeps = {
     store: Store
     resolveSessionAccess: ResolveSessionAccess
@@ -372,6 +380,29 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
             return
         }
         onSessionAlive?.(data)
+    })
+
+    socket.on('tool-progress', (data: unknown) => {
+        const parsed = toolProgressSchema.safeParse(data)
+        if (!parsed.success) {
+            return
+        }
+        const sessionAccess = resolveSessionAccess(parsed.data.sid)
+        if (!sessionAccess.ok) {
+            emitAccessError('session', parsed.data.sid, sessionAccess.reason)
+            return
+        }
+        // Relayed straight to viewers — never persisted and never used to mark the
+        // session alive: the 2s session-alive keepalive already owns liveness, and
+        // a heartbeat that outlived its 30s window must not extend anything.
+        onWebappEvent?.({
+            type: 'tool-progress',
+            sessionId: parsed.data.sid,
+            toolUseId: parsed.data.toolUseId,
+            parentToolUseId: parsed.data.parentToolUseId ?? null,
+            ...(parsed.data.toolName === undefined ? {} : { toolName: parsed.data.toolName }),
+            ...(parsed.data.elapsedSeconds === undefined ? {} : { elapsedSeconds: parsed.data.elapsedSeconds })
+        })
     })
 
     socket.on('messages-consumed', (data: { sid: string; localIds: string[] }) => {

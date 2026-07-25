@@ -8,6 +8,7 @@ import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
+import { parseToolProgressMessage } from "./utils/toolProgress";
 import { PLAN_FAKE_REJECT } from "./sdk/prompts";
 import { EnhancedMode } from "./loop";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
@@ -118,6 +119,15 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
         let ongoingToolCalls = new Map<string, { parentToolCallId: string | null }>();
 
         function onMessage(message: SDKMessage) {
+            // Liveness heartbeat, not conversation: forward it on the ephemeral
+            // channel and stop here. Falling through would put a 30s drip into the
+            // TUI buffer, the permission handler, and the persisted message log.
+            const toolProgress = parseToolProgressMessage(message);
+            if (toolProgress) {
+                session.client.emitToolProgress(toolProgress);
+                return;
+            }
+
             formatClaudeMessageForInk(message, messageBuffer);
             permissionHandler.onMessage(message);
 

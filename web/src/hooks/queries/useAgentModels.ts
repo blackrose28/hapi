@@ -23,6 +23,7 @@ export function useAgentModels(args: {
     api: ApiClient | null
     agent: AgentFlavor
     sessionId?: string | null
+    sessionActive?: boolean
     machineId?: string | null
     cwd?: string | null
     enabled?: boolean
@@ -33,7 +34,10 @@ export function useAgentModels(args: {
     error: string | null
 } {
     const { api, agent, sessionId, machineId, cwd } = args
-    const enabled = Boolean(args.enabled && api && (sessionId || machineId))
+    // A freshly spawned session isn't active yet (the CLI process hasn't connected back),
+    // and the hub only serves models for inactive sessions from a cache that doesn't exist
+    // until a live fetch succeeds — so fetching before activation is guaranteed to 404.
+    const enabled = Boolean(args.enabled && api && (sessionId ? args.sessionActive : machineId))
     const queryKey = sessionId
         ? queryKeys.sessionAgentModels(sessionId, agent)
         : queryKeys.machineAgentModels(machineId ?? 'unknown', agent, cwd)

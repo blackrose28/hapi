@@ -83,4 +83,69 @@ describe('isInternalEventJson', () => {
         const json = JSON.stringify({ type: 'output', data: 'string-data' });
         expect(isInternalEventJson(json)).toBe(false);
     });
+
+    describe('multiple concatenated envelopes', () => {
+        const heartbeat = (index: number) => JSON.stringify({
+            type: 'output',
+            data: {
+                parentUuid: index === 0 ? null : `parent-${index}`,
+                isSidechain: true,
+                userType: 'external',
+                cwd: '/data/Work/AI/LangBot',
+                sessionId: 'session-456',
+                version: '0.18.5-sharedhub',
+                uuid: `uuid-${index}`,
+                timestamp: '2026-07-25T04:52:27.873Z',
+                type: 'tool_progress',
+                tool_use_id: `toolu_abc-heartbeat-${index}`,
+                tool_name: 'Bash',
+                elapsed_time_seconds: (index + 1) * 30,
+                heartbeat: true,
+            },
+        });
+
+        it('returns true for envelopes separated by blank lines', () => {
+            const text = `${heartbeat(0)}\n\n${heartbeat(1)}\n\n${heartbeat(2)}`;
+            expect(isInternalEventJson(text)).toBe(true);
+        });
+
+        it('returns true for envelopes with no separator at all', () => {
+            expect(isInternalEventJson(`${heartbeat(0)}${heartbeat(1)}`)).toBe(true);
+        });
+
+        it('returns true for envelopes with leading and trailing whitespace', () => {
+            expect(isInternalEventJson(`\n  ${heartbeat(0)}\n${heartbeat(1)}\n  `)).toBe(true);
+        });
+
+        it('returns false when any object in the sequence is not an envelope', () => {
+            const text = `${heartbeat(0)}\n\n${JSON.stringify({ type: 'assistant' })}`;
+            expect(isInternalEventJson(text)).toBe(false);
+        });
+
+        it('returns false when prose follows the envelopes', () => {
+            expect(isInternalEventJson(`${heartbeat(0)}\n\nHere is the answer.`)).toBe(false);
+        });
+
+        it('returns false when the trailing envelope is truncated mid-stream', () => {
+            const text = `${heartbeat(0)}\n\n${heartbeat(1).slice(0, -20)}`;
+            expect(isInternalEventJson(text)).toBe(false);
+        });
+
+        it('is not confused by braces inside string values', () => {
+            const json = JSON.stringify({
+                type: 'output',
+                data: {
+                    parentUuid: null,
+                    sessionId: '123',
+                    userType: 'external',
+                    tool_input: 'echo "{\\"nested\\": \\"}}}\\"}"',
+                },
+            });
+            expect(isInternalEventJson(`${json}\n${heartbeat(1)}`)).toBe(true);
+        });
+
+        it('returns false for a JSON array of envelopes', () => {
+            expect(isInternalEventJson(`[${heartbeat(0)},${heartbeat(1)}]`)).toBe(false);
+        });
+    });
 });
