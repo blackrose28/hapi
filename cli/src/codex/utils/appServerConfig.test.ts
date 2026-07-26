@@ -388,6 +388,22 @@ describe('appServerConfig', () => {
         expect(instructions).toContain('set fork_context: false');
         expect(instructions).toContain('Do not rely on parent turn reasoning settings for spawned agents');
     });
+    it('injects proactive multi-agent instructions when /agent mode is enabled', () => {
+        const params = buildTurnStartParams({
+            threadId: 'thread-1',
+            message: 'work',
+            cwd: '/repo',
+            mode: {
+                permissionMode: 'default',
+                model: 'o3',
+                collaborationMode: 'default',
+                proactiveMultiAgent: true
+            }
+        });
+
+        expect(params.collaborationMode?.settings.developer_instructions)
+            .toContain('Proactive multi-agent delegation is active.');
+    });
     it('rejects collaboration mode payloads without a resolved model', () => {
         expect(() => buildTurnStartParams({
             threadId: 'thread-1',
