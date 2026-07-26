@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+<<<<<<< HEAD
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CodexGoalState } from '@/chat/types'
@@ -792,4 +793,42 @@ describe('SessionHeader editor entry point', () => {
         expect(media.removeListener).toHaveBeenCalledWith(media.addListener.mock.calls[0][0])
     })
 
+    it('shows an inherited catalog-default Fast tier', () => {
+        const session: Session = {
+            id: 'session-1',
+            namespace: 'default',
+            seq: 0,
+            createdAt: 0,
+            updatedAt: 0,
+            active: true,
+            activeAt: 0,
+            metadata: { flavor: 'codex', path: '/repo', host: 'machine' },
+            metadataVersion: 0,
+            agentState: null,
+            agentStateVersion: 0,
+            thinking: false,
+            thinkingAt: 0,
+            model: null,
+            modelReasoningEffort: null,
+            effort: null,
+            serviceTier: null
+        }
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <ToastProvider>
+                    <I18nProvider>
+                        <SessionHeader
+                            session={session}
+                            serviceTier="priority"
+                            onBack={vi.fn()}
+                            api={null}
+                        />
+                    </I18nProvider>
+                </ToastProvider>
+            </QueryClientProvider>
+        )
+
+        expect(screen.getByText('fast')).toBeInTheDocument()
+    })
 })

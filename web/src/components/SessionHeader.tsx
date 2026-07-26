@@ -177,6 +177,7 @@ function TerminalIcon(props: { className?: string }) {
 
 export function SessionHeader(props: {
     session: Session
+    serviceTier?: string | null
     onBack: () => void
     onViewFiles?: () => void
     onOpenOutline?: () => void
@@ -212,7 +213,7 @@ export function SessionHeader(props: {
         ? formatCodexReasoningLabel(session.modelReasoningEffort)
         : null
     // Match expected Fast badge semantics (#1004): only explicit service tier, no effort/model heuristics.
-    const showFastBadge = agentFlavor === 'codex' && isFastServiceTier(session.serviceTier)
+    const showFastBadge = agentFlavor === 'codex' && isFastServiceTier(props.serviceTier ?? session.serviceTier)
 
     const [menuOpen, setMenuOpen] = useState(false)
     const [menuAnchorPoint, setMenuAnchorPoint] = useState<{ x: number; y: number }>({ x: 0, y: 0 })

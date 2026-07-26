@@ -21,9 +21,19 @@ import { reconcileChatBlocks } from '@/chat/reconcile'
 import { hasInFlightToolCall } from '@/chat/running'
 import { buildConversationOutline, getConversationMessageAnchorId } from '@/chat/outline'
 import { isQueuedForInvocation, mergeMessages } from '@/lib/messages'
+<<<<<<< HEAD
 import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import { codexModelAdvertisesFastTier } from '@/components/AssistantChat/codexFastMode'
+=======
+import { inactiveSessionCanResume } from '@/lib/sessionResume'
+import {
+    getCodexModelReasoningEfforts,
+    supportsCodexReasoningEffort
+} from '@/lib/codexModelCapabilities'
+import { HappyComposer, type ComposerSendError } from '@/components/AssistantChat/HappyComposer'
+import { codexModelAdvertisesFastTier, getEffectiveCodexServiceTier } from '@/components/AssistantChat/codexFastMode'
+>>>>>>> 500407c6 (fix(codex): show catalog-default Fast tier (#1179))
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { HappyThread } from '@/components/AssistantChat/HappyThread'
@@ -167,6 +177,7 @@ export function SessionChat(props: {
         sessionId: props.session.id,
         enabled: agentFlavor === 'codex' && !controlledByUser
     })
+<<<<<<< HEAD
     const claudeModelsState = useAgentModels({
         api: props.api,
         agent: 'claude',
@@ -176,6 +187,15 @@ export function SessionChat(props: {
     })
     const [codexErrorDismissed, setCodexErrorDismissed] = useState(false)
     const [claudeErrorDismissed, setClaudeErrorDismissed] = useState(false)
+=======
+    const effectiveCodexServiceTier = agentFlavor === 'codex'
+        ? getEffectiveCodexServiceTier(
+            props.session.serviceTier,
+            props.session.model,
+            codexModelsState.models
+        )
+        : undefined
+>>>>>>> 500407c6 (fix(codex): show catalog-default Fast tier (#1179))
     const codexModelOptions = useMemo(() => {
         if (agentFlavor !== 'codex') {
             return undefined
@@ -707,6 +727,7 @@ export function SessionChat(props: {
             {!props.hideHeader && (
                 <SessionHeader
                     session={props.session}
+                    serviceTier={effectiveCodexServiceTier}
                     onBack={props.onBack}
                     onViewFiles={terminalSupported ? handleViewFiles : undefined}
                     onOpenOutline={() => setOutlineOpen(true)}
@@ -955,7 +976,7 @@ export function SessionChat(props: {
                         }
                         onEffortChange={readOnly ? undefined : handleEffortChange}
                         onCompactRuntimeChange={props.compactComposerMode && !readOnly ? handleCompactRuntimeChange : undefined}
-                        serviceTier={agentFlavor === 'codex' ? props.session.serviceTier : undefined}
+                        serviceTier={effectiveCodexServiceTier}
                         onServiceTierChange={
                             agentFlavor === 'codex'
                                 && props.session.active
