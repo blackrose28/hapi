@@ -286,17 +286,26 @@ function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
 
 export function expandSelectedSessionCollapseOverrides(
     overrides: Map<string, boolean>,
-    group: { key: string }
+    group: { key: string; machineId?: string }
 ): Map<string, boolean> {
+    const next = new Map(overrides)
+    let changed = false
+
     // Keep auto-expanded paths open after selection moves so content above the
     // clicked row does not collapse and displace the sidebar viewport.
-    if (overrides.get(group.key) === false) {
-        return overrides
+    if (overrides.get(group.key) !== false) {
+        next.set(group.key, false)
+        changed = true
     }
 
-    const next = new Map(overrides)
-    next.set(group.key, false)
-    return next
+    const machineKey = `machine::${group.machineId ?? UNKNOWN_MACHINE_ID}`
+    if (overrides.get(machineKey) !== false) {
+        next.set(machineKey, false)
+        changed = true
+    }
+
+    return changed ? next : overrides
+}
 }
 
 function groupByMachine(

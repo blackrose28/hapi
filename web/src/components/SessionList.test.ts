@@ -395,9 +395,9 @@ describe('expandSelectedSessionCollapseOverrides', () => {
             machineId: 'machine-1'
         })
 
-        expect(result.has('machine-1::/work/hapi')).toBe(false)
+        expect(result.get('machine-1::/work/hapi')).toBe(false)
         expect(result.get('sessions::machine-1::/work/hapi')).toBe(true)
-        expect(result.has('machine::machine-1')).toBe(false)
+        expect(result.get('machine::machine-1')).toBe(false)
     })
 
     it('leaves missing session preview override unset', () => {
