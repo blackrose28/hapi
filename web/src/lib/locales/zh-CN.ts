@@ -724,6 +724,7 @@ export default {
   'settings.language.label': '语言',
   'settings.display.title': '显示',
   'settings.display.appearance': '外观',
+  'settings.display.appearanceMode': '显示模式',
   'settings.display.appearance.system': '跟随系统',
   'settings.display.appearance.dark': '深色',
   'settings.display.appearance.light': '浅色',

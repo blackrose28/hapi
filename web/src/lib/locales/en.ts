@@ -721,6 +721,7 @@ const en = {
   'settings.language.label': 'Language',
   'settings.display.title': 'Display',
   'settings.display.appearance': 'Appearance',
+  'settings.display.appearanceMode': 'Appearance mode',
   'settings.display.appearance.system': 'Follow System',
   'settings.display.appearance.dark': 'Dark',
   'settings.display.appearance.light': 'Light',
