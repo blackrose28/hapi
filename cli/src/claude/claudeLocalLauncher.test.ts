@@ -44,6 +44,7 @@ function createSessionStub() {
             startingMode: 'local' as const,
             claudeEnvVars: {},
             claudeArgs: [],
+            getModel: () => 'claude-opus-4-1',
             mcpServers: [],
             allowedTools: [],
             hookSettingsPath: null,
@@ -74,6 +75,13 @@ describe('claudeLocalLauncher message filtering', () => {
         harness.scannerOnMessage!({ type: 'summary', leafUuid: '1' })
 
         expect(sentMessages).toHaveLength(0)
+    it('passes the current session model to the local Claude process', async () => {
+        const { session } = createSessionStub()
+
+        await claudeLocalLauncher(session as never)
+
+        expect(harness.launches[0]).toMatchObject({ model: 'claude-opus-4-1' })
+    })
     })
 
     it('filters out invisible system messages', async () => {
