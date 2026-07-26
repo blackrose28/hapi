@@ -145,7 +145,7 @@ export function ReasoningDisclosure(props: ReasoningDisclosureProps) {
                     isOpen ? 'opacity-100' : 'opacity-0'
                 )}
             >
-                <div className={cn(groupRow ? 'px-6 pb-2 pt-1' : 'pl-4 pt-1')}>
+                <div className={cn('max-h-[60vh] overflow-y-auto overscroll-contain', groupRow ? 'px-6 pb-2 pt-1' : 'pl-4 pt-1')}>
                     {props.children}
                 </div>
             </div>
