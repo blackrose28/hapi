@@ -10,12 +10,17 @@ type LocalLaunchFailure = {
     exitReason: LocalLaunchExitReason;
 };
 
+type CursorModelApplyHandler = (model: string | null | undefined) => Promise<string | null>;
+type CursorPermissionModeChangedHandler = (mode: PermissionMode) => void;
+
 export class CursorSession extends AgentSessionBase<EnhancedMode> {
     readonly cursorArgs?: string[];
     readonly model?: string;
     readonly startedBy: 'runner' | 'terminal';
     readonly startingMode: 'local' | 'remote';
     localLaunchFailure: LocalLaunchFailure | null = null;
+    private modelApplyHandler: CursorModelApplyHandler | null = null;
+    private permissionModeChangedHandler: CursorPermissionModeChangedHandler | null = null;
 
     constructor(opts: {
         api: ApiClient;
@@ -31,6 +36,7 @@ export class CursorSession extends AgentSessionBase<EnhancedMode> {
         cursorArgs?: string[];
         model?: string;
         permissionMode?: PermissionMode;
+        onPermissionModeChanged?: CursorPermissionModeChangedHandler;
     }) {
         super({
             api: opts.api,
@@ -55,10 +61,13 @@ export class CursorSession extends AgentSessionBase<EnhancedMode> {
         this.startedBy = opts.startedBy;
         this.startingMode = opts.startingMode;
         this.permissionMode = opts.permissionMode;
+        this.permissionModeChangedHandler = opts.onPermissionModeChanged ?? null;
     }
 
     setPermissionMode = (mode: PermissionMode): void => {
         this.permissionMode = mode;
+        // Keep runCursor's enqueue source of truth in sync (CreatePlan accept, ACP mode sync).
+        this.permissionModeChangedHandler?.(mode);
     };
 
     recordLocalLaunchFailure = (message: string, exitReason: LocalLaunchExitReason): void => {
