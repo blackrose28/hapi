@@ -344,8 +344,11 @@ function AppInner() {
 
     const globalEventSubscription = useMemo(() => getAppGlobalSseSubscription(), [])
     const sessionEventSubscription = useMemo(
-    }, [selectedSessionId])
-    const sseEnabled = Boolean(api && token)
+        () => selectedSessionId ? getAppSessionSseSubscription(selectedSessionId) : null,
+        [selectedSessionId]
+    )
+    const sseEnabled = Boolean(api && session)
+    const showReconnectingBanner = sseDisconnected && !isSyncing
 
     const { subscriptionId: globalSubscriptionId } = useSSE({
         enabled: Boolean(api && session),
@@ -378,7 +381,6 @@ function AppInner() {
         api,
         subscriptionId: sessionSubscriptionId,
         enabled: sseEnabled && Boolean(sessionEventSubscription)
->>>>>>> 9af6696a (fix(web): keep global SSE alive for session list status updates (#694))
     })
 
     // Loading auth
@@ -424,7 +426,10 @@ function AppInner() {
                         reason={sseDisconnectReason}
                     />
                     <VoiceErrorBanner />
-                    <OfflineBanner />
+                    <OfflineBanner
+                        isHubConnected={globalSubscriptionId !== null}
+                        isReconnecting={sseDisconnected && !isSyncing}
+                    />
                     <div className="h-full min-h-0 flex flex-col">
                         <NavBar session={session!} />
                         <Outlet />
