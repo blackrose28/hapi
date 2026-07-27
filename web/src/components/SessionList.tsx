@@ -1353,7 +1353,6 @@ export function SessionList(props: {
         return getVisibleSessionPreview(
             group.sessions,
             {
-                expanded: isFiltering,
                 selectedSessionId,
                 limit: getGroupVisibleCount(group)
             }
