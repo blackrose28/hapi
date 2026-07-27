@@ -4,9 +4,10 @@
  * 1. Bump version
  * 2. Build binaries (with embedded web assets)
  * 3. Publish platform packages first (so lockfile can resolve them)
- * 4. Publish main package
- * 5. bun install (to get complete lockfile with published packages)
- * 6. Git commit + tag + push
+ * 4. Verify all platform packages are live on npm
+ * 5. Publish main package
+ * 6. bun install --lockfile-only --os=* --cpu=* (to lock all platform packages)
+ * 7. Git commit + tag + push
  */
 
 import { execSync } from 'node:child_process';
@@ -41,6 +42,56 @@ function run(cmd: string, cwd = projectRoot): void {
     }
 }
 
+<<<<<<< HEAD
+=======
+function updateBuildInfoVersion(nextVersion: string): void {
+    const content = readFileSync(buildInfoPath, 'utf-8');
+    const updated = content.replace(
+        /export const APP_VERSION = ['"][^'"]+['"]/,
+        `export const APP_VERSION = '${nextVersion}'`
+    );
+
+    if (updated === content) {
+        throw new Error(`Could not update APP_VERSION in ${buildInfoPath}`);
+    }
+
+    if (!dryRun) {
+        writeFileSync(buildInfoPath, updated);
+    }
+}
+
+async function waitForPlatformPackages(platforms: string[], expectedVersion: string): Promise<void> {
+    const timeoutMs = 10 * 60 * 1000;
+    const intervalMs = 15_000;
+    const deadline = Date.now() + timeoutMs;
+    const pending = new Set(platforms.map(platform => `@twsxtd/hapi-${platform}`));
+
+    while (pending.size > 0) {
+        for (const name of [...pending]) {
+            try {
+                const published = execSync(`npm view ${name} version`, { encoding: 'utf-8' }).trim();
+                if (published === expectedVersion) {
+                    console.log(`   ✓ ${name}@${expectedVersion} is live on npm`);
+                    pending.delete(name);
+                }
+            } catch {
+                // Not published yet, keep waiting
+            }
+        }
+        if (pending.size === 0) {
+            return;
+        }
+        if (Date.now() >= deadline) {
+            console.error(`❌ Timed out waiting for platform packages on npm: ${[...pending].join(', ')}`);
+            console.error('   The main package was NOT published. Publish the missing platform packages and re-run with --publish-npm.');
+            process.exit(1);
+        }
+        console.log(`   ⏳ Waiting for: ${[...pending].join(', ')} (retry in ${intervalMs / 1000}s)...`);
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+}
+
+>>>>>>> 909aaca0 (fix(cli): gate main package release on platform packages being live (#1187))
 async function runWithTimeoutRetry(cmd: string, cwd = projectRoot): Promise<void> {
     const timeoutCmd = `timeout 60s ${cmd}`;
     while (true) {
@@ -112,8 +163,18 @@ async function main(): Promise<void> {
         run(`npm publish --access public${dryRun ? ' --dry-run' : ''}`, npmDir);
     }
 
-    // Step 4: Publish main package
-    console.log('\n📤 Step 4: Publishing main package...');
+    // Step 4: Verify all platform packages are live on npm before publishing the main package.
+    // The main package pins platform packages via optionalDependencies, so publishing it first
+    // would let users install a version whose platform binary does not exist yet.
+    if (dryRun) {
+        console.log('\n🔍 Step 4: Skipping platform package verification (dry-run)');
+    } else {
+        console.log('\n🔍 Step 4: Verifying platform packages are live on npm...');
+        await waitForPlatformPackages(platforms, version);
+    }
+
+    // Step 5: Publish main package
+    console.log('\n📤 Step 5: Publishing main package...');
     const mainNpmDir = join(projectRoot, 'npm', 'main');
     run(`npm publish --access public${dryRun ? ' --dry-run' : ''}`, mainNpmDir);
 
@@ -123,12 +184,12 @@ async function main(): Promise<void> {
         return;
     }
 
-    // Step 5: bun install to get complete lockfile
-    console.log('\n📥 Step 5: Updating lockfile...');
+    // Step 6: bun install to get complete lockfile
+    console.log('\n📥 Step 6: Updating lockfile for all platform packages...');
 
-    await runWithTimeoutRetry('bun install', repoRoot);
-    // Step 6: Git commit + tag + push
-    console.log('\n📝 Step 6: Creating git commit and tag...');
+    await runWithTimeoutRetry('bun install --lockfile-only --os=* --cpu=*', repoRoot);
+    // Step 7: Git commit + tag + push
+    console.log('\n📝 Step 7: Creating git commit and tag...');
     run(`git add .`, repoRoot);
     run(`git commit -m "Release version ${version}"`, repoRoot);
     run(`git tag v${version}`, repoRoot);
