@@ -1,6 +1,7 @@
 import type { ApiClient } from '@/api/client'
 import type { DecryptedMessage, MessageStatus } from '@/types/api'
 import { normalizeDecryptedMessage } from '@/chat/normalize'
+import type { NormalizedMessage } from '@/chat/types'
 import { isQueuedForInvocation, isUserMessage, mergeMessages } from '@/lib/messages'
 
 export type MessageWindowState = {
@@ -20,9 +21,17 @@ export type MessageWindowState = {
 
 export const VISIBLE_WINDOW_SIZE = 400
 export const PENDING_WINDOW_SIZE = 200
-const PAGE_SIZE = 50
-const COLD_LOAD_REGULAR_TARGET = 15
-const COLD_LOAD_BACKFILL_PAGE_SIZE = 100
+const AGENT_RUN_WINDOW_SIZE = 800
+const OLDER_LOAD_WINDOW_SIZE = VISIBLE_WINDOW_SIZE * 2
+// Hub caps message page limit at 200 (MessagesQuerySchema); use the full page so
+// a cold load / load-older shows more than a handful of visible bubbles — raw rows
+// include tool calls and agent-run traces that render to little or nothing.
+const PAGE_SIZE = 200
+const COLD_LOAD_BACKFILL_PAGE_SIZE = 200
+// Kept decoupled from PAGE_SIZE: bounds how many regular (non-trace) messages the
+// cold-load backfill walks older pages for. With a 200-row first page this floor
+// is usually already met, so backfill stays reserved for trace-flooded sessions.
+const COLD_LOAD_REGULAR_TARGET = 50
 const PENDING_OVERFLOW_WARNING = 'New messages arrived while you were away. Scroll to bottom to refresh.'
 
 type MessagesResponse = Awaited<ReturnType<ApiClient['getMessages']>>
@@ -442,17 +451,42 @@ function isCodexAgentRunMessage(message: DecryptedMessage): boolean {
         || eventType === 'agent-run-trace'
 }
 
-function countRegularMessages(messages: DecryptedMessage[]): number {
-    let count = 0
-    const seen = new Set<string>()
-    for (const message of messages) {
-        if (seen.has(message.id)) continue
-        seen.add(message.id)
-        if (!isCodexAgentRunMessage(message)) {
-            count += 1
+// Identity under which a message renders. reduceTimeline merges a tool-result
+// into the matching tool-call card, so both rows share one rendered identity;
+// counting raw rows would let N call/result pairs satisfy the floor as 2N.
+function renderedIdentityKey(message: DecryptedMessage, normalized: NormalizedMessage): string {
+    const blocks = Array.isArray(normalized.content) ? normalized.content : [normalized.content]
+    for (const block of blocks) {
+        if (!block || typeof block !== 'object') continue
+        const candidate = block as { type?: unknown; id?: unknown; tool_use_id?: unknown }
+        if (candidate.type === 'tool-call' && typeof candidate.id === 'string') {
+            return `tool:${candidate.id}`
+        }
+        if (candidate.type === 'tool-result' && typeof candidate.tool_use_id === 'string') {
+            return `tool:${candidate.tool_use_id}`
         }
     }
-    return count
+    return `msg:${message.id}`
+}
+
+// Counts distinct rendered conversation identities, not raw non-trace rows:
+// token-count/ready events normalize fine but reduceTimeline drops them,
+// un-normalizable rows render nothing, and tool call/result pairs collapse
+// into one card. A latest page full of those must not satisfy the backfill
+// floor and hide the real conversation root.
+function countRegularMessages(messages: DecryptedMessage[]): number {
+    const seen = new Set<string>()
+    for (const message of messages) {
+        if (isCodexAgentRunMessage(message)) continue
+        const normalized = normalizeDecryptedMessage(message)
+        if (!normalized) continue
+        if (normalized.role === 'event') {
+            const eventType = normalized.content.type
+            if (eventType === 'token-count' || eventType === 'ready') continue
+        }
+        seen.add(renderedIdentityKey(message, normalized))
+    }
+    return seen.size
 }
 
 function hasV8Cursor(response: MessagesResponse): boolean {
@@ -764,7 +798,10 @@ export async function fetchLatestMessages(
         // returns the standard seq-based response (no nextBeforeAt field) — we fall back
         // to seq-cursor mode seamlessly.
         const firstResponse = await api.getMessages(sessionId, { byPosition: true, limit: PAGE_SIZE })
-        const response = initial.atBottom
+        // Re-read atBottom after the await: the thread may have mounted (and forced
+        // atBottom=true) while the fetch was in flight. Using the stale snapshot
+        // would park the whole latest page in pending with nothing left to flush it.
+        const response = getState(sessionId).atBottom
             ? await backfillColdLoadMessages(api, sessionId, firstResponse, () => isCurrentGeneration(sessionId, 'latest', generation))
             : firstResponse
         if (!isCurrentGeneration(sessionId, 'latest', generation)) {

@@ -458,6 +458,10 @@ export function HappyThread(props: {
         lastScrollTopRef.current = viewportRef.current?.scrollTop ?? 0
         atBottomRef.current = true
         onAtBottomChangeRef.current(true)
+        // Re-entry forces the thread to the bottom, so release anything the
+        // non-at-bottom cold load parked in pending — otherwise new messages
+        // stay invisible until the user manually scrolls to bottom.
+        onFlushPendingRef.current()
         forceScrollTokenRef.current = props.forceScrollToken
         pendingScrollRef.current = null
         loadLockRef.current = false
@@ -482,6 +486,7 @@ export function HappyThread(props: {
         autoScrollEnabledRef.current = true
         atBottomRef.current = true
         onAtBottomChangeRef.current(true)
+        onFlushPendingRef.current()
         scrollToBottomInstant()
 
         initialScrollDeadlineRef.current = Date.now() + INITIAL_SCROLL_SETTLE_MS
