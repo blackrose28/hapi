@@ -246,11 +246,7 @@ export function StatusBar(props: {
     const collaborationModeLabel = displayCollaborationMode
         ? getCodexCollaborationModeLabel(displayCollaborationMode)
         : null
-<<<<<<< HEAD
-    const codexReasoningLabel = props.agentFlavor === 'codex'
-=======
     const codexReasoningLabel = shouldShowCodexReasoningLabel(props.agentFlavor)
->>>>>>> b104c38f (fix(web): show Codex reasoning effort in SessionHeader (#1016))
         ? formatCodexReasoningLabel(props.modelReasoningEffort)
         : null
     // Prefer the explicit service tier (the real Fast-mode toggle) when set;

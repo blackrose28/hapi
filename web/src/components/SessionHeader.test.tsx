@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-<<<<<<< HEAD
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CodexGoalState } from '@/chat/types'
 import type { Session, TeamChat, TeamParticipant } from '@/types/api'
 import { en, viVN, zhCN } from '@/lib/locales'
 import { SessionHeader } from './SessionHeader'
+import { ToastProvider } from '@/lib/toast-context'
+import { I18nProvider } from '@/lib/i18n-context'
 
 const navigateMock = vi.fn()
 const useTeamChatsMock = vi.fn<() => { teamChats: TeamChat[]; isLoading: boolean; error: string | null; refetch: () => Promise<unknown> | unknown }>(() => ({ teamChats: [], isLoading: false, error: null, refetch: vi.fn() }))
@@ -128,6 +129,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
         effort: null,
         permissionMode: 'default',
         collaborationMode: undefined,
+        serviceTier: null,
         ...overrides
     }
 }

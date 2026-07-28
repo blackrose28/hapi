@@ -1,7 +1,7 @@
 import type { SessionSummary } from './sessionSummary';
 import { z } from 'zod'
 import { CachedAgentModelCatalogSchema } from './agentModels'
-import { CODEX_COLLABORATION_MODES, PERMISSION_MODES } from './modes'
+import { AgentFlavorSchema, CODEX_COLLABORATION_MODES, PERMISSION_MODES } from './modes'
 
 export const PermissionModeSchema = z.enum(PERMISSION_MODES)
 export const CodexCollaborationModeSchema = z.enum(CODEX_COLLABORATION_MODES)
@@ -883,6 +883,22 @@ export type MachinesResponse = { machines: Machine[] }
 export type SpawnResponse =
     | { type: 'success'; sessionId: string }
     | { type: 'error'; message: string }
+
+export const SpawnSessionRequestSchema = z.object({
+    directory: z.string().min(1),
+    agent: AgentFlavorSchema.optional(),
+    model: z.string().optional(),
+    modelReasoningEffort: z.string().optional(),
+    effort: z.string().optional(),
+    yolo: z.boolean().optional(),
+    permissionMode: PermissionModeSchema.optional(),
+    sessionType: z.enum(['simple', 'worktree']).optional(),
+    worktreeName: z.string().optional(),
+    serviceTier: z.enum(['fast', 'standard']).optional(),
+    collaborationMode: CodexCollaborationModeSchema.optional()
+})
+
+export type SpawnSessionRequest = z.infer<typeof SpawnSessionRequestSchema>
 
 export type SqliteStorageUsageResponse = {
     path: string

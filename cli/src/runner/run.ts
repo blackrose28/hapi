@@ -1154,6 +1154,9 @@ export function buildCliArgs(
   if (options.modelReasoningEffort && (agent === 'codex' || agent === 'opencode')) {
     args.push('--model-reasoning-effort', options.modelReasoningEffort);
   }
+  if (options.collaborationMode && options.collaborationMode !== 'default' && agent === 'codex') {
+    args.push('--collaboration-mode', options.collaborationMode);
+  }
   // Pi RPC mode has no permission switching; never pass these flags to it
   // (the Pi command parser does not recognize --permission-mode/--yolo).
   if (agent !== 'pi') {

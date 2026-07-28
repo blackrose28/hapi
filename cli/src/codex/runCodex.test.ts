@@ -7,7 +7,6 @@ const mockCodexSession = vi.hoisted(() => ({
     setModelReasoningEffort: vi.fn(),
     setServiceTier: vi.fn(),
     setCollaborationMode: vi.fn(),
-    setServiceTier: vi.fn(),
     stopKeepAlive: vi.fn()
 }))
 

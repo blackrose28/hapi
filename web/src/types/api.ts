@@ -1,3 +1,4 @@
+
 export type {
     CodexModelsResponse,
     CodexModelSummary,
@@ -25,6 +26,7 @@ export type {
 import type { RunnerState } from '@hapi/protocol/schemas'
 
 import type {
+    CodexCollaborationMode,
     DecryptedMessage as ProtocolDecryptedMessage,
     Session,
     SessionSummary,
@@ -374,6 +376,8 @@ export type CodexDesktopSyncRequest = {
     machineId?: string | null
     model?: string | null
     modelReasoningEffort?: string | null
+    serviceTier?: string | null
+    collaborationMode?: CodexCollaborationMode
     yolo?: boolean
 }
 

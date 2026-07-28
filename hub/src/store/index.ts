@@ -534,6 +534,11 @@ export class Store {
 
     private migrateFromV9ToV10(): void {
         this.createTeamChatSchema()
+        const columns = this.getSessionColumnNames()
+        if (columns.size === 0) return
+        if (!columns.has('service_tier')) {
+            this.db.exec('ALTER TABLE sessions ADD COLUMN service_tier TEXT')
+        }
     }
 
     private migrateFromV10ToV11(): void {
@@ -614,13 +619,6 @@ export class Store {
         }
     }
 
-    private migrateFromV9ToV10(): void {
-        const columns = this.getSessionColumnNames()
-        if (columns.size === 0) return
-        if (!columns.has('service_tier')) {
-            this.db.exec('ALTER TABLE sessions ADD COLUMN service_tier TEXT')
-        }
-    }
 
     private getSessionColumnNames(): Set<string> {
         const rows = this.db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>

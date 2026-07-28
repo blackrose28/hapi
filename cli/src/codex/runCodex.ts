@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods';
 import { logger } from '@/ui/logger';
 import { randomUUID } from 'node:crypto';
 import { loop, type EnhancedMode, type PermissionMode } from './loop';

@@ -684,7 +684,8 @@ describe('ApiSessionClient.updateMetadata', () => {
             modelReasoningEffort: null,
             effort: null,
             permissionMode: undefined,
-            collaborationMode: undefined
+            collaborationMode: undefined,
+            serviceTier: null
         }
     }
 

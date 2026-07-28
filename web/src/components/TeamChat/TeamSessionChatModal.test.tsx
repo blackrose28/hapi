@@ -83,6 +83,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
         modelReasoningEffort: null,
         effort: 'high',
         permissionMode: 'default',
+        serviceTier: null,
         collaborationMode: undefined,
         ...overrides
     }

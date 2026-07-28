@@ -889,6 +889,7 @@ export function HappyComposer(props: {
     const showCollaborationSettings = Boolean(onCollaborationModeChange && collaborationModeOptions.length > 0)
     const showPermissionSettings = Boolean(onPermissionModeChange && permissionModeOptions.length > 0)
     const showModelSettings = Boolean(onModelChange && supportsModelChange(agentFlavor) && (piModels && piModels.length > 0 || modelOptions.length > 0))
+    const showModelEffortSettings = Boolean(modelEffortOptions && modelEffortOptions.length > 0)
     const showModelReasoningEffortSettings = Boolean(onModelReasoningEffortChange && modelReasoningEffortOptions.length > 0)
     // For Pi: hide effort when the selected model explicitly has reasoning: false
     const piEffortHidden = piModels && selectedPiModel && selectedPiModel.reasoning === false
@@ -1149,7 +1150,7 @@ export function HappyComposer(props: {
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
                                         }`}
-                                        onClick={() => handleModelEffortChange(option.value)}
+                                        onClick={() => handleModelChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <div
@@ -1180,7 +1181,7 @@ export function HappyComposer(props: {
                                 <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
                                     {t('misc.reasoningEffort')}
                                 </div>
-                                {codexReasoningEffortOptions.map((option) => (
+                                {modelReasoningEffortOptions.map((option) => (
                                     <button
                                         key={option.value ?? 'default'}
                                         type="button"

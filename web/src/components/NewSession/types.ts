@@ -17,6 +17,7 @@ export type ClaudeEffort = 'auto' | 'medium' | 'high' | 'max'
 export type GrokEffort = 'auto' | 'low' | 'medium' | 'high' | string
 // Shared by the LaunchEffortSelector (Claude + Grok both use it).
 export type LaunchEffort = ClaudeEffort | GrokEffort
+export type NewSessionServiceTier = 'standard' | 'fast'
 
 export type NewSessionDraft = {
     machineId: string | null

@@ -23,7 +23,6 @@ import { useToast } from '@/lib/toast-context'
 import { queryKeys } from '@/lib/query-keys'
 import { markCodexSessionsImported } from '@/lib/codexImportedSessions'
 import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
-import { AgentFlavorIcon } from '@/components/AgentFlavorIcon'
 import { isFastServiceTier } from '@/components/AssistantChat/codexFastMode'
 
 function getSessionTitle(session: Session): string {

@@ -792,11 +792,13 @@ export class ApiClient {
         worktreeName?: string,
         effort?: string,
         resumeSessionId?: string,
-        permissionMode?: PermissionMode
+        permissionMode?: PermissionMode,
+        serviceTier?: 'fast' | 'standard',
+        collaborationMode?: 'default' | 'plan'
     ): Promise<SpawnResponse> {
         return await this.request<SpawnResponse>(`/api/machines/${encodeURIComponent(machineId)}/spawn`, {
             method: 'POST',
-            body: JSON.stringify({ directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, effort, resumeSessionId, permissionMode })
+            body: JSON.stringify({ directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, effort, resumeSessionId, permissionMode, serviceTier, collaborationMode })
         })
     }
 

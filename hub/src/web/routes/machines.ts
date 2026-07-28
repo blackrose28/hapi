@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { AgentFlavorSchema, isKnownFlavor } from '@hapi/protocol'
-import { PermissionModeSchema } from '@hapi/protocol/schemas'
+import { CodexCollaborationModeSchema, PermissionModeSchema } from '@hapi/protocol/schemas'
 import type { SyncEngine } from '../../sync/syncEngine'
 import type { WebAppEnv } from '../middleware/auth'
 import { requireMachine, requireCapability, type RestCapabilityResolver } from './guards'
@@ -16,7 +16,9 @@ const spawnBodySchema = z.object({
     permissionMode: PermissionModeSchema.optional(),
     sessionType: z.enum(['simple', 'worktree']).optional(),
     worktreeName: z.string().optional(),
-    resumeSessionId: z.string().trim().min(1).optional()
+    resumeSessionId: z.string().trim().min(1).optional(),
+    serviceTier: z.enum(['fast', 'standard']).optional(),
+    collaborationMode: CodexCollaborationModeSchema.optional()
 })
 
 const pathsExistsSchema = z.object({
@@ -70,7 +72,10 @@ export function createMachinesRoutes(
             parsed.data.worktreeName,
             parsed.data.resumeSessionId,
             parsed.data.effort,
-            parsed.data.permissionMode
+            parsed.data.permissionMode,
+            parsed.data.serviceTier,
+            undefined,
+            parsed.data.collaborationMode
         )
         return c.json(result)
     })

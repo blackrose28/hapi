@@ -16,7 +16,9 @@ export interface CodexModelSummary {
     displayName: string;
     isDefault: boolean;
     defaultReasoningEffort?: string | null;
+    defaultServiceTier?: string | null;
     supportedReasoningEfforts?: string[];
+    serviceTiers?: string[];
 }
 
 export interface ListCodexModelsRequest {

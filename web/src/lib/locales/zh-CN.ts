@@ -253,6 +253,8 @@ export default {
   'newSession.codexResume.title': '继续现有 Codex 会话',
   'newSession.codexResume.desc': '从 Codex 会话或线程 ID 继续，类似 codex resume <id>。',
   'newSession.codexResume.sessionId': 'Codex 会话 ID',
+  'newSession.collaborationMode': '协作模式',
+  'newSession.fastMode': '快速模式',
   'newSession.yolo': 'YOLO 模式',
   'newSession.yolo.title': '跳过审批和沙箱',
   'newSession.yolo.desc': '启动时使用危险的代理标志。',

@@ -269,7 +269,7 @@ export class SessionCache {
             }
             session.effort = payload.effort
         }
-        if (payload.serviceTier !== undefined && !this.isStaleRuntimeKeepAlive(session.id, 'serviceTier', t)) {
+        if (payload.serviceTier !== undefined) {
             if (payload.serviceTier !== session.serviceTier) {
                 this.store.sessions.setSessionServiceTier(payload.sid, payload.serviceTier, session.namespace, {
                     touchUpdatedAt: false
@@ -277,7 +277,7 @@ export class SessionCache {
             }
             session.serviceTier = payload.serviceTier
         }
-        if (payload.collaborationMode !== undefined && !this.isStaleRuntimeKeepAlive(session.id, 'collaborationMode', t)) {
+        if (payload.collaborationMode !== undefined) {
             session.collaborationMode = payload.collaborationMode
         }
 
@@ -557,7 +557,6 @@ export class SessionCache {
                 }
             }
             session.serviceTier = config.serviceTier
-            this.markRuntimeConfigUpdated(sessionId, 'serviceTier', appliedAt)
         }
         if (config.collaborationMode !== undefined) {
             session.collaborationMode = config.collaborationMode

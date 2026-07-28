@@ -189,6 +189,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
         effort: null,
         permissionMode: 'default',
         collaborationMode: undefined,
+        serviceTier: null,
         ...overrides
     }
 }

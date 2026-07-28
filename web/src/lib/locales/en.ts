@@ -249,6 +249,8 @@ const en = {
   'newSession.codexResume.title': 'Resume existing Codex session',
   'newSession.codexResume.desc': 'Continue from a Codex session/thread id, like codex resume <id>.',
   'newSession.codexResume.sessionId': 'Codex session id',
+  'newSession.collaborationMode': 'Collaboration mode',
+  'newSession.fastMode': 'Fast mode',
   'newSession.yolo': 'YOLO mode',
   'newSession.yolo.title': 'Bypass approvals and sandbox',
   'newSession.yolo.desc': 'Uses dangerous agent flags when spawning.',

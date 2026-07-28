@@ -2,6 +2,8 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, ty
 import { CREATABLE_AGENT_FLAVORS, GROK_PERMISSION_MODES, type GrokPermissionMode } from '@hapi/protocol'
 import type { ApiClient } from '@/api/client'
 import type { CodexLocalSessionSummary, Machine } from '@/types/api'
+import type { CodexCollaborationMode } from '@hapi/protocol'
+import { codexModelAdvertisesFastTier } from '@/components/AssistantChat/codexFastMode'
 import { usePlatform } from '@/hooks/usePlatform'
 import { useMachinePathsExists } from '@/hooks/useMachinePathsExists'
 import { useSpawnSession } from '@/hooks/mutations/useSpawnSession'
@@ -19,12 +21,15 @@ import type {
     AgentType,
     LaunchEffort,
     NewSessionDraft,
+    NewSessionServiceTier,
     ReasoningEffort,
     SessionType,
 } from './types'
 import { ActionButtons } from './ActionButtons'
 import { AgentSelector } from './AgentSelector'
+import { CollaborationModeSelector } from './CollaborationModeSelector'
 import { DirectorySection } from './DirectorySection'
+import { FastModeSelector } from './FastModeSelector'
 import { MachineSelector } from './MachineSelector'
 import { ModelSelector } from './ModelSelector'
 import { OpencodeModelSelector } from './OpencodeModelSelector'
@@ -118,12 +123,7 @@ export function NewSession(props: {
     )
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
     const [isDirectoryFocused, setIsDirectoryFocused] = useState(false)
-    // A restored draft's agent may be stale (e.g. 'gemini' from before Gemini
-    // CLI was removed as a launchable agent — Google sunset the consumer
-    // Gemini CLI on 2026-06-18). Coerce it to a creatable flavor so the form
-    // never lets a non-launchable agent through, and drop the agent-dependent
-    // fields (model / effort / reasoning effort) so a stale Gemini model
-    // doesn't carry into the coerced agent.
+
     const initialDraftAgent = props.initialDraft?.agent
     const initialAgentCoerced = initialDraftAgent !== undefined
         && !(CREATABLE_AGENT_FLAVORS as readonly AgentType[]).includes(initialDraftAgent)
@@ -163,6 +163,8 @@ export function NewSession(props: {
     const [resumeCodexSessionId, setResumeCodexSessionId] = useState(
         props.initialDraft?.resumeCodexSessionId ?? ''
     )
+    const [serviceTier, setServiceTier] = useState<NewSessionServiceTier>('standard')
+    const [collaborationMode, setCollaborationMode] = useState<CodexCollaborationMode>('default')
     const [directoryCreationConfirmed, setDirectoryCreationConfirmed] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [codexImportSessions, setCodexImportSessions] = useState<CodexLocalSessionSummary[]>([])
@@ -188,6 +190,8 @@ export function NewSession(props: {
         setModel('auto')
         setEffort('auto')
         setGrokPermissionMode('default')
+        setServiceTier('standard')
+        setCollaborationMode('default')
     }, [agent])
 
     useEffect(() => {
@@ -291,6 +295,18 @@ export function NewSession(props: {
         return options
     }, [claudeModelsState.models, model])
 
+    const showCodexFastMode = agent === 'codex'
+        && !codexModelsState.error
+        && codexModelAdvertisesFastTier(model === 'auto' ? null : model, codexModelsState.models)
+
+    useEffect(() => {
+        if (agent === 'codex' && codexModelsState.isLoading) {
+            return
+        }
+        if (!showCodexFastMode && serviceTier !== 'standard') {
+            setServiceTier('standard')
+        }
+    }, [agent, codexModelsState.isLoading, showCodexFastMode, serviceTier])
     const cursorModelsState = useCursorModelsForMachine({
         api: props.api,
         machineId,
@@ -643,6 +659,12 @@ export function NewSession(props: {
                 ? modelReasoningEffort
                 : undefined
             const trimmedResumeCodexSessionId = resumeCodexSessionId.trim()
+            const resolvedServiceTier = agent === 'codex' && showCodexFastMode
+                ? serviceTier
+                : undefined
+            const resolvedCollaborationMode = agent === 'codex' && collaborationMode !== 'default'
+                ? collaborationMode
+                : undefined
 
             if (agent === 'codex' && selectedCodexImportSession) {
                 setIsImportingCodexSession(true)
@@ -652,6 +674,8 @@ export function NewSession(props: {
                     machineId: codexImportMachineId ?? machineId,
                     model: resolvedModel ?? null,
                     modelReasoningEffort: resolvedModelReasoningEffort ?? null,
+                    serviceTier: resolvedServiceTier,
+                    collaborationMode: resolvedCollaborationMode ?? 'default',
                     yolo: yoloMode
                 })
                 if (result.success) {
@@ -691,7 +715,9 @@ export function NewSession(props: {
                 worktreeName: sessionType === 'worktree' ? (worktreeName.trim() || undefined) : undefined,
                 resumeSessionId: agent === 'codex' && resumeCodex && trimmedResumeCodexSessionId
                     ? trimmedResumeCodexSessionId
-                    : undefined
+                    : undefined,
+                serviceTier: resolvedServiceTier,
+                collaborationMode: resolvedCollaborationMode
             })
 
             if (result.type === 'success') {
@@ -711,6 +737,9 @@ export function NewSession(props: {
         }
     }
 
+    const fastModeSelectionPending = agent === 'codex'
+        && serviceTier === 'fast'
+        && codexModelsState.isLoading
     const resumeCodexSessionIdRequired = agent === 'codex' && resumeCodex
     const canCreate = Boolean(
         machineId
@@ -719,6 +748,7 @@ export function NewSession(props: {
         && !missingWorktreeDirectory
         && (!resumeCodexSessionIdRequired || resumeCodexSessionId.trim())
         && (props.canCreateExtra ?? true)
+        && !fastModeSelectionPending
     )
 
     return (
@@ -842,6 +872,18 @@ export function NewSession(props: {
                 value={grokPermissionMode}
                 isDisabled={isFormDisabled}
                 onChange={setGrokPermissionMode}
+            />
+            <CollaborationModeSelector
+                agent={agent}
+                value={collaborationMode}
+                isDisabled={isFormDisabled}
+                onChange={setCollaborationMode}
+            />
+            <FastModeSelector
+                visible={showCodexFastMode}
+                value={serviceTier}
+                isDisabled={isFormDisabled}
+                onChange={setServiceTier}
             />
             {agent !== 'grok' ? (
                 <YoloToggle

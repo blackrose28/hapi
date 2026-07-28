@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { PermissionMode, AgentFlavor } from '@hapi/protocol'
+import type { AgentFlavor, CodexCollaborationMode, PermissionMode } from '@hapi/protocol'
 import type { ApiClient } from '@/api/client'
 import type { SpawnResponse } from '@/types/api'
 import { queryKeys } from '@/lib/query-keys'
@@ -16,6 +16,8 @@ type SpawnInput = {
     sessionType?: 'simple' | 'worktree'
     worktreeName?: string
     resumeSessionId?: string
+    serviceTier?: 'fast' | 'standard'
+    collaborationMode?: CodexCollaborationMode
 }
 
 export function useSpawnSession(api: ApiClient | null): {
@@ -41,7 +43,9 @@ export function useSpawnSession(api: ApiClient | null): {
                 input.worktreeName,
                 input.effort,
                 input.resumeSessionId,
-                input.permissionMode
+                input.permissionMode,
+                input.serviceTier,
+                input.collaborationMode
             )
         },
         onSuccess: () => {
