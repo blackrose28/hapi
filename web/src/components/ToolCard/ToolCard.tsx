@@ -585,6 +585,7 @@ function ToolCardInner(props: ToolCardProps) {
                         >
                             {header}
                         </button>
+<<<<<<< HEAD
                     </AppDialogTrigger>
                     {detailsDialog}
                 </AppDialog>

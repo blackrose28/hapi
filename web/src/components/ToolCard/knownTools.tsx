@@ -644,7 +644,7 @@ export function getToolPresentation(opts: ToolOpts): ToolPresentation {
     }
 
     return {
-        icon: <WrenchIcon className={DEFAULT_ICON_CLASS} />,
+        icon: <WrenchIcon className={`${DEFAULT_ICON_CLASS} translate-y-px`} />,
         title,
         subtitle: subtitle && subtitle !== title ? truncate(subtitle, 80) : null,
         minimal: true,
