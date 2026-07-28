@@ -742,7 +742,6 @@ const en = {
   'misc.fastModeFast': 'Fast',
   'misc.variant': 'Variant',
   'misc.loading': 'Loading…',
-  'misc.loadOlder': 'Load older',
   'misc.newMessage': '{n} new message{s}',
   'misc.loadingMessages': 'Loading messages…',
   'misc.typeMessage': "Type 'continue' to resume...",

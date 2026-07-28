@@ -914,6 +914,15 @@ export function HappyThread(props: {
                         <span>{t('misc.loadingMessages')}</span>
                     </div>
                 ) : null}
+                {props.isLoadingMoreMessages && !props.isSyncingTail ? (
+                    <div
+                        role="status"
+                        className="pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-bg)]/90 px-2.5 py-1 text-xs text-[var(--app-hint)] shadow-sm backdrop-blur"
+                    >
+                        <Spinner size="sm" label={null} className="text-current" />
+                        <span>{t('misc.loading')}</span>
+                    </div>
+                ) : null}
                 <ThreadPrimitive.Viewport
                     asChild
                     autoScroll={false}
@@ -931,35 +940,6 @@ export function HappyThread(props: {
                                     {props.messagesWarning ? (
                                         <div className="mb-3 rounded-md bg-amber-500/10 p-2 text-xs">
                                             {props.messagesWarning}
-                                        </div>
-                                    ) : null}
-
-                                    {props.hasMoreMessages && !props.isSyncingTail ? (
-                                        <div className="py-1 mb-2">
-                                            <div className="mx-auto w-fit">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        void loadOlderFromUserAction()
-                                                    }}
-                                                    disabled={props.isLoadingMoreMessages || props.isSyncingTail}
-                                                    aria-busy={props.isLoadingMoreMessages}
-                                                    className="gap-1.5 text-xs opacity-80 hover:opacity-100"
-                                                >
-                                                    {props.isLoadingMoreMessages ? (
-                                                        <>
-                                                            <Spinner size="sm" label={null} className="text-current" />
-                                                            {t('misc.loading')}
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span aria-hidden="true">↑</span>
-                                                            {t('misc.loadOlder')}
-                                                        </>
-                                                    )}
-                                                </Button>
-                                            </div>
                                         </div>
                                     ) : null}
 
