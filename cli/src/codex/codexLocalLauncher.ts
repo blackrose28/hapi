@@ -48,6 +48,7 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
     let hasSummary = false;
     let transcriptLocator: CodexTranscriptLocator | null = null;
     let scannerTranscriptPath: string | null = null;
+    let scannerReplayedExistingHistory = false;
     const pendingPlansByTurnId = new Map<string, ProposedPlanMessage>();
     const pendingExecWrappers = new Map<string, PendingExecWrapper>();
     const toolHookBridge = new CodexToolHookBridge();
@@ -76,6 +77,21 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
             type: 'message',
             message: `${message} Keeping local Codex running; remote transcript sync is unavailable for this launch.`
         });
+    };
+
+    const drainAndCleanupScanner = async (
+        activeScanner: CodexSessionScanner,
+        replayedExistingHistory: boolean
+    ): Promise<void> => {
+        try {
+            // Codex can flush its final transcript records after the last watcher tick.
+            await activeScanner.flush();
+            if (replayedExistingHistory) {
+                session.markTranscriptHistoryReplayConsumed();
+            }
+        } finally {
+            await activeScanner.cleanup();
+        }
     };
 
     const handleSessionFound = (sessionId: string, allowSwitch = false): void => {
@@ -176,10 +192,11 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
             scannerTranscriptPath = transcriptPath;
             return;
         }
+        const replayExistingHistory = session.shouldReplayTranscriptHistory();
         const createdScanner = await createCodexSessionScanner({
             transcriptPath,
             // 中文注释：导入模式下允许 scanner 首次回放 transcript 全量内容，补齐 Codex 客户端里已有但 Hapi 还未看到的消息。
-            replayExistingHistory: session.replayTranscriptHistoryOnStart,
+            replayExistingHistory,
             onSessionId: (sessionId) => {
                 if (!isPrimarySessionId(sessionId)) {
                     logger.debug(`[codex-local]: Ignoring transcript session id ${sessionId}; primary is ${primarySessionId}`);
@@ -257,11 +274,12 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
             }
         });
         if (shuttingDown) {
-            await createdScanner.cleanup();
+            await drainAndCleanupScanner(createdScanner, replayExistingHistory);
             return;
         }
         scanner = createdScanner;
         scannerTranscriptPath = transcriptPath;
+        scannerReplayedExistingHistory = replayExistingHistory;
     };
 
     const handleTranscriptPath = (transcriptPath: string): Promise<void> => {
@@ -396,7 +414,7 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
         }
         const activeScanner = scanner as CodexSessionScanner | null;
         if (activeScanner) {
-            await activeScanner.cleanup();
+            await drainAndCleanupScanner(activeScanner, scannerReplayedExistingHistory);
         }
         flushAllPendingExecWrappers();
         for (const message of toolHookBridge.finish()) {

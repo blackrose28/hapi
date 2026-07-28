@@ -81,6 +81,7 @@ function createSessionStub(
     let localLaunchFailure: { message: string; exitReason: 'switch' | 'exit' } | null = null;
     let sessionId: string | null = null;
     let transcriptPath: string | null = initialTranscriptPath;
+    let transcriptHistoryReplayPending = replayTranscriptHistoryOnStart;
     let modelReasoningEffort: string | null = null;
     const modelReasoningEffortUpdates: Array<string | null> = [];
     const transcriptPathCallbacks: Array<(path: string) => void> = [];
@@ -97,7 +98,10 @@ function createSessionStub(
             startedBy: 'terminal' as const,
             startingMode: 'local' as const,
             codexArgs,
-            replayTranscriptHistoryOnStart,
+            shouldReplayTranscriptHistory: () => transcriptHistoryReplayPending,
+            markTranscriptHistoryReplayConsumed: () => {
+                transcriptHistoryReplayPending = false;
+            },
             client: {
                 isPending: () => pendingClient,
                 rpcHandlerManager: {
@@ -629,9 +633,9 @@ describe('codexLocalLauncher', () => {
         }
     });
 
-    it('replays existing transcript messages when importing a Codex thread into a new Hapi session', async () => {
+    it('replays imported transcript history only on the first local attachment', async () => {
         const transcriptPath = join(tempDir, 'codex-import-transcript.jsonl');
-        const { session, agentMessages } = createSessionStub('default', undefined, '/tmp/worktree', null, true);
+        const { session, userMessages, agentMessages } = createSessionStub('default', undefined, '/tmp/worktree', null, true);
         let releaseRunBarrier: (() => void) | undefined;
         harness.runBarrier = new Promise((resolve) => {
             releaseRunBarrier = resolve;
@@ -641,6 +645,7 @@ describe('codexLocalLauncher', () => {
             transcriptPath,
             [
                 JSON.stringify({ type: 'session_meta', payload: { id: 'codex-thread-import' } }),
+                JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'old imported prompt' } }),
                 JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'old imported message' } })
             ].join('\n') + '\n'
         );
@@ -653,14 +658,60 @@ describe('codexLocalLauncher', () => {
         });
         await wait(300);
 
+        await appendFile(
+            transcriptPath,
+            JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'tail before switch' } }) + '\n'
+        );
+
         if (releaseRunBarrier) {
             releaseRunBarrier();
         }
         await launcherPromise;
 
+        expect(userMessages).toEqual(['old imported prompt', 'tail before switch']);
+        expect(agentMessages.filter((message) => (
+            message as { message?: string }
+        ).message === 'old imported message')).toHaveLength(1);
+
+        let releaseSecondRunBarrier: (() => void) | undefined;
+        harness.runBarrier = new Promise((resolve) => {
+            releaseSecondRunBarrier = resolve;
+        });
+
+        const secondLauncherPromise = codexLocalLauncher(session as never);
+        await wait(50);
+
+        harness.sessionHookHandlers[1]?.('codex-thread-import', {
+            transcript_path: transcriptPath
+        });
+        await wait(300);
+
+        expect(userMessages).toEqual(['old imported prompt', 'tail before switch']);
+        expect(agentMessages.filter((message) => (
+            message as { message?: string }
+        ).message === 'old imported message')).toHaveLength(1);
+
+        await appendFile(
+            transcriptPath,
+            [
+                JSON.stringify({ type: 'event_msg', payload: { type: 'user_message', message: 'new local prompt' } }),
+                JSON.stringify({ type: 'event_msg', payload: { type: 'agent_message', message: 'new local response' } })
+            ].join('\n') + '\n'
+        );
+        await wait(700);
+
+        if (releaseSecondRunBarrier) {
+            releaseSecondRunBarrier();
+        }
+        await secondLauncherPromise;
+
+        expect(userMessages).toEqual(['old imported prompt', 'tail before switch', 'new local prompt']);
+        expect(agentMessages.filter((message) => (
+            message as { message?: string }
+        ).message === 'old imported message')).toHaveLength(1);
         expect(agentMessages).toContainEqual({
             type: 'message',
-            message: 'old imported message',
+            message: 'new local response',
             id: expect.any(String)
         });
     });

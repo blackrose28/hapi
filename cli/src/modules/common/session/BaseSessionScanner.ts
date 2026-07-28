@@ -109,6 +109,13 @@ export abstract class BaseSessionScanner<TEvent> {
         this.intervalId = setInterval(() => this.sync.invalidate(), this.options.intervalMs);
     }
 
+    public async flush(): Promise<void> {
+        if (this.stopped) {
+            return;
+        }
+        await this.sync.invalidateAndAwait();
+    }
+
     public async cleanup(): Promise<void> {
         this.stopped = true;
         if (this.intervalId) {
