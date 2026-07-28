@@ -765,6 +765,8 @@ export function SessionChat(props: {
     const runtime = useHappyRuntime({
         session: props.session,
         blocks: reconciled.blocks,
+        messagesVersion: props.messagesVersion,
+        historyVersion: props.historyVersion,
         isSending: props.isSending,
         isRunning: props.session.thinking || hasRunningChildAgent,
         onSendMessage: handleSend,
