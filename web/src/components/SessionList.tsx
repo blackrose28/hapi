@@ -598,7 +598,10 @@ function ScheduleIcon(props: { className?: string }) {
     )
 }
 
-function formatCodexImportedRelativeTime(value: number, t: (key: string, params?: Record<string, string | number>) => string): string | null {
+function formatCodexImportedRelativeTime(
+    value: number,
+    t: (key: string, params?: Record<string, string | number>) => string
+): string | null {
     const ms = value < 1_000_000_000_000 ? value * 1000 : value
     if (!Number.isFinite(ms)) return null
     const delta = Date.now() - ms
@@ -704,7 +707,7 @@ function SessionItem(props: {
             <button
                 type="button"
                 {...longPressHandlers}
-                className={`session-list-item group/session-row flex w-full flex-col gap-1 px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)] select-none rounded-lg ${selected ? 'bg-[var(--app-secondary-bg)]' : ''}`}
+                className={`session-list-item group/session-row flex w-full flex-col gap-1 py-2 pl-2.5 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)] select-none rounded-lg ${selected ? 'bg-[var(--app-secondary-bg)]' : ''}`}
                 style={{ WebkitTouchCallout: 'none' }}
                 aria-current={selected ? 'page' : undefined}
                 aria-describedby={describedBy}
@@ -1174,18 +1177,23 @@ export function SessionList(props: {
     }, [allGroups])
 
     return (
-        <div className="mx-auto w-full max-w-content flex flex-col">
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+            <div className="session-list-scrollbar-offset mx-auto w-full max-w-content shrink-0">
             {renderHeader ? (
+<<<<<<< HEAD
                 <div className="flex items-center justify-between px-3 py-1">
                     <div className="text-xs text-[var(--app-hint)]">
                         {isSearching
                             ? t('sessions.search.count', { n: visibleSessions.length, total: allSessions.length })
                             : t('sessions.count', { n: props.sessions.length, m: allGroups.length })}
                     </div>
+=======
+                <div className="flex items-center justify-end px-2 py-1">
+>>>>>>> adb9e209 (fix(web): stabilize session list alignment and scrolling (#1196))
                     <button
                         type="button"
                         onClick={props.onNewSession}
-                        className="session-list-new-button p-1.5 rounded-full text-[var(--app-link)] transition-colors"
+                        className="session-list-new-button flex h-9 w-9 items-center justify-center rounded-full text-[var(--app-link)] transition-colors"
                         title={t('sessions.new')}
                     >
                         <PlusIcon className="h-5 w-5" />
@@ -1210,6 +1218,7 @@ export function SessionList(props: {
                 </div>
             ) : null}
 
+<<<<<<< HEAD
             <div className="flex flex-col gap-3 px-2 pt-1 pb-2">
                 {machineGroups.map((mg) => {
                     const machineCollapsed = isMachineCollapsed(mg)
@@ -1220,6 +1229,49 @@ export function SessionList(props: {
                                 type="button"
                                 onClick={() => toggleMachine(mg)}
                                 className="flex w-full items-center gap-2 px-1 py-1.5 text-left rounded-lg transition-colors hover:bg-[var(--app-subtle-bg)] select-none"
+=======
+            {showMachineFilterBar ? (
+                <MachineFilterBar
+                    machines={machineFilters.map((mg) => {
+                        const machine = mg.machineId ? machinesById[mg.machineId] : undefined
+                        return {
+                            id: mg.machineId ?? UNKNOWN_MACHINE_ID,
+                            label: mg.label,
+                            sessionCount: mg.totalSessions,
+                            healthPresentation: presentMachineHealth(
+                                machine?.health,
+                                getMachinePlatform(machine)
+                            )
+                        }
+                    })}
+                    totalCount={allSessions.length}
+                    value={activeMachineFilter}
+                    onChange={setMachineFilter}
+                />
+            ) : null}
+            </div>
+
+            <div className="app-scroll-y session-list-scrollbar-left min-h-0 flex-1">
+            <div className="mx-auto flex w-full max-w-content flex-col gap-1 pl-1.5 pr-2 pt-1 pb-2">
+                {groups.map((group) => {
+                    const isCollapsed = isGroupCollapsed(group)
+                    const visibleGroupSessions = getVisibleGroupSessions(group)
+                    const hiddenSessionCount = group.sessions.length - visibleGroupSessions.length
+                    const canCollapseSessions = getGroupVisibleCount(group) > sessionPreviewLimit
+                    const showMoreCount = Math.min(sessionPreviewLimit, hiddenSessionCount)
+                    const canStartInGroupDirectory = group.directory !== 'Other'
+                    // With multiple machines in the unfiltered view, disambiguate
+                    // same-named directories by suffixing the machine label.
+                    const groupTitle = showMachineFilterBar && activeMachineFilter === null
+                        ? `${group.displayName} · ${resolveMachineLabel(group.machineId)}`
+                        : group.displayName
+                    return (
+                        <div key={group.key}>
+                            <div
+                                className="group/project sticky top-0 z-10 flex items-center gap-2 py-1.5 pl-2 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-subtle-bg)] cursor-pointer min-w-0 w-full select-none"
+                                onClick={() => toggleGroup(group.key, isCollapsed)}
+                                title={group.directory}
+>>>>>>> adb9e209 (fix(web): stabilize session list alignment and scrolling (#1196))
                             >
                                 <ChevronIcon className="h-4 w-4 text-[var(--app-hint)] shrink-0" collapsed={machineCollapsed} />
                                 <MachineIcon className="h-4 w-4 text-[var(--app-hint)] shrink-0" />
@@ -1230,6 +1282,7 @@ export function SessionList(props: {
                             {/* Level 2: Projects */}
                             <div className="collapsible-panel" data-open={!machineCollapsed || undefined}>
                                 <div className="collapsible-inner">
+<<<<<<< HEAD
                                 <div className="flex flex-col ml-3.5 pl-1 mt-0.5">
                                     {mg.projectGroups.map((group) => {
                                         const isCollapsed = isGroupCollapsed(group)
@@ -1292,12 +1345,43 @@ export function SessionList(props: {
                                             </div>
                                         )
                                     })}
+=======
+                                <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
+                                    {visibleGroupSessions.map((s) => (
+                                        <SessionItem
+                                            key={s.id}
+                                            session={s}
+                                            onSelect={props.onSelect}
+                                            showPath={false}
+                                            api={api}
+                                            selected={s.id === selectedSessionId}
+                                            showDetailedStatus={showDetailedStatus}
+                                        />
+                                    ))}
+                                    {group.sessions.length > sessionPreviewLimit && (hiddenSessionCount > 0 || canCollapseSessions) ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => hiddenSessionCount > 0
+                                                ? showMoreSessions(group)
+                                                : collapseSessionGroup(group)}
+                                            className={cn(
+                                                'ml-2.5 mr-2 my-1 rounded-md px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]',
+                                                hiddenSessionCount > 0 && 'border border-dashed border-[var(--app-border)]'
+                                            )}
+                                        >
+                                            {hiddenSessionCount > 0
+                                                ? t('sessions.group.showMore', { n: showMoreCount })
+                                                : t('sessions.group.showLess')}
+                                        </button>
+                                    ) : null}
+>>>>>>> adb9e209 (fix(web): stabilize session list alignment and scrolling (#1196))
                                 </div>
                                 </div>
                             </div>
                         </div>
                     )
                 })}
+            </div>
             </div>
         </div>
     )

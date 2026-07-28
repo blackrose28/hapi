@@ -314,17 +314,27 @@ body {
     }
 }
 
-/* Desktop sidebar: use custom width from CSS variable */
-@media (min-width: 1024px) {
-    .desktop-scrollbar-left {
-        direction: rtl;
-    }
+/* Keep the session list scrollbar on the left at every viewport size. */
+.session-list-scrollbar-left {
+    direction: rtl;
+    scrollbar-gutter: stable;
+}
 
-    .desktop-scrollbar-left > * {
-        direction: ltr;
-    }
+.session-list-scrollbar-left > * {
+    direction: ltr;
+}
 
-    /* Apply resizable width to sidebar */
+/* Match fixed sidebar controls to the space reserved for the left scrollbar. */
+.session-list-scrollbar-offset {
+    padding-left: 8px;
+}
+
+/* Desktop sidebar: use custom width from CSS variable. */
+@media (min-width: 920px) {
+    div[style*="--sidebar-w"] {
+        width: var(--sidebar-w) !important;
+    }
+}
     div[style*="--sidebar-w"] {
         width: var(--sidebar-w) !important;
     }
