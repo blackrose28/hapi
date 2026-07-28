@@ -18,7 +18,17 @@ export interface SDKMessage {
 export interface SDKUserMessage extends SDKMessage {
     type: 'user'
     parent_tool_use_id?: string
+<<<<<<< HEAD
     tool_use_result?: unknown
+=======
+    /**
+     * Set by Claude Code on user-role messages it injects itself (skill bodies,
+     * compact continuation summaries) rather than relaying from the human. The
+     * on-disk transcript spells the same thing `isMeta`.
+     */
+    isSynthetic?: boolean
+    isMeta?: boolean
+>>>>>>> 31a7f67e (fix(cli): mark synthetic SDK user messages as meta (#1209))
     message: {
         role: 'user'
         content: string | Array<{
