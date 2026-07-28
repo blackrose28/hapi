@@ -81,6 +81,8 @@ function createSessionStub(
     let localLaunchFailure: { message: string; exitReason: 'switch' | 'exit' } | null = null;
     let sessionId: string | null = null;
     let transcriptPath: string | null = initialTranscriptPath;
+    let modelReasoningEffort: string | null = null;
+    const modelReasoningEffortUpdates: Array<string | null> = [];
     const transcriptPathCallbacks: Array<(path: string) => void> = [];
 
     return {
@@ -103,7 +105,11 @@ function createSessionStub(
                 }
             },
             getPermissionMode: () => permissionMode,
-            getModelReasoningEffort: () => null,
+            getModelReasoningEffort: () => modelReasoningEffort,
+            setModelReasoningEffort: (effort: string | null) => {
+                modelReasoningEffort = effort;
+                modelReasoningEffortUpdates.push(effort);
+            },
             onSessionFound: (value: string) => {
                 sessionId = value;
             },
@@ -146,7 +152,9 @@ function createSessionStub(
         userMessages,
         agentMessages,
         getUserActivityCount: () => userActivityCount,
-        getLocalLaunchFailure: () => localLaunchFailure
+        getLocalLaunchFailure: () => localLaunchFailure,
+        getModelReasoningEffort: () => modelReasoningEffort,
+        getModelReasoningEffortUpdates: () => modelReasoningEffortUpdates
     };
 }
 
@@ -360,6 +368,44 @@ describe('codexLocalLauncher', () => {
             message: 'hello from transcript',
             id: expect.any(String)
         });
+    });
+
+    it('tracks explicit and default reasoning effort from local turn context', async () => {
+        const transcriptPath = await writeTranscriptMeta('codex-turn-context.jsonl', 'codex-thread-effort');
+        const { session, getModelReasoningEffort, getModelReasoningEffortUpdates } = createSessionStub('default');
+        let releaseRunBarrier: (() => void) | undefined;
+        harness.runBarrier = new Promise((resolve) => {
+            releaseRunBarrier = resolve;
+        });
+
+        const launcherPromise = codexLocalLauncher(session as never);
+        await wait(50);
+        harness.sessionHookHandlers[0]?.('codex-thread-effort', {
+            transcript_path: transcriptPath
+        });
+        await wait(100);
+
+        await appendFile(transcriptPath, [
+            JSON.stringify({
+                type: 'turn_context',
+                payload: { effort: 'max' }
+            }),
+            JSON.stringify({
+                type: 'event_msg',
+                payload: { type: 'token_count', info: {} }
+            }),
+            JSON.stringify({
+                type: 'turn_context',
+                payload: { model: 'gpt-5.4' }
+            })
+        ].join('\n') + '\n');
+        await wait(700);
+
+        releaseRunBarrier?.();
+        await launcherPromise;
+
+        expect(getModelReasoningEffortUpdates()).toEqual(['max', null]);
+        expect(getModelReasoningEffort()).toBeNull();
     });
 
     it('renders nested Code Mode plans and commands without their covered exec wrapper', async () => {

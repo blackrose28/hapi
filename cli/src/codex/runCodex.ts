@@ -90,7 +90,9 @@ export async function runCodex(opts: {
         ?? (persistedPermissionMode && isPermissionModeAllowedForFlavor(persistedPermissionMode, 'codex') ? persistedPermissionMode as PermissionMode : undefined)
         ?? 'default';
     let currentModel = opts.model;
-    let currentModelReasoningEffort: ReasoningEffort | undefined = opts.modelReasoningEffort;
+    // Three states matter here: `undefined` inherits Codex configuration,
+    // `null` explicitly clears a HAPI override, and a string explicitly sets it.
+    let currentModelReasoningEffort: ReasoningEffort | null | undefined = opts.modelReasoningEffort;
     let currentCollaborationMode: EnhancedMode['collaborationMode'] = opts.collaborationMode ?? 'default';
     let currentProactiveMultiAgent: boolean | undefined;
     // Service tier (Fast mode), stored representation: `'fast'` and
@@ -120,7 +122,11 @@ export async function runCodex(opts: {
         if (options?.syncModel !== false) {
             sessionInstance.setModel(currentModel ?? null);
         }
-        sessionInstance.setModelReasoningEffort(currentModelReasoningEffort ?? null);
+        // Do not collapse inherited Codex config into an explicit default.
+        // Explicit clears remain `null` and must still be synchronized.
+        if (currentModelReasoningEffort !== undefined) {
+            sessionInstance.setModelReasoningEffort(currentModelReasoningEffort);
+        }
         // Preserve the third state: only sync when the user/persisted session
         // has an explicit tier. `undefined` means "omit" so the keepalive does
         // not overwrite the account-default or persisted Fast tier with null.
@@ -151,7 +157,7 @@ export async function runCodex(opts: {
             currentModel = updates.model ?? undefined;
         }
         if (updates.modelReasoningEffort !== undefined) {
-            currentModelReasoningEffort = updates.modelReasoningEffort ?? undefined;
+            currentModelReasoningEffort = updates.modelReasoningEffort;
         }
         if (updates.collaborationMode !== undefined) {
             currentCollaborationMode = updates.collaborationMode;
@@ -176,7 +182,7 @@ export async function runCodex(opts: {
         }
         const sessionModelReasoningEffort = sessionWrapperRef.current?.getModelReasoningEffort();
         if (sessionModelReasoningEffort !== undefined) {
-            currentModelReasoningEffort = (sessionModelReasoningEffort ?? undefined) as ReasoningEffort | undefined;
+            currentModelReasoningEffort = sessionModelReasoningEffort as ReasoningEffort | null;
         }
         const sessionCollaborationMode = sessionWrapperRef.current?.getCollaborationMode();
         if (sessionCollaborationMode) {
@@ -201,7 +207,7 @@ export async function runCodex(opts: {
                     permissionMode: currentPermissionMode,
                     collaborationMode: currentCollaborationMode,
                     model: currentModel,
-                    modelReasoningEffort: currentModelReasoningEffort,
+                    modelReasoningEffort: currentModelReasoningEffort ?? undefined,
                     serviceTier: currentServiceTier,
                     proactiveMultiAgent: currentProactiveMultiAgent
                 });
@@ -221,7 +227,7 @@ export async function runCodex(opts: {
                     messageQueue.pushIsolateAndClear(goalCommand, {
                         permissionMode: currentPermissionMode ?? 'default',
                         model: currentModel,
-                        modelReasoningEffort: currentModelReasoningEffort,
+                        modelReasoningEffort: currentModelReasoningEffort ?? undefined,
                         collaborationMode: currentCollaborationMode,
                         serviceTier: currentServiceTier
                     }, localId);
@@ -260,7 +266,7 @@ export async function runCodex(opts: {
                 const enhancedMode: EnhancedMode = {
                     permissionMode: messagePermissionMode ?? 'default',
                     model: currentModel,
-                    modelReasoningEffort: currentModelReasoningEffort,
+                    modelReasoningEffort: currentModelReasoningEffort ?? undefined,
                     collaborationMode: currentCollaborationMode,
                     proactiveMultiAgent: currentProactiveMultiAgent,
                     serviceTier: currentServiceTier
@@ -275,7 +281,7 @@ export async function runCodex(opts: {
                 const enhancedMode: EnhancedMode = {
                     permissionMode: currentPermissionMode ?? 'default',
                     model: currentModel,
-                    modelReasoningEffort: currentModelReasoningEffort,
+                    modelReasoningEffort: currentModelReasoningEffort ?? undefined,
                     collaborationMode: currentCollaborationMode,
                     proactiveMultiAgent: currentProactiveMultiAgent,
                     serviceTier: currentServiceTier
@@ -369,7 +375,7 @@ export async function runCodex(opts: {
         }
 
         if (config.modelReasoningEffort !== undefined) {
-            currentModelReasoningEffort = parseReasoningEffortValue(config.modelReasoningEffort);
+            currentModelReasoningEffort = parseReasoningEffortValue(config.modelReasoningEffort) ?? null;
         }
 
         if (config.collaborationMode !== undefined) {
@@ -415,7 +421,7 @@ export async function runCodex(opts: {
             startedBy,
             permissionMode: currentPermissionMode,
             model: currentModel,
-            modelReasoningEffort: currentModelReasoningEffort,
+            modelReasoningEffort: currentModelReasoningEffort ?? undefined,
             collaborationMode: currentCollaborationMode,
             resumeSessionId: opts.resumeSessionId,
             recoveryContext: opts.recoveryContext,

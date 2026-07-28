@@ -372,10 +372,10 @@ describe('appServerConfig', () => {
             mode: 'plan',
             settings: {
                 model: 'o3',
-                reasoning_effort: null,
                 developer_instructions: withCollaborationInstructions(`${codexSystemPrompt}\n\nOnly respond in Chinese.`)
             }
         });
+        expect(params.collaborationMode?.settings).not.toHaveProperty('reasoning_effort');
     });
 
     it('injects spawn_agent argument rules into collaboration mode instructions', () => {
@@ -432,7 +432,6 @@ describe('appServerConfig', () => {
             mode: 'default',
             settings: {
                 model: 'o3',
-                reasoning_effort: null,
                 developer_instructions: withCollaborationInstructions(codexSystemPrompt)
             }
         });
@@ -453,7 +452,6 @@ describe('appServerConfig', () => {
             mode: 'default',
             settings: {
                 model: 'o3',
-                reasoning_effort: null,
                 developer_instructions: withCollaborationInstructions(codexSystemPrompt)
             }
         });
@@ -473,7 +471,6 @@ describe('appServerConfig', () => {
             mode: 'default',
             settings: {
                 model: 'gpt-5',
-                reasoning_effort: null,
                 developer_instructions: withCollaborationInstructions(codexSystemPrompt)
             }
         });

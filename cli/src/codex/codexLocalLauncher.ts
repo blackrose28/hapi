@@ -6,7 +6,7 @@ import { codexLocal } from './codexLocal';
 import type { ReasoningEffort } from './appServerTypes';
 import { CodexSession } from './session';
 import { createCodexSessionScanner, type CodexSessionScanner } from './utils/codexSessionScanner';
-import { convertCodexEvent, type CodexMessage } from './utils/codexEventConverter';
+import { convertCodexEvent, type CodexMessage, type CodexSessionEvent } from './utils/codexEventConverter';
 import { buildHapiMcpBridge } from './utils/buildHapiMcpBridge';
 import { parseCodexCliOverrides, stripCodexCliOverrides } from './utils/codexCliOverrides';
 import { buildCodexPermissionModeCliArgs } from './utils/permissionModeConfig';
@@ -22,6 +22,20 @@ type PendingExecWrapper = {
     message: ToolCallMessage;
     turnId?: string;
 };
+
+function extractTurnContextReasoningEffort(event: CodexSessionEvent): ReasoningEffort | null | undefined {
+    if (event.type !== 'turn_context') {
+        return undefined;
+    }
+    if (!event.payload || typeof event.payload !== 'object') {
+        return null;
+    }
+    const effort = (event.payload as Record<string, unknown>).effort;
+    if (typeof effort !== 'string' || !effort.trim()) {
+        return null;
+    }
+    return effort.trim().toLowerCase();
+}
 
 export async function codexLocalLauncher(session: CodexSession, _recoveryContext?: string): Promise<'switch' | 'exit'> {
     const resumeSessionId = session.sessionId;
@@ -174,6 +188,10 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
                 session.onSessionFound(sessionId);
             },
             onEvent: (event) => {
+                const observedReasoningEffort = extractTurnContextReasoningEffort(event);
+                if (observedReasoningEffort !== undefined) {
+                    session.setModelReasoningEffort(observedReasoningEffort);
+                }
                 const converted = convertCodexEvent(event);
                 if (converted?.sessionId) {
                     if (!isPrimarySessionId(converted.sessionId)) {

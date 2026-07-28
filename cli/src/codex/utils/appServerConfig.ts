@@ -279,7 +279,7 @@ export function buildTurnStartParams(args: {
             mode: collaborationMode,
             settings: {
                 model,
-                reasoning_effort: modelReasoningEffort ?? null,
+                ...(modelReasoningEffort !== undefined ? { reasoning_effort: modelReasoningEffort } : {}),
                 developer_instructions: appendCollaborationInstructions(developerInstructions, args.mode?.proactiveMultiAgent)
             }
         };
