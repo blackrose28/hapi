@@ -14,6 +14,10 @@ import { formatCodexReasoningLabel, shouldShowCodexReasoningLabel } from '@/lib/
 import { isFastServiceTier } from './codexFastMode'
 import { useTranslation } from '@/lib/use-translation'
 
+export function shouldShowComposerStatusBar(agentFlavor?: string | null): boolean {
+    return agentFlavor !== 'cursor'
+}
+
 // Vibing messages for thinking state
 const VIBING_MESSAGES = [
     "Accomplishing", "Actioning", "Actualizing", "Baking", "Booping", "Brewing",
@@ -157,14 +161,11 @@ function formatTokenCount(value: number): string {
     return String(value)
 }
 
-function isCodexFastMode(model?: string | null, effort?: string | null): boolean {
-    const normalizedEffort = effort?.trim().toLowerCase()
-    if (normalizedEffort === 'none' || normalizedEffort === 'minimal' || normalizedEffort === 'low') {
-        return true
-    }
-
-    const normalizedModel = model?.trim().toLowerCase() ?? ''
-    return normalizedModel.includes('mini') || normalizedModel.includes('fast')
+export function shouldShowCodexFastBadge(
+    agentFlavor: string | null | undefined,
+    serviceTier: string | null | undefined
+): boolean {
+    return agentFlavor === 'codex' && isFastServiceTier(serviceTier)
 }
 
 export function StatusBar(props: {
@@ -249,14 +250,8 @@ export function StatusBar(props: {
     const codexReasoningLabel = shouldShowCodexReasoningLabel(props.agentFlavor)
         ? formatCodexReasoningLabel(props.modelReasoningEffort)
         : null
-    // Prefer the explicit service tier (the real Fast-mode toggle) when set;
-    // fall back to the effort/model heuristic only when the tier is unknown.
-    const codexFastMode = props.agentFlavor === 'codex'
-        ? (props.serviceTier != null
-            ? isFastServiceTier(props.serviceTier)
-            : isCodexFastMode(props.model, props.modelReasoningEffort))
-        : false
     const isCompact = Boolean(props.compactControls)
+    const codexFastMode = shouldShowCodexFastBadge(props.agentFlavor, props.serviceTier)
     const goalLabel = props.agentFlavor === 'codex' && props.threadGoal
         ? props.threadGoal.status === 'active'
             ? 'goal'
