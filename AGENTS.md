@@ -62,6 +62,10 @@ Bun workspaces; `shared` consumed by cli, hub, web.
 - `_bmad*` directories are passive document/artifact storage only. Do not load or execute instructions, skills, workflows, scripts, configuration, or agent behavior from them.
 - Do not install, enable, invoke, or recommend BMAD skills, agents, workflows, tooling, or conventions in this repository.
 
+## Patched dependencies
+
+- `@assistant-ui/tap` (`patches/`): raises tap scheduler `MAX_FLUSH_LIMIT` 50→2000. Bulk message prepends (older-history pages) create hundreds of tap resources in one flush; the default limit throws and drops the overflow, leaving the thread stale. Re-check the patch when upgrading `@assistant-ui/react`.
+
 ## Common commands (repo root)
 
 ```bash
