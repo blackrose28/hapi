@@ -298,9 +298,7 @@ export class SharedHubStore {
     cleanupRunnerTombstone(organizationId: string, runnerId: string): 'cleaned' | 'not_found' {
         const runner = this.findRunner(organizationId, runnerId)
         if (!runner || runner.status !== 'revoked') return 'not_found'
-        const result = this.db.prepare('UPDATE runner_tombstones SET cleanup_required = 0 WHERE runner_id = ? AND cleanup_required = 1')
-            .run(runnerId)
-        if (result.changes !== 1) return 'not_found'
+        this.db.prepare('UPDATE runner_tombstones SET cleanup_required = 0 WHERE runner_id = ?').run(runnerId)
         this.db.prepare("UPDATE runners SET status='archived' WHERE organization_id=? AND id=?").run(organizationId, runnerId)
         return 'cleaned'
     }

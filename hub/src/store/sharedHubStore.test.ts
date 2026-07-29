@@ -181,4 +181,12 @@ describe('SharedHubStore', () => {
         expect(store.cleanupRunnerTombstone('o1', 'r1')).toBe('not_found')
         expect(store.cleanupRunnerTombstone('o1', 'never')).toBe('not_found')
     })
+
+    it('cleans up a revoked runner whose tombstone flag was already cleared', () => {
+        const { db, store } = seeded()
+        db.exec("INSERT INTO runners(id,organization_id,owner_membership_id,machine_id,profile,name,status,created_at) VALUES ('r1','o1','u1','m1','p1','A','revoked',1)")
+        db.exec("INSERT INTO runner_tombstones(runner_id,cleanup_required,revoked_at) VALUES ('r1',0,1)")
+        expect(store.cleanupRunnerTombstone('o1', 'r1')).toBe('cleaned')
+        expect(store.findRunner('o1', 'r1')?.status).toBe('archived')
+    })
 })
