@@ -7,7 +7,9 @@ import { unwrapRoleWrappedRecordEnvelope } from '@hapi/protocol/messages'
  * Uses role-aware parsing to avoid false positives:
  *  - Started:   agent-role output with tool_result containing
  *               "Command running in background with ID:" (background bash)
- *               or "Async agent launched successfully." + "agentId:" (async subagent)
+ *               or "Async agent launched successfully." + "agentId:" (async subagent,
+ *               text form), or a structured { agentId, output_file } object (async
+ *               subagent, object form) — the SDK uses either shape depending on version
  *  - Completed: agent-role output wrapping a user-type message (system-injected)
  *               starting with "<task-notification>" — this fires for both kinds,
  *               since a subagent's own turn finishing doesn't mean its background
@@ -62,6 +64,13 @@ function countTaskStarts(content: Record<string, unknown>): number {
 }
 
 function isBackgroundStartResult(block: Record<string, unknown>): boolean {
+    // The SDK sometimes returns the async-launch metadata as a structured
+    // object (content: { agentId, output_file }) instead of the text form
+    // below — check that first, same as the web ToolCard's Agent result view.
+    if (isObject(block.content) && ('agentId' in block.content || 'output_file' in block.content)) {
+        return true
+    }
+
     const text = typeof block.content === 'string'
         ? block.content
         : Array.isArray(block.content)

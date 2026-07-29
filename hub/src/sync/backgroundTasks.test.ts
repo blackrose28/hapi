@@ -39,6 +39,21 @@ describe('extractBackgroundTaskDelta', () => {
         expect(extractBackgroundTaskDelta(message)).toEqual({ started: 1, completed: 0 })
     })
 
+    it('counts an async agent launch as a start when the SDK returns structured metadata instead of text', () => {
+        const message = {
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'tool_result',
+                    content: { agentId: 'a7b702cddc7d8364c', output_file: '/tmp/agent-output.jsonl' }
+                }
+            }
+        }
+
+        expect(extractBackgroundTaskDelta(message)).toEqual({ started: 1, completed: 0 })
+    })
+
     it('counts a task-notification as a completion regardless of which kind of background work started it', () => {
         const message = {
             role: 'agent',
