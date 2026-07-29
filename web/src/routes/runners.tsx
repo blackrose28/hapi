@@ -97,6 +97,9 @@ export function RunnersPage() {
         }
     }
 
+    const pendingEnrollments = enrollments.filter((e) => e.status === 'active')
+    const pastEnrollments = enrollments.filter((e) => e.status !== 'active')
+
     const hubUrl = serverUrl || window.location.origin
     const enrollCmd = enrollmentCode
         ? `hapi runner enroll --hub ${hubUrl} --code ${enrollmentCode.code} --profile ${profileName}`
@@ -200,15 +203,15 @@ export function RunnersPage() {
             )}
 
             <div className="space-y-8">
-                {enrollments.length > 0 && (
+                {pendingEnrollments.length > 0 && (
                     <section>
                         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Pending Enrollments</h2>
                         <div className="space-y-2">
-                            {enrollments.map((e) => (
+                            {pendingEnrollments.map((e) => (
                                 <div key={e.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
                                     <div className="space-y-0.5">
                                         <p className="text-sm font-medium">
-                                            <span className={`inline-block size-1.5 rounded-full mr-2 ${e.status === 'active' ? 'bg-green-500' : e.status === 'expired' ? 'bg-yellow-500' : 'bg-muted-foreground'}`} />
+                                            <span className="inline-block size-1.5 rounded-full mr-2 bg-green-500" />
                                             {e.status}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
@@ -224,6 +227,27 @@ export function RunnersPage() {
                                             Cancel
                                         </button>
                                     )}
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {pastEnrollments.length > 0 && (
+                    <section>
+                        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Past Enrollments</h2>
+                        <div className="space-y-2">
+                            {pastEnrollments.map((e) => (
+                                <div key={e.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+                                    <div className="space-y-0.5">
+                                        <p className="text-sm font-medium">
+                                            <span className={`inline-block size-1.5 rounded-full mr-2 ${e.status === 'expired' ? 'bg-yellow-500' : 'bg-muted-foreground'}`} />
+                                            {e.status}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Expires: {new Date(e.expiresAt).toLocaleString()}
+                                        </p>
+                                    </div>
                                 </div>
                             ))}
                         </div>
