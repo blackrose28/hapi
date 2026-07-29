@@ -166,7 +166,8 @@ export class ApiClient {
             throw new ApiError(`HTTP ${res.status} ${res.statusText}${detail}`, res.status, code, body || undefined)
         }
 
-        return await res.json() as T
+        if (res.status === 204) return undefined as T
+        return await res.json().catch(() => undefined) as T
     }
 
     async getSessions(): Promise<SessionsResponse> {
