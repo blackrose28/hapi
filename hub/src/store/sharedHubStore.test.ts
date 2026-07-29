@@ -177,6 +177,7 @@ describe('SharedHubStore', () => {
         expect(db.prepare('SELECT cleanup_required FROM runner_tombstones WHERE runner_id=?').get('r1')).toEqual({ cleanup_required: 1 })
         expect(store.cleanupRunnerTombstone('o1', 'r1')).toBe('cleaned')
         expect(db.prepare('SELECT cleanup_required FROM runner_tombstones WHERE runner_id=?').get('r1')).toEqual({ cleanup_required: 0 })
+        expect(store.findRunner('o1', 'r1')?.status).toBe('archived')
         expect(store.cleanupRunnerTombstone('o1', 'r1')).toBe('not_found')
         expect(store.cleanupRunnerTombstone('o1', 'never')).toBe('not_found')
     })

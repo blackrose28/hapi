@@ -300,7 +300,9 @@ export class SharedHubStore {
         if (!runner || runner.status !== 'revoked') return 'not_found'
         const result = this.db.prepare('UPDATE runner_tombstones SET cleanup_required = 0 WHERE runner_id = ? AND cleanup_required = 1')
             .run(runnerId)
-        return result.changes === 1 ? 'cleaned' : 'not_found'
+        if (result.changes !== 1) return 'not_found'
+        this.db.prepare("UPDATE runners SET status='archived' WHERE organization_id=? AND id=?").run(organizationId, runnerId)
+        return 'cleaned'
     }
 
     resolveEffectiveGrants(input: {
