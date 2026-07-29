@@ -703,6 +703,12 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
 
     const startedWithCliMtimeMs = getInstalledCliMtimeMs();
 
+    // Resolved once here, and reused verbatim if this runner later
+    // self-restarts on a version bump (see restartOnStaleVersionAndHeartbeat
+    // below) - it must not be re-derived from a possibly-absent CLI flag.
+    const workspaceRoot = resolveWorkspaceRoot(options.workspaceRoot);
+    logger.debug(`[RUNNER RUN] Workspace root: ${workspaceRoot ?? '(not set)'}`);
+
     // Write initial runner state (no lock needed for state file)
     const fileState: RunnerLocallyPersistedState = {
       pid: process.pid,
@@ -712,6 +718,7 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
       startedWithCliMtimeMs,
       startedWithApiUrl: configuration.apiUrl,
       startedWithMachineId: machineId,
+      workspaceRoot,
       runnerLogPath: logger.logFilePath
     };
     await writeRunnerProfileState(enrolled.paths,fileState);
@@ -727,9 +734,6 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
 
     // Create API client
     const api = ApiClient.createForRunner(enrolled.credential.credential,machineId);
-
-    const workspaceRoot = resolveWorkspaceRoot(options.workspaceRoot);
-    logger.debug(`[RUNNER RUN] Workspace root: ${workspaceRoot ?? '(not set)'}`);
 
     // Get or create machine (with retry for transient connection errors)
     const machine = await withRetry(
@@ -855,7 +859,11 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
         // 3. Next it will start a new runner with the latest version with runner-sync :D
         // Done!
         try {
-          spawnHappyCLI(['runner', 'start', '--profile', enrolled.profile.profile], {
+          const restartArgs = ['runner', 'start', '--profile', enrolled.profile.profile];
+          if (workspaceRoot) {
+            restartArgs.push('--workspace-root', workspaceRoot);
+          }
+          spawnHappyCLI(restartArgs, {
             detached: true,
             stdio: 'ignore'
           });
@@ -887,6 +895,7 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
           startedWithCliMtimeMs,
           startedWithApiUrl: fileState.startedWithApiUrl,
           startedWithMachineId: fileState.startedWithMachineId,
+          workspaceRoot: fileState.workspaceRoot,
           lastHeartbeat: new Date().toLocaleString(),
           runnerLogPath: fileState.runnerLogPath
         };

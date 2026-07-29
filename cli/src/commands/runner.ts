@@ -17,16 +17,38 @@ import { spawnHappyCLI, getHappyCliCommand } from '@/utils/spawnHappyCLI'
 import { runDoctorCommand } from '@/ui/doctor'
 import type { CommandDefinition } from './types'
 import { exchangeRunnerEnrollment } from '@/runner/enrollmentClient'
-import { createRunnerProfile, resolveRunnerProfilePaths } from '@/runner/profile'
+import { createRunnerProfile, listEnrolledProfiles, resolveRunnerProfilePaths } from '@/runner/profile'
 import { readRunnerProfileState } from '@/runner/profile'
 import { configuration } from '@/configuration'
 import type { RunnerLocallyPersistedState } from '@/persistence'
 import { isProcessAlive } from '@/utils/process'
 import { readdirSync } from 'node:fs'
+import { promptChoiceOrNew, promptRequired } from '@/utils/prompt'
 
 function option(args:string[],name:string):string|undefined { const direct=args.indexOf(name);if(direct>=0)return args[direct+1];return args.find((arg)=>arg.startsWith(`${name}=`))?.slice(name.length+1) }
 async function profileState(args:string[]){const name=option(args,'--profile');if(!name)throw new Error('profile_required');const paths=resolveRunnerProfilePaths(configuration.happyHomeDir,name);return{name,paths,state:await readRunnerProfileState<RunnerLocallyPersistedState>(paths)}}
 async function profilePost(args:string[],path:string,body:unknown={}){const {state}=await profileState(args);if(!state?.httpPort||!isProcessAlive(state.pid))throw new Error('runner_not_running');const response=await fetch(`http://127.0.0.1:${state.httpPort}${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!response.ok)throw new Error('runner_request_failed');return response.json() as Promise<Record<string,unknown>>}
+
+/**
+ * Validates and normalizes a workspace-root path: expands `~` / `~/foo`
+ * (the shell only expands unquoted tildes), resolves it to an absolute
+ * path, and checks it's an existing directory.
+ */
+function normalizeWorkspaceRootInput(value: string): { path: string } | { error: string } {
+    const trimmed = value.trim()
+    if (!trimmed) return { error: 'requires a non-empty path' }
+    let expanded = trimmed
+    if (expanded === '~') {
+        expanded = homedir()
+    } else if (expanded.startsWith('~/')) {
+        expanded = resolve(homedir(), expanded.slice(2))
+    }
+    const absolute = isAbsolute(expanded) ? expanded : resolve(expanded)
+    if (!existsSync(absolute) || !statSync(absolute).isDirectory()) {
+        return { error: `path does not exist or is not a directory: ${absolute}` }
+    }
+    return { path: absolute }
+}
 
 /**
  * Parses `--workspace-root <path>` / `--workspace-root=<path>` from the
@@ -52,26 +74,40 @@ function extractWorkspaceRootArg(args: string[]): string | undefined {
         }
         if (value === undefined) continue
 
-        const trimmed = value.trim()
-        if (!trimmed) {
-            console.error('--workspace-root requires a non-empty path')
+        const result = normalizeWorkspaceRootInput(value)
+        if ('error' in result) {
+            console.error(`--workspace-root ${result.error}`)
             process.exit(1)
         }
-        // Handle `~` / `~/foo` since the shell only expands unquoted tildes.
-        let expanded = trimmed
-        if (expanded === '~') {
-            expanded = homedir()
-        } else if (expanded.startsWith('~/')) {
-            expanded = resolve(homedir(), expanded.slice(2))
-        }
-        const absolute = isAbsolute(expanded) ? expanded : resolve(expanded)
-        if (!existsSync(absolute) || !statSync(absolute).isDirectory()) {
-            console.error(`--workspace-root path does not exist or is not a directory: ${absolute}`)
-            process.exit(1)
-        }
-        return absolute
+        return result.path
     }
     return undefined
+}
+
+/** Prompts for `--profile` when missing: offers existing enrolled profiles, or free text. Returns undefined if not interactive. */
+async function promptForProfile(): Promise<string | undefined> {
+    return promptChoiceOrNew('Profile', listEnrolledProfiles(configuration.happyHomeDir))
+}
+
+/** Last-known workspace root from a previous run of this profile, if any (e.g. runner self-restarting without re-passing the flag). */
+async function resolvePersistedWorkspaceRoot(profileBaseHome: string, profile: string): Promise<string | undefined> {
+    try {
+        const state = await readRunnerProfileState<RunnerLocallyPersistedState>(resolveRunnerProfilePaths(profileBaseHome, profile))
+        return state?.workspaceRoot
+    } catch {
+        return undefined
+    }
+}
+
+/** Prompts for `--workspace-root` when missing. Returns undefined if not interactive. */
+async function promptForWorkspaceRoot(): Promise<string | undefined> {
+    return promptRequired(
+        'Workspace root (absolute path the runner may browse/spawn in): ',
+        (value) => {
+            const result = normalizeWorkspaceRootInput(value)
+            return 'error' in result ? { ok: false, error: `Workspace root ${result.error}` } : { ok: true, value: result.path }
+        }
+    )
 }
 
 export const runnerCommand: CommandDefinition = {
@@ -127,18 +163,22 @@ export const runnerCommand: CommandDefinition = {
         }
 
         if (runnerSubcommand === 'start') {
-            const profile=option(mutableArgs,'--profile');if(!profile){console.error('--profile is required');process.exitCode=1;return}
+            let profile=option(mutableArgs,'--profile')
+            if(!profile)profile=await promptForProfile()
+            if(!profile){console.error('--profile is required');process.exitCode=1;return}
             const profileBaseHome=process.env.HAPI_PROFILE_BASE_HOME??configuration.happyHomeDir
+            let resolvedWorkspaceRoot=workspaceRoot
+            if(!resolvedWorkspaceRoot)resolvedWorkspaceRoot=await resolvePersistedWorkspaceRoot(profileBaseHome,profile)
+            if(!resolvedWorkspaceRoot)resolvedWorkspaceRoot=await promptForWorkspaceRoot()
+            if(!resolvedWorkspaceRoot){console.error('--workspace-root is required');process.exitCode=1;return}
             const foreground=mutableArgs.includes('--foreground')
             if (foreground) {
-                await startRunner({ workspaceRoot, profile })
+                await startRunner({ workspaceRoot: resolvedWorkspaceRoot, profile })
                 process.exit(0)
             }
             const childArgs = ['runner', 'start-sync']
             childArgs.push('--profile',profile)
-            if (workspaceRoot) {
-                childArgs.push('--workspace-root', workspaceRoot)
-            }
+            childArgs.push('--workspace-root', resolvedWorkspaceRoot)
             const child = spawnHappyCLI(childArgs, {
                 detached: true,
                 stdio: 'ignore',
@@ -165,10 +205,15 @@ export const runnerCommand: CommandDefinition = {
         }
 
         if (runnerSubcommand === 'install') {
-            const profile=option(mutableArgs,'--profile');if(!profile){console.error('--profile is required');process.exitCode=1;return}
+            let profile=option(mutableArgs,'--profile')
+            if(!profile)profile=await promptForProfile()
+            if(!profile){console.error('--profile is required');process.exitCode=1;return}
             const paths=resolveRunnerProfilePaths(configuration.happyHomeDir,profile)
             if (!existsSync(paths.profileFile)||!existsSync(paths.credentialFile)){console.error('Runner profile not found. Run `hapi runner enroll --profile '+profile+' ...` first');process.exitCode=1;return}
-            const { command: execPath, args: baseArgs } = getHappyCliCommand(['runner','start','--foreground','--profile',profile])
+            let resolvedWorkspaceRoot=workspaceRoot
+            if(!resolvedWorkspaceRoot)resolvedWorkspaceRoot=await promptForWorkspaceRoot()
+            if(!resolvedWorkspaceRoot){console.error('--workspace-root is required');process.exitCode=1;return}
+            const { command: execPath, args: baseArgs } = getHappyCliCommand(['runner','start','--foreground','--profile',profile,'--workspace-root',resolvedWorkspaceRoot])
             if (platform() === 'linux') {
                 try { execSync('systemctl --user --version', { stdio: 'ignore' }) } catch { console.error('systemd user instance is not available'); process.exitCode=1; return }
                 const unitName=`hapi-runner-${profile}.service`
@@ -234,7 +279,9 @@ ${argv}
         }
 
         if (runnerSubcommand === 'uninstall') {
-            const profile=option(mutableArgs,'--profile');if(!profile){console.error('--profile is required');process.exitCode=1;return}
+            let profile=option(mutableArgs,'--profile')
+            if(!profile)profile=await promptForProfile()
+            if(!profile){console.error('--profile is required');process.exitCode=1;return}
             if (platform() === 'linux') {
                 const unitName=`hapi-runner-${profile}.service`
                 const unitPath=join(homedir(),'.config','systemd','user',unitName)
@@ -257,8 +304,15 @@ ${argv}
         }
 
         if (runnerSubcommand === 'start-sync') {
-            const profile=option(mutableArgs,'--profile');if(!profile)throw new Error('Runner profile is required')
-            await startRunner({ workspaceRoot, profile })
+            let profile=option(mutableArgs,'--profile')
+            if(!profile)profile=await promptForProfile()
+            if(!profile)throw new Error('Runner profile is required')
+            const profileBaseHome=process.env.HAPI_PROFILE_BASE_HOME??configuration.happyHomeDir
+            let resolvedWorkspaceRoot=workspaceRoot
+            if(!resolvedWorkspaceRoot)resolvedWorkspaceRoot=await resolvePersistedWorkspaceRoot(profileBaseHome,profile)
+            if(!resolvedWorkspaceRoot)resolvedWorkspaceRoot=await promptForWorkspaceRoot()
+            if(!resolvedWorkspaceRoot)throw new Error('Runner workspace root is required')
+            await startRunner({ workspaceRoot: resolvedWorkspaceRoot, profile })
             process.exit(0)
         }
 
@@ -296,10 +350,14 @@ ${chalk.bold('Usage:')}
   hapi runner list               List active sessions
 
 ${chalk.bold('Options:')}
-  --workspace-root <path>        Restrict the runner to this directory.
+  --profile <name>               Runner profile to use.
+  --workspace-root <path>        Directory the runner may browse & spawn in.
                                  Browse & spawn will reject paths outside it.
                                  Supports \`~\` / \`~/foo\` expansion.
-                                 Omit to leave browsing off (legacy mode).
+
+  --profile and --workspace-root are required for 'start' and 'install'
+  ('uninstall' only needs --profile). If omitted and you're at an
+  interactive terminal, you'll be prompted for them.
 
   If you want to kill all hapi related processes run 
   ${chalk.cyan('hapi doctor clean')}

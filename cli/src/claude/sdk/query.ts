@@ -275,7 +275,8 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
                 throw new Error('canCallTool callback is not provided.')
             }
             return this.canCallTool(request.request.tool_name, request.request.input, {
-                signal
+                signal,
+                toolUseId: request.request.tool_use_id
             })
         }
         

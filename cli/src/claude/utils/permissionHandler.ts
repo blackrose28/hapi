@@ -111,13 +111,31 @@ function buildAskUserQuestionUpdatedInput(input: unknown, answers: Record<string
         }
     }
 
+    const questions = isObject(input) && Array.isArray(input.questions) ? input.questions : null;
+
+    // The AskUserQuestion tool built into Claude Code reads answers back by
+    // the literal question text (input.questions[i].question), not by index.
+    // Our UI submits answers keyed by index ("0", "1", ...) since that's a
+    // stable/simple key for rendering answer state — remap index keys to the
+    // corresponding question text here so the tool actually recognizes the
+    // answer instead of reporting "The user did not answer the questions."
+    const remappedAnswers: Record<string, string[]> = {};
+    for (const [key, value] of Object.entries(flatAnswers)) {
+        const idx = Number.parseInt(key, 10);
+        const question = questions && Number.isInteger(idx) && String(idx) === key
+            ? questions[idx]
+            : null;
+        const questionText = isObject(question) && typeof question.question === 'string' ? question.question : null;
+        remappedAnswers[questionText ?? key] = value;
+    }
+
     if (!isObject(input)) {
-        return { answers: flatAnswers };
+        return { answers: remappedAnswers };
     }
 
     return {
         ...input,
-        answers: flatAnswers
+        answers: remappedAnswers
     };
 }
 
@@ -260,7 +278,7 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
     /**
      * Creates the canCallTool callback for the SDK
      */
-    handleToolCall = async (toolName: string, input: unknown, mode: EnhancedMode, options: { signal: AbortSignal }): Promise<PermissionResult> => {
+    handleToolCall = async (toolName: string, input: unknown, mode: EnhancedMode, options: { signal: AbortSignal, toolUseId?: string }): Promise<PermissionResult> => {
         const isQuestionTool = isQuestionToolName(toolName);
 
         // Check if tool is explicitly allowed
@@ -309,14 +327,25 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
         // Approval flow
         //
 
-        let toolCallId = this.resolveToolCallId(toolName, input);
-        if (!toolCallId) { // What if we got permission before tool call
-            logger.debug(`[permission:resolve] no match on first attempt for ${toolName}, input=${JSON.stringify(input)}, retrying in 1s`);
-            await delay(1000);
+        // Prefer the tool_use_id the SDK hands us directly over the fragile
+        // name+deepEqual(input) heuristic below, which breaks whenever the
+        // SDK normalizes/adds fields (e.g. AskUserQuestion's default
+        // multiSelect: false) between the recorded tool_use and the
+        // can_use_tool control request.
+        let toolCallId: string | null = options.toolUseId ?? null;
+        if (toolCallId) {
+            const call = this.toolCalls.find(c => c.id === toolCallId);
+            if (call) call.used = true;
+        } else {
             toolCallId = this.resolveToolCallId(toolName, input);
-            if (!toolCallId) {
-                logger.debug(`[permission:resolve] still no match after retry for ${toolName}, known tool calls=${JSON.stringify(this.toolCalls.map(c => ({ id: c.id, name: c.name, input: c.input, used: c.used })))}`);
-                throw new Error(`Could not resolve tool call ID for ${toolName}`);
+            if (!toolCallId) { // What if we got permission before tool call
+                logger.debug(`[permission:resolve] no match on first attempt for ${toolName}, input=${JSON.stringify(input)}, retrying in 1s`);
+                await delay(1000);
+                toolCallId = this.resolveToolCallId(toolName, input);
+                if (!toolCallId) {
+                    logger.debug(`[permission:resolve] still no match after retry for ${toolName}, known tool calls=${JSON.stringify(this.toolCalls.map(c => ({ id: c.id, name: c.name, input: c.input, used: c.used })))}`);
+                    throw new Error(`Could not resolve tool call ID for ${toolName}`);
+                }
             }
         }
         return this.handlePermissionRequest(toolCallId, toolName, input, options.signal);

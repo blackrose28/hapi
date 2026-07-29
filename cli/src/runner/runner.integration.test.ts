@@ -174,7 +174,7 @@ describe('Runner Integration Tests', { timeout: 20_000 }, () => {
     // Start fresh runner for this test
     // This will return and start a background process - we don't need to wait for it
     let startOutput = '';
-    const startProcess = spawnIntegrationCli(['runner', 'start', '--profile', profile], {
+    const startProcess = spawnIntegrationCli(['runner', 'start', '--profile', profile, '--workspace-root', fixtureRoot], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
     startProcess.stdout?.on('data', (data) => { startOutput += data.toString(); });
@@ -353,7 +353,7 @@ describe('Runner Integration Tests', { timeout: 20_000 }, () => {
 
   it('should not allow starting a second runner', async () => {
     const originalPid = runnerPid;
-    const secondChild = spawnIntegrationCli(['runner', 'start', '--profile', profile], {
+    const secondChild = spawnIntegrationCli(['runner', 'start', '--profile', profile, '--workspace-root', fixtureRoot], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
@@ -450,6 +450,7 @@ describe('Runner Integration Tests', { timeout: 20_000 }, () => {
       const initialState = await readRunnerState();
       expect(initialState).toBeDefined();
       const initialPid = initialState!.pid;
+      expect(initialState!.workspaceRoot).toBe(fixtureRoot);
 
       const changedTime = new Date(originalTimes.mtimeMs + 10_000);
       utimesSync(packagePath, changedTime, changedTime);
@@ -461,6 +462,10 @@ describe('Runner Integration Tests', { timeout: 20_000 }, () => {
       const finalState = await readRunnerState();
       expect(finalState).toBeDefined();
       expect(finalState!.pid).not.toBe(initialPid);
+      // Regression check: the self-restart on a stale-version detection must
+      // carry the workspace root forward, not silently drop it (it used to
+      // only forward --profile to the respawned `runner start`).
+      expect(finalState!.workspaceRoot).toBe(fixtureRoot);
     } finally {
       await stopRunner();
       utimesSync(packagePath, originalTimes.atime, originalTimes.mtime);

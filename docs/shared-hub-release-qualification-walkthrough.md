@@ -270,7 +270,7 @@ Record start, commit, disconnect, and first-denial timestamps. Mark the SLO fail
 ## 9. Qualify Linux service lifecycle
 
 ```bash
-./hapi runner install --profile qual-linux
+./hapi runner install --profile qual-linux --workspace-root /approved/workspace
 systemctl --user status hapi-runner-qual-linux.service
 systemctl --user restart hapi-runner-qual-linux.service
 ./hapi runner status --profile qual-linux
@@ -292,7 +292,7 @@ Build or obtain the matching macOS release artifact and verify its published che
 
 ```bash
 ./hapi runner enroll --hub https://<hub-host> --code '<one-time-code>' --profile qual-macos
-./hapi runner install --profile qual-macos
+./hapi runner install --profile qual-macos --workspace-root /approved/workspace
 launchctl print "gui/$(id -u)/com.hapi.runner.qual-macos"
 ./hapi runner status --profile qual-macos
 ./hapi runner uninstall --profile qual-macos

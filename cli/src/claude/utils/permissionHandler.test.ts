@@ -5,11 +5,14 @@ import type { Session } from '../session';
 
 function createFakeSession() {
     const queueItems: { message: string; mode: unknown }[] = [];
+    let permissionRpcHandler: ((response: any) => Promise<void>) | null = null;
 
     const session = {
         client: {
             rpcHandlerManager: {
-                registerHandler: vi.fn(),
+                registerHandler: vi.fn((method: string, handler: (response: any) => Promise<void>) => {
+                    if (method === 'permission') permissionRpcHandler = handler;
+                }),
             },
             updateAgentState: vi.fn(),
         },
@@ -21,7 +24,7 @@ function createFakeSession() {
         setPermissionMode: vi.fn(),
     } as unknown as Session;
 
-    return { session, queueItems };
+    return { session, queueItems, submitPermissionResponse: (response: any) => permissionRpcHandler!(response) };
 }
 
 describe('PermissionHandler — YOLO plan mode', () => {
@@ -104,5 +107,74 @@ describe('PermissionHandler — YOLO plan mode', () => {
 
         expect(result.behavior).toBe('allow');
         expect(queueItems).toHaveLength(0);
+    });
+});
+
+describe('PermissionHandler — AskUserQuestion', () => {
+    it('resolves by toolUseId even when the SDK normalizes input (e.g. adds multiSelect) between recording and the permission request', async () => {
+        const { session, submitPermissionResponse } = createFakeSession();
+        const handler = new PermissionHandler(session);
+
+        const recordedInput = {
+            questions: [{ question: 'Pick one?', options: [{ label: 'A' }, { label: 'B' }] }]
+        };
+        handler.onMessage({
+            type: 'assistant',
+            message: {
+                role: 'assistant',
+                content: [{ type: 'tool_use', id: 'tc-q1', name: 'AskUserQuestion', input: recordedInput }],
+            },
+        } as any);
+
+        // Input as it arrives in the can_use_tool control request differs
+        // (SDK-added multiSelect) from what was recorded above — a deepEqual
+        // match would fail, so this only resolves because toolUseId is used.
+        const normalizedInput = {
+            questions: [{ question: 'Pick one?', options: [{ label: 'A' }, { label: 'B' }], multiSelect: false }]
+        };
+
+        const resultPromise = handler.handleToolCall(
+            'AskUserQuestion',
+            normalizedInput,
+            { permissionMode: 'default' } as any,
+            { signal: new AbortController().signal, toolUseId: 'tc-q1' }
+        );
+
+        await submitPermissionResponse({ id: 'tc-q1', approved: true, answers: { '0': ['A'] } });
+        const result = await resultPromise;
+
+        expect(result.behavior).toBe('allow');
+        // Answers must be remapped from index ("0") to the literal question
+        // text, matching what the built-in AskUserQuestion tool looks up.
+        expect((result as any).updatedInput.answers).toEqual({ 'Pick one?': ['A'] });
+    });
+
+    it('remaps multiple index-keyed answers to their question text', async () => {
+        const { session, submitPermissionResponse } = createFakeSession();
+        const handler = new PermissionHandler(session);
+
+        const input = {
+            questions: [
+                { question: 'First?', options: [{ label: 'A' }, { label: 'B' }] },
+                { question: 'Second?', options: [{ label: 'C' }, { label: 'D' }] }
+            ]
+        };
+        handler.onMessage({
+            type: 'assistant',
+            message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tc-q2', name: 'AskUserQuestion', input }] },
+        } as any);
+
+        const resultPromise = handler.handleToolCall(
+            'AskUserQuestion',
+            input,
+            { permissionMode: 'default' } as any,
+            { signal: new AbortController().signal, toolUseId: 'tc-q2' }
+        );
+
+        await submitPermissionResponse({ id: 'tc-q2', approved: true, answers: { '0': ['A'], '1': ['D'] } });
+        const result = await resultPromise;
+
+        expect(result.behavior).toBe('allow');
+        expect((result as any).updatedInput.answers).toEqual({ 'First?': ['A'], 'Second?': ['D'] });
     });
 });

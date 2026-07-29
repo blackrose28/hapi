@@ -1,4 +1,4 @@
-import { constants } from 'node:fs'
+import { constants, existsSync, readdirSync } from 'node:fs'
 import { lstat, mkdir, open, readFile, realpath, rename, rm } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'node:path'
 import { RunnerProfileNameSchema, RunnerProfileSchema, StoredRunnerCredentialSchema, type RunnerProfile, type StoredRunnerCredential } from '@hapi/protocol/runner-enrollment'
@@ -9,6 +9,16 @@ export function resolveRunnerProfilePaths(home:string,name:string):RunnerProfile
     const profile=RunnerProfileNameSchema.parse(name),base=resolve(home,'profiles'),root=resolve(base,profile)
     if(!root.startsWith(base+sep))throw new Error('invalid_profile')
     return{root,profileFile:join(root,'profile.json'),credentialFile:join(root,'credential.json'),stateFile:join(root,'runner.state.json'),lockFile:join(root,'locks','runner.lock'),logsDir:join(root,'logs')}
+}
+
+/** Names of profiles enrolled under `home/profiles` (have a profile.json), sorted alphabetically. */
+export function listEnrolledProfiles(home:string):string[] {
+    const base=resolve(home,'profiles')
+    if(!existsSync(base))return[]
+    return readdirSync(base,{withFileTypes:true})
+        .filter((entry)=>entry.isDirectory()&&existsSync(join(base,entry.name,'profile.json')))
+        .map((entry)=>entry.name)
+        .sort()
 }
 
 async function assertNoSymlink(path:string):Promise<void>{try{if((await lstat(path)).isSymbolicLink())throw new Error('unsafe_profile')}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error}}

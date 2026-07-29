@@ -23,7 +23,7 @@ export async function claudeRemote(opts: {
     allowedTools?: string[],
     hookSettingsPath: string,
     signal?: AbortSignal,
-    canCallTool: (toolName: string, input: unknown, mode: EnhancedMode, options: { signal: AbortSignal }) => Promise<PermissionResult>,
+    canCallTool: (toolName: string, input: unknown, mode: EnhancedMode, options: { signal: AbortSignal, toolUseId?: string }) => Promise<PermissionResult>,
 
     // Dynamic parameters
     nextMessage: () => Promise<{ message: string, mode: EnhancedMode } | null>,
@@ -136,7 +136,7 @@ export async function claudeRemote(opts: {
             ? initial.mode.allowedTools.concat(opts.allowedTools ?? [])
             : undefined,
         disallowedTools: initial.mode.disallowedTools,
-        canCallTool: (toolName: string, input: unknown, options: { signal: AbortSignal }) => opts.canCallTool(toolName, input, mode, options),
+        canCallTool: (toolName: string, input: unknown, options: { signal: AbortSignal, toolUseId?: string }) => opts.canCallTool(toolName, input, mode, options),
         abort: opts.signal,
         pathToClaudeCodeExecutable: getDefaultClaudeCodePath(),
         settingsPath: opts.hookSettingsPath,

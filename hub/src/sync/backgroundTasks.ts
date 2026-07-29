@@ -6,9 +6,12 @@ import { unwrapRoleWrappedRecordEnvelope } from '@hapi/protocol/messages'
  *
  * Uses role-aware parsing to avoid false positives:
  *  - Started:   agent-role output with tool_result containing
- *               "Command running in background with ID:"
+ *               "Command running in background with ID:" (background bash)
+ *               or "Async agent launched successfully." + "agentId:" (async subagent)
  *  - Completed: agent-role output wrapping a user-type message (system-injected)
- *               starting with "<task-notification>"
+ *               starting with "<task-notification>" — this fires for both kinds,
+ *               since a subagent's own turn finishing doesn't mean its background
+ *               work is done, only this completion notification does.
  *
  * Both signals arrive as { role: 'agent', content: { type: 'output', data: {...} } }
  * because the CLI wraps all messages in agent envelopes.
@@ -65,6 +68,7 @@ function isBackgroundStartResult(block: Record<string, unknown>): boolean {
             ? block.content.map((c: unknown) => isObject(c) && typeof c.text === 'string' ? c.text : '').join('')
             : ''
     return text.includes('Command running in background with ID:')
+        || (text.startsWith('Async agent launched successfully.') && text.includes('agentId:'))
 }
 
 /**
