@@ -40,6 +40,8 @@ vi.mock('@/components/SessionChat', async () => {
             composerAppendText?: string
             onComposerAppendTextConsumed?: () => void
             onNewSessionRequested?: () => void
+            compactMode?: boolean
+            compactComposerMode?: boolean
         }) => {
         sessionChatMock(props)
             React.useEffect(() => {
@@ -124,7 +126,7 @@ describe('EditorChatPanel', () => {
         expect(sessionChatMock).not.toHaveBeenCalled()
     })
 
-    it('passes compact chat props to SessionChat when loaded', () => {
+    it('keeps the compact Editor layout without opting into the Agent compact composer', () => {
         const api = {} as ApiClient
         const onNewSessionRequested = vi.fn()
 
@@ -138,6 +140,7 @@ describe('EditorChatPanel', () => {
         expect(sessionChatMock).toHaveBeenCalledWith(expect.objectContaining({
             api,
             compactMode: true,
+            compactComposerMode: false,
             hideHeader: true,
             disableVoice: true,
             availableSlashCommands: [],

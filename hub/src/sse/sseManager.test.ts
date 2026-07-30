@@ -303,4 +303,118 @@ describe('SSEManager namespace filtering', () => {
 
         expect(received).toEqual([])
     })
+
+    it('delivers terminal snippet invalidations to every scoped connection in the matching namespace', () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        const received: string[] = []
+
+        for (const subscription of [
+            { id: 'all', namespace: 'alpha', all: true },
+            { id: 'session', namespace: 'alpha', sessionId: 'session-1' },
+            { id: 'machine', namespace: 'alpha', machineId: 'machine-1' },
+            { id: 'other-namespace', namespace: 'beta', all: true }
+        ]) {
+            manager.subscribe({
+                ...subscription,
+                membershipId: subscription.id,
+                authorize: () => true,
+                send: () => {
+                    received.push(subscription.id)
+                },
+                sendHeartbeat: () => {}
+            })
+        }
+
+        manager.broadcast({
+            type: 'terminal-snippets-updated',
+            namespace: 'alpha'
+        })
+
+        expect(received.sort()).toEqual(['all', 'machine', 'session'])
+    })
+
+    it('contains synchronous send failures, removes the connection, and continues delivery', () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        let failedCalls = 0
+        const received: SyncEvent[] = []
+
+        manager.subscribe({
+            id: 'sync-failure',
+            namespace: 'alpha',
+            membershipId: 'sync-failure',
+            authorize: () => true,
+            all: true,
+            send: () => {
+                failedCalls += 1
+                throw new Error('send failed')
+            },
+            sendHeartbeat: () => {}
+        })
+        manager.subscribe({
+            id: 'healthy',
+            namespace: 'alpha',
+            membershipId: 'healthy',
+            authorize: () => true,
+            all: true,
+            send: (event) => {
+                received.push(event)
+            },
+            sendHeartbeat: () => {}
+        })
+
+        expect(() => manager.broadcast({
+            type: 'terminal-snippets-updated',
+            namespace: 'alpha'
+        })).not.toThrow()
+        manager.broadcast({
+            type: 'terminal-snippets-updated',
+            namespace: 'alpha'
+        })
+
+        expect(failedCalls).toBe(1)
+        expect(received).toHaveLength(2)
+    })
+
+    it('contains asynchronous send failures, removes the connection, and continues delivery', async () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        let failedCalls = 0
+        const received: SyncEvent[] = []
+
+        manager.subscribe({
+            id: 'async-failure',
+            namespace: 'alpha',
+            membershipId: 'async-failure',
+            authorize: () => true,
+            all: true,
+            send: async () => {
+                failedCalls += 1
+                throw new Error('send failed')
+            },
+            sendHeartbeat: () => {}
+        })
+        manager.subscribe({
+            id: 'healthy',
+            namespace: 'alpha',
+            membershipId: 'healthy',
+            authorize: () => true,
+            all: true,
+            send: (event) => {
+                received.push(event)
+            },
+            sendHeartbeat: () => {}
+        })
+
+        expect(() => manager.broadcast({
+            type: 'terminal-snippets-updated',
+            namespace: 'alpha'
+        })).not.toThrow()
+        await Promise.resolve()
+        manager.broadcast({
+            type: 'terminal-snippets-updated',
+            namespace: 'alpha'
+        })
+
+        expect(failedCalls).toBe(1)
+        expect(received).toHaveLength(2)
+    })
 })

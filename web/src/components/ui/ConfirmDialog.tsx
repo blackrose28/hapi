@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription
-} from '@/components/ui/dialog'
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/use-translation'
 
@@ -59,22 +59,21 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription className="mt-2 whitespace-pre-line">
+        <AppDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <AppDialogContent presentation="alert" className="max-w-sm" dismissible={!isPending}>
+                <AppDialogHeader title={title} closeDisabled={isPending} />
+                <AppDialogBody className="p-4">
+                    <p className="whitespace-pre-line text-sm text-[var(--app-hint)]">
                         {description}
-                    </DialogDescription>
-                </DialogHeader>
+                    </p>
 
-                {error ? (
-                    <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                        {error}
-                    </div>
-                ) : null}
-
-                <div className="mt-4 flex gap-2 justify-end">
+                    {error ? (
+                        <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                            {error}
+                        </div>
+                    ) : null}
+                </AppDialogBody>
+                <AppDialogFooter>
                     <Button
                         type="button"
                         variant="secondary"
@@ -91,8 +90,8 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
                     >
                         {isPending ? confirmingLabel : confirmLabel}
                     </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
+                </AppDialogFooter>
+            </AppDialogContent>
+        </AppDialog>
     )
 }

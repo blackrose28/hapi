@@ -1,8 +1,10 @@
+import { CliCapabilitiesSchema, CliCapabilitySchema } from '@hapi/protocol'
 import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/types'
 import type { Store, StoredMachine, StoredSession } from '../../../store'
 import type { RpcRegistry } from '../../rpcRegistry'
 import type { SyncEvent } from '../../../sync/syncEngine'
 import type { TerminalRegistry } from '../../terminalRegistry'
+import type { TerminalHistoryRequestRegistry } from '../../terminalHistoryRequests'
 import type { LostSessionTerminalList, TerminalSessionStateStore } from '../../terminalSessionState'
 import type { CliSocketWithData, SocketServer } from '../../socketTypes'
 import type { AccessErrorReason, AccessResult } from './types'
@@ -40,6 +42,7 @@ export type CliHandlersDeps = {
     store: Store
     rpcRegistry: RpcRegistry
     terminalRegistry: TerminalRegistry
+    terminalHistoryRequests?: TerminalHistoryRequestRegistry
     terminalSessionState?: TerminalSessionStateStore
     onSessionAlive?: (payload: SessionAlivePayload) => void
     onSessionEnd?: (payload: SessionEndPayload) => void
@@ -85,7 +88,7 @@ export function broadcastLostTerminalLists(
 }
 
 export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlersDeps): void {
-    const { io, store, rpcRegistry, terminalRegistry, terminalSessionState, onSessionAlive, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, resolveCapability } = deps
+    const { io, store, rpcRegistry, terminalRegistry, terminalHistoryRequests, terminalSessionState, onSessionAlive, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, resolveCapability } = deps
     const terminalNamespace = io.of('/terminal')
     const namespace = typeof socket.data.namespace === 'string' ? socket.data.namespace : null
 
@@ -118,6 +121,15 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
     }
 
     const auth = socket.handshake.auth as Record<string, unknown> | undefined
+    const parsedCapabilities = CliCapabilitiesSchema.safeParse(auth?.capabilities)
+    socket.data.cliCapabilities = new Set(
+        parsedCapabilities.success
+            ? parsedCapabilities.data.flatMap((capability) => {
+                const knownCapability = CliCapabilitySchema.safeParse(capability)
+                return knownCapability.success ? [knownCapability.data] : []
+            })
+            : []
+    )
     const sessionId = typeof auth?.sessionId === 'string' ? auth.sessionId : null
     if (sessionId && resolveSessionAccess(sessionId).ok) {
         socket.join(`session:${sessionId}`)
@@ -166,6 +178,7 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
     })
     registerTerminalHandlers(socket, {
         terminalRegistry,
+        terminalHistoryRequests,
         terminalSessionState,
         terminalNamespace,
         resolveSessionAccess,
@@ -186,6 +199,6 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
             namespace && sessionId ? { namespace, sessionId } : null
         ) ?? []
         broadcastLostTerminalLists(terminalNamespace, lostLists, resolveCapability)
-        cleanupTerminalHandlers(socket, { terminalRegistry, terminalNamespace, resolveCapability })
+        cleanupTerminalHandlers(socket, { terminalRegistry, terminalHistoryRequests, terminalNamespace, resolveCapability })
     })
 }

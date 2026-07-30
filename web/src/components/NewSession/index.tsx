@@ -12,7 +12,13 @@ import { useActiveSuggestions, type Suggestion } from '@/hooks/useActiveSuggesti
 import { useDirectorySuggestions } from '@/hooks/useDirectorySuggestions'
 import { useRecentPaths } from '@/hooks/useRecentPaths'
 import { useTranslation } from '@/lib/use-translation'
-import type { AgentType, ClaudeEffort, ReasoningEffort, SessionType } from './types'
+import type {
+    AgentType,
+    ClaudeEffort,
+    NewSessionDraft,
+    ReasoningEffort,
+    SessionType,
+} from './types'
 import { ActionButtons } from './ActionButtons'
 import { AgentSelector } from './AgentSelector'
 import { DirectorySection } from './DirectorySection'
@@ -42,6 +48,8 @@ export function NewSession(props: {
     onChooseFolder?: (args: { machineId: string | null; directory: string }) => void
     initialDirectory?: string
     initialMachineId?: string
+    initialDraft?: Partial<NewSessionDraft> | null
+    onDraftChange?: (draft: NewSessionDraft) => void
     createLabel?: string
     canCreateExtra?: boolean
 }) {
@@ -52,19 +60,41 @@ export function NewSession(props: {
     const isFormDisabled = Boolean(isPending || props.isLoading)
     const { getRecentPaths, addRecentPath, getLastUsedMachineId, setLastUsedMachineId } = useRecentPaths()
 
-    const [machineId, setMachineId] = useState<string | null>(props.initialMachineId ?? null)
-    const [directory, setDirectory] = useState(props.initialDirectory ?? '')
+    const [machineId, setMachineId] = useState<string | null>(
+        props.initialDraft?.machineId !== undefined
+            ? props.initialDraft.machineId
+            : (props.initialMachineId ?? null)
+    )
+    const [directory, setDirectory] = useState(
+        props.initialDraft?.directory ?? props.initialDirectory ?? ''
+    )
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
     const [isDirectoryFocused, setIsDirectoryFocused] = useState(false)
-    const [agent, setAgent] = useState<AgentType>(loadPreferredAgent)
-    const [model, setModel] = useState('auto')
-    const [effort, setEffort] = useState<ClaudeEffort>('auto')
-    const [modelReasoningEffort, setModelReasoningEffort] = useState<ReasoningEffort>('default')
-    const [yoloMode, setYoloMode] = useState(loadPreferredYoloMode)
-    const [sessionType, setSessionType] = useState<SessionType>('simple')
-    const [worktreeName, setWorktreeName] = useState('')
-    const [resumeCodex, setResumeCodex] = useState(false)
-    const [resumeCodexSessionId, setResumeCodexSessionId] = useState('')
+    const [agent, setAgent] = useState<AgentType>(
+        props.initialDraft?.agent ?? loadPreferredAgent
+    )
+    const [model, setModel] = useState(props.initialDraft?.model ?? 'auto')
+    const [effort, setEffort] = useState<ClaudeEffort>(
+        props.initialDraft?.effort ?? 'auto'
+    )
+    const [modelReasoningEffort, setModelReasoningEffort] = useState<ReasoningEffort>(
+        props.initialDraft?.modelReasoningEffort ?? 'default'
+    )
+    const [yoloMode, setYoloMode] = useState(
+        props.initialDraft?.yoloMode ?? loadPreferredYoloMode
+    )
+    const [sessionType, setSessionType] = useState<SessionType>(
+        props.initialDraft?.sessionType ?? 'simple'
+    )
+    const [worktreeName, setWorktreeName] = useState(
+        props.initialDraft?.worktreeName ?? ''
+    )
+    const [resumeCodex, setResumeCodex] = useState(
+        props.initialDraft?.resumeCodex ?? false
+    )
+    const [resumeCodexSessionId, setResumeCodexSessionId] = useState(
+        props.initialDraft?.resumeCodexSessionId ?? ''
+    )
     const [directoryCreationConfirmed, setDirectoryCreationConfirmed] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const worktreeInputRef = useRef<HTMLInputElement>(null)
@@ -75,7 +105,10 @@ export function NewSession(props: {
         }
     }, [sessionType])
 
+    const previousAgentRef = useRef(agent)
     useEffect(() => {
+        if (previousAgentRef.current === agent) return
+        previousAgentRef.current = agent
         setModel('auto')
         setEffort('auto')
     }, [agent])
@@ -131,10 +164,16 @@ export function NewSession(props: {
         cwd: deferredDirectory,
         enabled: agent === 'claude' && Boolean(machineId) && Boolean(deferredDirectory)
     })
+    const previousModelContextRef = useRef(`${machineId ?? ''}\0${deferredDirectory}`)
     useEffect(() => {
+        const nextContext = `${machineId ?? ''}\0${deferredDirectory}`
+        if (previousModelContextRef.current === nextContext) return
+        previousModelContextRef.current = nextContext
         setModel('auto')
     }, [machineId, deferredDirectory])
-    const [opencodeSelectedModel, setOpencodeSelectedModel] = useState<string | null>(null)
+    const [opencodeSelectedModel, setOpencodeSelectedModel] = useState<string | null>(
+        props.initialDraft?.opencodeSelectedModel ?? null
+    )
     const runnerSpawnError = useMemo(
         () => formatRunnerSpawnError(selectedMachine),
         [selectedMachine]
@@ -217,11 +256,46 @@ export function NewSession(props: {
             setOpencodeSelectedModel(fallback)
         }
     }, [agent, opencodeSelectedModel, opencodeModelsState.currentModelId, opencodeModelsState.availableModels])
+    const previousOpencodeContextRef = useRef(`${agent}\0${machineId ?? ''}\0${deferredDirectory}`)
     useEffect(() => {
+        const nextContext = `${agent}\0${machineId ?? ''}\0${deferredDirectory}`
+        if (previousOpencodeContextRef.current === nextContext) return
+        previousOpencodeContextRef.current = nextContext
         // Reset selection when agent / machine / directory changes; new probe = new defaults.
         setOpencodeSelectedModel(null)
         setModelReasoningEffort('default')
     }, [agent, machineId, deferredDirectory])
+
+    useEffect(() => {
+        props.onDraftChange?.({
+            machineId,
+            directory,
+            agent,
+            model,
+            effort,
+            modelReasoningEffort,
+            yoloMode,
+            sessionType,
+            worktreeName,
+            resumeCodex,
+            resumeCodexSessionId,
+            opencodeSelectedModel,
+        })
+    }, [
+        props.onDraftChange,
+        machineId,
+        directory,
+        agent,
+        model,
+        effort,
+        modelReasoningEffort,
+        yoloMode,
+        sessionType,
+        worktreeName,
+        resumeCodex,
+        resumeCodexSessionId,
+        opencodeSelectedModel,
+    ])
     const opencodeReasoningEffortOptions = useMemo(() => {
         if (agent !== 'opencode' || opencodeModelsState.availableEfforts.length === 0) {
             return []

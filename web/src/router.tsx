@@ -32,7 +32,6 @@ import { clearDraftsAfterSend } from '@/lib/clearDraftsAfterSend'
 import type { Machine } from '@/types/api'
 import FilesPage from '@/routes/sessions/files'
 import FilePage from '@/routes/sessions/file'
-import TerminalPage from '@/routes/sessions/terminal'
 import SettingsPage from '@/routes/settings'
 import { RunnersPage } from '@/routes/runners'
 import { AdminPage } from '@/routes/admin'
@@ -355,6 +354,7 @@ export type RootSearch = {
     modalReplaceSessionId?: string
     modalNewSessionId?: string
     modalReturnTo?: 'editor'
+    modalParent?: 'new-session'
 }
 
 const rootRoute = createRootRoute({
@@ -381,6 +381,9 @@ const rootRoute = createRootRoute({
         }
         if (search.modalReturnTo === 'editor') {
             result.modalReturnTo = 'editor'
+        }
+        if (search.modalParent === 'new-session') {
+            result.modalParent = 'new-session'
         }
         return result
     }
@@ -427,12 +430,6 @@ const sessionFilesRoute = createRoute({
         return tab ? { tab } : {}
     },
     component: FilesPage,
-})
-
-const sessionTerminalRoute = createRoute({
-    getParentRoute: () => sessionDetailRoute,
-    path: 'terminal',
-    component: TerminalPage,
 })
 
 type SessionFileSearch = {
@@ -581,7 +578,6 @@ export const routeTree = rootRoute.addChildren([
         sessionsIndexRoute,
         newSessionRoute,
         sessionDetailRoute.addChildren([
-            sessionTerminalRoute,
             sessionFilesRoute,
             sessionFileRoute,
         ]),

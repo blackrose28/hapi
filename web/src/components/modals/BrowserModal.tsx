@@ -3,7 +3,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useAppContext } from '@/lib/app-context'
 import { useTranslation } from '@/lib/use-translation'
 import { useMachines } from '@/hooks/queries/useMachines'
-import { DialogContent, DialogTitle, DialogHeader, DialogDescription } from '@/components/ui/dialog'
+import { AppDialogBody, AppDialogContent, AppDialogHeader } from '@/components/ui/app-dialog'
 import { WorkspaceBrowser } from '@/components/WorkspaceBrowser'
 import type { RootSearch } from '@/router'
 
@@ -25,26 +25,33 @@ export function BrowserModal(props: { machineId?: string; initialPath?: string; 
         }
 
         void navigate({
-            search: (prev: any) => ({
-                ...prev,
-                modal: 'new-session',
-                modalPath: directory,
-                modalMachineId: machineId,
-                modalReturnTo: search.modalReturnTo
-            })
+            search: (prev: any) => {
+                const next = {
+                    ...prev,
+                    modal: 'new-session',
+                    modalPath: directory,
+                    modalMachineId: machineId,
+                    modalReturnTo: search.modalReturnTo
+                }
+                delete next.modalParent
+                return next
+            }
         } as any)
     }, [navigate, search.modalReturnTo])
 
     return (
-        <DialogContent className="flex h-[85vh] max-h-[85vh] w-[95vw] max-w-2xl flex-col gap-0 overflow-hidden p-0">
-            <DialogHeader className="p-4 pb-3 border-b border-[var(--app-border)]">
-                <DialogTitle className="text-xl font-semibold">
-                    {search.modalReturnTo === 'editor' ? 'Open project folder' : t('browse.title')}
-                </DialogTitle>
-                <DialogDescription className="sr-only">Browse workspaces</DialogDescription>
-            </DialogHeader>
-
-            <div className="min-h-0 flex-1 overflow-hidden p-4">
+        <AppDialogContent
+            presentation="workspace"
+            className="h-[85vh] max-h-[85vh] w-[95vw] max-w-2xl"
+        >
+            <AppDialogHeader
+                title={search.modalReturnTo === 'editor' ? 'Open project folder' : t('browse.title')}
+                subtitle="Browse workspaces"
+                mobileNavigation="back"
+                mobileBackLabel="Back"
+                onMobileBack={props.onClose}
+            />
+            <AppDialogBody className="overflow-hidden p-4">
                 <WorkspaceBrowser
                     api={api}
                     machines={machines}
@@ -54,7 +61,7 @@ export function BrowserModal(props: { machineId?: string; initialPath?: string; 
                     initialPath={props.initialPath}
                     actionLabel={search.modalReturnTo === 'editor' ? 'Open Folder' : undefined}
                 />
-            </div>
-        </DialogContent>
+            </AppDialogBody>
+        </AppDialogContent>
     )
 }

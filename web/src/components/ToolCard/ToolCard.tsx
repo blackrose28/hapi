@@ -7,7 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CodeBlock } from '@/components/CodeBlock'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { DiffView } from '@/components/DiffView'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogHeader,
+    AppDialogTrigger,
+} from '@/components/ui/app-dialog'
 import { PermissionFooter } from '@/components/ToolCard/PermissionFooter'
 import { AskUserQuestionFooter } from '@/components/ToolCard/AskUserQuestionFooter'
 import { RequestUserInputFooter } from '@/components/ToolCard/RequestUserInputFooter'
@@ -386,15 +392,15 @@ function ToolCardInner(props: ToolCardProps) {
     )
 
     const detailsDialog = (
-        <DialogContent
+        <AppDialogContent
+            presentation="workspace"
             className="max-w-2xl"
-            aria-describedby={undefined}
-            closeLabel={t('button.close')}
         >
-            <DialogHeader>
-                <DialogTitle>{toolTitle}</DialogTitle>
-            </DialogHeader>
-            <div className="mt-3 flex max-h-[75vh] flex-col gap-4 overflow-auto">
+            <AppDialogHeader
+                title={toolTitle}
+                closeLabel={t('button.close')}
+            />
+            <AppDialogBody className="flex max-h-[75vh] flex-col gap-4 overflow-auto p-3">
                 <div>
                     <div className="mb-1 text-xs font-medium text-[var(--app-hint)]">
                         {isQuestionToolWithAnswers
@@ -426,8 +432,8 @@ function ToolCardInner(props: ToolCardProps) {
                         />
                     </div>
                 ) : null}
-            </div>
-        </DialogContent>
+            </AppDialogBody>
+        </AppDialogContent>
     )
 
     if (displayMode === 'group-row') {
@@ -441,8 +447,8 @@ function ToolCardInner(props: ToolCardProps) {
                     data-running={props.block.tool.state === 'pending' || props.block.tool.state === 'running' ? 'true' : 'false'}
                     className="activity-row flex min-h-[37px] w-full min-w-0 items-center gap-1 rounded-[11px]"
                 >
-                    <Dialog>
-                        <DialogTrigger asChild>
+                    <AppDialog>
+                        <AppDialogTrigger asChild>
                             <button
                                 type="button"
                                 className="flex min-h-[37px] min-w-0 flex-1 items-center gap-2 rounded-[11px] px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
@@ -482,9 +488,9 @@ function ToolCardInner(props: ToolCardProps) {
                                     <StatusIcon state={props.block.tool.state} />
                                 </span>
                             </button>
-                        </DialogTrigger>
+                        </AppDialogTrigger>
                         {detailsDialog}
-                    </Dialog>
+                    </AppDialog>
                     {expansionKind ? (
                         <button
                             type="button"
@@ -642,8 +648,8 @@ function ToolCardInner(props: ToolCardProps) {
             )}
         >
             <CardHeader className="p-0 space-y-0">
-                <Dialog>
-                    <DialogTrigger asChild>
+                <AppDialog>
+                    <AppDialogTrigger asChild>
                         <button
                             type="button"
                             data-tool-card-trigger
@@ -659,9 +665,9 @@ function ToolCardInner(props: ToolCardProps) {
                         >
                             {header}
                         </button>
-                    </DialogTrigger>
+                    </AppDialogTrigger>
                     {detailsDialog}
-                </Dialog>
+                </AppDialog>
             </CardHeader>
 
             {hasBody ? (

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CliCapabilitiesSchema } from './socket'
 
 export const RunnerPlatformSchema = z.enum(['linux', 'darwin'])
 export const RunnerArchitectureSchema = z.enum(['x64', 'arm64'])
@@ -27,7 +28,8 @@ export const RunnerSocketAuthSchema = z.object({
     credential: RunnerCredentialEnvelopeSchema,
     machineId: BoundedIdSchema,
     clientType: z.enum(['machine-scoped', 'session-scoped']),
-    sessionId: BoundedIdSchema.optional()
+    sessionId: BoundedIdSchema.optional(),
+    capabilities: CliCapabilitiesSchema.optional()
 }).strict()
 
 export const RunnerEnrollmentIssueSchema = z.object({ ownerMembershipId: BoundedIdSchema.optional() }).strict()

@@ -12,7 +12,10 @@ export default defineConfig({
         globals: false,
         environment: 'node',
         include: ['src/**/*.test.ts'],
-        exclude: ['src/terminal/TerminalManager.test.ts'],
+        exclude: [
+            'src/terminal/TerminalManager.test.ts',
+            'src/terminal/bashHistory.test.ts',
+        ],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

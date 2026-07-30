@@ -1,4 +1,5 @@
 import {
+    TERMINAL_HISTORY_CLI_CAPABILITY,
     TerminalKeepalivePayloadSchema,
     TerminalListRequestSchema,
     TerminalOpenPayloadSchema,
@@ -8,6 +9,10 @@ import {
 } from '@hapi/protocol'
 import { z } from 'zod'
 import type { TerminalRegistry, TerminalRegistryEntry } from '../terminalRegistry'
+import {
+    TerminalHistoryRequestRegistry,
+    type TerminalHistoryScope
+} from '../terminalHistoryRequests'
 import type { TerminalSessionStateStore } from '../terminalSessionState'
 import type { SocketServer, SocketWithData } from '../socketTypes'
 import { terminalScopeRoom } from '../terminalRooms'
@@ -26,6 +31,12 @@ const terminalResizeSchema = z.object({
     rows: z.number().int().positive()
 }).strict()
 
+const terminalHistoryWebRequestSchema = z.object({
+    terminalId: z.string().min(1),
+    requestId: z.string().min(1),
+    limit: z.number().int().optional()
+}).strict()
+
 const terminalLegacyCloseSchema = z.object({
     terminalId: z.string().min(1)
 }).strict()
@@ -38,6 +49,7 @@ export type TerminalHandlersDeps = {
     getSession: (sessionId: string) => { active: boolean; namespace: string } | null
     getMachine: (machineId: string) => { active: boolean; namespace: string } | null
     terminalRegistry: TerminalRegistry
+    terminalHistoryRequests?: TerminalHistoryRequestRegistry
     terminalSessionState?: TerminalSessionStateStore
     maxTerminalsPerSocket: number
     maxTerminalsPerSession: number
@@ -46,6 +58,7 @@ export type TerminalHandlersDeps = {
 
 export function registerTerminalHandlers(socket: SocketWithData, deps: TerminalHandlersDeps): void {
     const { io, getSession, getMachine, terminalRegistry, terminalSessionState, maxTerminalsPerSocket, maxTerminalsPerSession, capabilityResolver } = deps
+    const terminalHistoryRequests = deps.terminalHistoryRequests ?? new TerminalHistoryRequestRegistry()
     const cliNamespace = io.of('/cli')
     const namespace = typeof socket.data.namespace === 'string' ? socket.data.namespace : null
 
@@ -414,6 +427,53 @@ export function registerTerminalHandlers(socket: SocketWithData, deps: TerminalH
         terminalRegistry.markActivity(terminalId)
     })
 
+    socket.on('terminal:history', (data: unknown) => {
+        const parsed = terminalHistoryWebRequestSchema.safeParse(data)
+        if (!parsed.success || !namespace) {
+            return
+        }
+        const entry = resolveEntryForControl(parsed.data.terminalId)
+        if (!entry) {
+            return
+        }
+        const cliSocket = resolveCliSocket(entry, true)
+        const scope = getEntryScope(entry) as TerminalHistoryScope | null
+        if (!cliSocket || !scope) {
+            return
+        }
+        if (!cliSocket.data.cliCapabilities?.has(TERMINAL_HISTORY_CLI_CAPABILITY)) {
+            socket.emit('terminal:history-result', {
+                ...scope,
+                terminalId: entry.terminalId,
+                requestId: parsed.data.requestId,
+                status: 'cli_outdated',
+                entries: []
+            })
+            return
+        }
+
+        const correlationId = terminalHistoryRequests.register({
+            webSocketId: socket.id,
+            webRequestId: parsed.data.requestId,
+            cliSocketId: cliSocket.id,
+            terminalId: entry.terminalId,
+            namespace,
+            scope
+        })
+        const limit = Math.min(100, Math.max(1, parsed.data.limit ?? 100))
+        const forwarded = cliSocket.emit('terminal:history', {
+            ...scope,
+            terminalId: entry.terminalId,
+            requestId: correlationId,
+            limit
+        })
+        if (!forwarded) {
+            terminalHistoryRequests.remove(correlationId)
+            return
+        }
+        terminalRegistry.markActivity(entry.terminalId)
+    })
+
     socket.on('terminal:close', (data: unknown) => {
         const parsed = terminalCloseSchema.safeParse(data)
         if (!parsed.success) {
@@ -469,6 +529,7 @@ export function registerTerminalHandlers(socket: SocketWithData, deps: TerminalH
     })
 
     socket.on('disconnect', () => {
+        terminalHistoryRequests.removeByWebSocket(socket.id)
         // Socket disconnect means the web view detached (route switch,
         // reconnect, page background, etc.). Do not close the underlying
         // terminal process here; explicit `terminal:close` is the destructive

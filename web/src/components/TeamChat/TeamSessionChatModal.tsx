@@ -15,6 +15,12 @@ import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/toast-context'
 import { cn } from '@/lib/utils'
 import type { AttachmentMetadata, Session } from '@/types/api'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 
 function getSessionTitle(session: Session): string {
     return session.metadata?.name
@@ -94,18 +100,6 @@ export function TeamSessionChatModal(props: {
         setActiveSessionId(props.sessionId)
     }, [props.sessionId])
 
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                props.onClose()
-            }
-        }
-        window.addEventListener('keydown', onKeyDown)
-        return () => {
-            window.removeEventListener('keydown', onKeyDown)
-        }
-    }, [props.onClose])
-
     const { sendMessage, retryMessage, isSending } = useSendMessage(props.api, activeSessionId, {
         isSessionThinking: session?.thinking ?? false,
         onSuccess: (sentSessionId) => {
@@ -175,36 +169,28 @@ export function TeamSessionChatModal(props: {
     const metaLine = session ? getSessionMetaLine(session) : ''
 
     return (
-        <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Direct chat with @${props.alias}`}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4"
-            onMouseDown={(event) => {
-                if (event.target === event.currentTarget) {
-                    props.onClose()
-                }
-            }}
-        >
-            <div className="flex h-[min(92vh,900px)] w-[min(1120px,calc(100vw-1rem))] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-fg)] shadow-2xl sm:w-[min(1120px,calc(100vw-2rem))]">
-                <div className="border-b border-[var(--app-border)] bg-[var(--app-subtle-bg)] px-3 py-2 sm:px-4">
-                    <div className="flex items-start gap-3">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                <div className="truncate text-sm font-semibold sm:text-base">Direct chat with @{props.alias}</div>
-                                {status ? (
-                                    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium', status.pillClassName)}>
-                                        <span className={cn('h-1.5 w-1.5 rounded-full', status.dotClassName, session?.thinking ? 'animate-pulse' : '')} />
-                                        {status.label}
-                                    </span>
-                                ) : null}
-                            </div>
-                            <div className="mt-0.5 truncate text-xs text-[var(--app-hint)]">{title}</div>
-                            <div className="mt-0.5 truncate text-[11px] text-[var(--app-hint)]">
-                                <span>Messages here go only to this session, not the Team Chat.</span>
-                                {metaLine ? <span> · {metaLine}</span> : null}
-                            </div>
-                        </div>
+        <AppDialog open onOpenChange={(open) => !open && props.onClose()}>
+            <AppDialogContent
+                presentation="workspace"
+                className="h-[min(92vh,900px)] w-[min(1120px,calc(100vw-1rem))] max-w-none text-[var(--app-fg)] sm:w-[min(1120px,calc(100vw-2rem))]"
+            >
+                <AppDialogHeader
+                    title={`Direct chat with @${props.alias}`}
+                    subtitle={(
+                        <span className="flex min-w-0 items-center gap-1">
+                            <span className="shrink-0">{title}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Messages here go only to this session, not the Team Chat.</span>
+                            {metaLine ? <span className="truncate"> · {metaLine}</span> : null}
+                        </span>
+                    )}
+                    meta={status ? (
+                        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium', status.pillClassName)}>
+                            <span className={cn('h-1.5 w-1.5 rounded-full', status.dotClassName, session?.thinking ? 'animate-pulse' : '')} />
+                            {status.label}
+                        </span>
+                    ) : null}
+                    actions={(
                         <div className="flex shrink-0 items-center gap-2">
                             <button
                                 type="button"
@@ -213,19 +199,16 @@ export function TeamSessionChatModal(props: {
                             >
                                 Open full session
                             </button>
-                            <button
-                                type="button"
-                                aria-label="Close direct chat"
-                                onClick={props.onClose}
-                                className="rounded-md border border-[var(--app-border)] bg-[var(--app-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--app-fg)] transition-colors hover:bg-[var(--app-secondary-bg)]"
-                            >
-                                Close
-                            </button>
                         </div>
-                    </div>
-                </div>
+                    )}
+                    closeLabel="Close direct chat"
+                    mobileNavigation="back"
+                    mobileBackLabel="Back to Team Chat"
+                    onMobileBack={props.onClose}
+                    className="sm:pl-4"
+                />
 
-                <div className="min-h-0 flex-1">
+                <AppDialogBody>
                     {isLoading ? (
                         <div className="flex h-full items-center justify-center p-4">
                             <LoadingState label="Loading direct chat…" className="text-sm" />
@@ -261,8 +244,8 @@ export function TeamSessionChatModal(props: {
                             disableVoice={true}
                         />
                     )}
-                </div>
-            </div>
-        </div>
+                </AppDialogBody>
+            </AppDialogContent>
+        </AppDialog>
     )
 }

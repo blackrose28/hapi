@@ -39,12 +39,21 @@ import type {
     TeamMentionRequest,
     TeamChatMessage
 } from '@/types/api'
-import type { AgentFlavor } from '@hapi/protocol'
+import {
+    TerminalSnippetResponseSchema,
+    TerminalSnippetsResponseSchema,
+    type AgentFlavor,
+    type CreateTerminalSnippetInput,
+    type TerminalSnippetResponse,
+    type TerminalSnippetsResponse,
+    type UpdateTerminalSnippetInput
+} from '@hapi/protocol'
 
 type ApiClientOptions = {
     baseUrl?: string
     getToken?: () => string | null
     onUnauthorized?: () => Promise<string | null>
+    cacheScopeId?: string
 }
 
 type ErrorPayload = {
@@ -65,6 +74,29 @@ function readCsrfCookie(): string | null {
     return match ? decodeURIComponent(match[1]) : null
 }
 
+function normalizeCacheBaseUrl(baseUrl: string | null | undefined): string {
+    const fallbackOrigin = typeof globalThis.location?.origin === 'string'
+        ? globalThis.location.origin
+        : 'same-origin'
+    const candidate = baseUrl?.trim() || fallbackOrigin
+
+    try {
+        return new URL(candidate).origin
+    } catch {
+        return candidate.replace(/\/+$/, '') || 'same-origin'
+    }
+}
+
+export function deriveApiCacheScope(
+    baseUrl: string | null | undefined,
+    scopeId: string | null | undefined
+): string {
+    return JSON.stringify([
+        normalizeCacheBaseUrl(baseUrl),
+        scopeId?.trim() || 'unknown'
+    ])
+}
+
 export class ApiError extends Error {
     status: number
     code?: string
@@ -80,9 +112,11 @@ export class ApiError extends Error {
 }
 
 export class ApiClient {
+    readonly cacheScope: string
     private readonly baseUrl: string | null
 
     constructor(options?: ApiClientOptions) {
+        this.cacheScope = deriveApiCacheScope(options?.baseUrl, options?.cacheScopeId)
         this.baseUrl = options?.baseUrl ?? null
     }
 
@@ -172,6 +206,44 @@ export class ApiClient {
 
     async getSessions(): Promise<SessionsResponse> {
         return await this.request<SessionsResponse>('/api/sessions')
+    }
+
+    async getTerminalSnippets(): Promise<TerminalSnippetsResponse> {
+        return TerminalSnippetsResponseSchema.parse(
+            await this.request<unknown>('/api/terminal-snippets')
+        )
+    }
+
+    async createTerminalSnippet(
+        input: CreateTerminalSnippetInput
+    ): Promise<TerminalSnippetResponse> {
+        return TerminalSnippetResponseSchema.parse(
+            await this.request<unknown>('/api/terminal-snippets', {
+                method: 'POST',
+                body: JSON.stringify(input)
+            })
+        )
+    }
+
+    async updateTerminalSnippet(
+        id: string,
+        input: UpdateTerminalSnippetInput
+    ): Promise<TerminalSnippetResponse> {
+        return TerminalSnippetResponseSchema.parse(
+            await this.request<unknown>(
+                `/api/terminal-snippets/${encodeURIComponent(id)}`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify(input)
+                }
+            )
+        )
+    }
+
+    async deleteTerminalSnippet(id: string): Promise<void> {
+        await this.request(`/api/terminal-snippets/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+        })
     }
 
     async getTeamChats(): Promise<TeamChatsResponse> {

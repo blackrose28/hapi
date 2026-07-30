@@ -101,6 +101,7 @@ export function EditorChatPanel(props: {
                 autocompleteSuggestions={getAutocompleteSuggestions}
                 availableSlashCommands={slashCommands.commands}
                 compactMode={true}
+                compactComposerMode={false}
                 hideHeader={true}
                 disableVoice={true}
                 composerAppendText={props.pendingDraftText}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { AssistantRuntimeProvider } from '@assistant-ui/react'
 import type { ApiClient } from '@/api/client'
@@ -12,12 +13,15 @@ import type {
 } from '@/types/api'
 import type { ChatBlock, NormalizedMessage } from '@/chat/types'
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
+import type { SendStatus } from '@/hooks/mutations/useSendMessage'
 import { normalizeDecryptedMessage } from '@/chat/normalize'
 import { reduceChatBlocks } from '@/chat/reducer'
 import { reconcileChatBlocks } from '@/chat/reconcile'
+import { hasInFlightToolCall } from '@/chat/running'
 import { buildConversationOutline, getConversationMessageAnchorId } from '@/chat/outline'
 import { isQueuedForInvocation } from '@/lib/messages'
 import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
+import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import { HappyThread } from '@/components/AssistantChat/HappyThread'
 import { QueuedMessagesBar } from '@/components/AssistantChat/QueuedMessagesBar'
 import { TeamMentionQueueBar } from '@/components/AssistantChat/TeamMentionQueueBar'
@@ -62,6 +66,7 @@ export function SessionChat(props: {
     pendingCount: number
     messagesVersion: number
     onBack: () => void
+    onSessionDeleted?: () => void
     onRefresh: () => void
     onLoadMore: () => Promise<unknown>
     onSend: (text: string, attachments?: AttachmentMetadata[]) => void
@@ -73,11 +78,15 @@ export function SessionChat(props: {
     disableVoice?: boolean
     hideHeader?: boolean
     compactMode?: boolean
+    compactComposerMode?: boolean
+    compactSendStatus?: SendStatus
     pinIndex?: number
     composerAppendText?: string
     onComposerAppendTextConsumed?: () => void
     onNewSessionRequested?: () => void
     onFocusSession?: () => void
+    compactCloseLabel?: string
+    compactCloseButtonRef?: Ref<HTMLButtonElement>
 }) {
     const { requests: teamMentionRequests } = useSessionTeamMentions(props.api, props.session.id)
     const { haptic } = usePlatform()
@@ -317,6 +326,8 @@ export function SessionChat(props: {
         () => reduceChatBlocks(normalizedMessages, props.session.agentState, teamMentionRequests),
         [normalizedMessages, props.session.agentState, teamMentionRequests]
     )
+    const effectiveAgentRunning = props.session.thinking
+        || (props.compactComposerMode === true && hasInFlightToolCall(normalizedMessages))
     const reconciled = useMemo(
         () => reconcileChatBlocks(reduced.blocks, blocksByIdRef.current),
         [reduced.blocks]
@@ -404,6 +415,48 @@ export function SessionChat(props: {
         }
     }, [setEffort, props.onRefresh, haptic])
 
+    const handleCompactRuntimeChange = useCallback(async (change: CompactRuntimeChange) => {
+        try {
+            switch (change.type) {
+                case 'model':
+                    await setModel(change.value)
+                    break
+                case 'effort':
+                    if (agentFlavor === 'codex' || agentFlavor === 'opencode') {
+                        await setModelReasoningEffort(change.value)
+                    } else {
+                        await setEffort(change.value)
+                    }
+                    break
+                case 'collaboration':
+                    await setCollaborationMode(change.value)
+                    break
+                case 'permission':
+                    if (props.session.collaborationMode && props.session.collaborationMode !== 'default') {
+                        await setCollaborationMode('default')
+                    }
+                    await setPermissionMode(change.value)
+                    break
+            }
+            haptic.notification('success')
+            props.onRefresh()
+        } catch (error) {
+            haptic.notification('error')
+            console.error(`Failed to set compact runtime ${change.type}:`, error)
+            throw error
+        }
+    }, [
+        agentFlavor,
+        haptic,
+        props.onRefresh,
+        props.session.collaborationMode,
+        setCollaborationMode,
+        setEffort,
+        setModel,
+        setModelReasoningEffort,
+        setPermissionMode
+    ])
+
     // Abort handler
     const handleAbort = useCallback(async () => {
         await abortSession()
@@ -425,9 +478,12 @@ export function SessionChat(props: {
 
     const handleViewTerminal = useCallback(() => {
         navigate({
-            to: '/sessions/$sessionId/terminal',
-            params: { sessionId: props.session.id }
-        })
+            search: (previous: any) => ({
+                ...previous,
+                modal: 'terminal',
+                modalSessionId: props.session.id,
+            }),
+        } as any)
     }, [navigate, props.session.id])
 
     const handleSend = useCallback((text: string, attachments?: AttachmentMetadata[]) => {
@@ -436,8 +492,9 @@ export function SessionChat(props: {
     }, [props.onSend])
 
     const handleGoalCommand = useCallback((command: string) => {
+        if (effectiveAgentRunning) return
         handleSend(command)
-    }, [handleSend])
+    }, [effectiveAgentRunning, handleSend])
 
     const attachmentAdapter = useMemo(() => {
         if (!props.session.active) {
@@ -453,7 +510,9 @@ export function SessionChat(props: {
         onSendMessage: handleSend,
         onAbort: handleAbort,
         attachmentAdapter,
-        allowSendWhenInactive: true
+        allowSendWhenInactive: true,
+        allowDraftWhileRunning: props.compactComposerMode === true,
+        isAgentRunning: effectiveAgentRunning
     })
 
     return (
@@ -465,12 +524,14 @@ export function SessionChat(props: {
                     onViewFiles={terminalSupported ? handleViewFiles : undefined}
                     onOpenOutline={() => setOutlineOpen(true)}
                     api={props.api}
-                    onSessionDeleted={props.onBack}
+                    onSessionDeleted={props.onSessionDeleted ?? props.onBack}
                     compactMode={props.compactMode}
                     pinIndex={props.pinIndex}
                     onFocusSession={props.onFocusSession}
+                    compactCloseLabel={props.compactCloseLabel}
+                    compactCloseButtonRef={props.compactCloseButtonRef}
                     codexGoal={reduced.latestGoal}
-                    onGoalCommand={handleGoalCommand}
+                    onGoalCommand={effectiveAgentRunning ? undefined : handleGoalCommand}
                 />
             )}
 
@@ -616,9 +677,14 @@ export function SessionChat(props: {
                     <HappyComposer
                         key={`composer-${props.session.id}`}
                         sessionId={props.session.id}
-                        disabled={props.isSending || readOnly}
+                        disabled={readOnly || undefined}
+                        sendDisabled={props.isSending}
                         permissionMode={props.session.permissionMode}
-                        collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
+                        collaborationMode={
+                            agentFlavor === 'codex' && (props.compactComposerMode || codexCollaborationModeSupported)
+                                ? props.session.collaborationMode
+                                : undefined
+                        }
                         model={props.session.model}
                         modelReasoningEffort={
                             agentFlavor === 'codex' || agentFlavor === 'opencode'
@@ -639,7 +705,7 @@ export function SessionChat(props: {
                         availableModelReasoningEffortOptions={opencodeReasoningEffortOptions}
                         active={props.session.active}
                         allowSendWhenInactive
-                        thinking={props.session.thinking}
+                        thinking={effectiveAgentRunning}
                         agentState={props.session.agentState}
                         backgroundTaskCount={props.session.backgroundTaskCount}
                         contextSize={reduced.latestUsage?.contextSize}
@@ -669,6 +735,7 @@ export function SessionChat(props: {
                                 : undefined
                         }
                         onEffortChange={readOnly ? undefined : handleEffortChange}
+                        onCompactRuntimeChange={props.compactComposerMode && !readOnly ? handleCompactRuntimeChange : undefined}
                         onSwitchToRemote={readOnly ? undefined : handleSwitchToRemote}
                         onTerminal={props.session.active && terminalSupported ? handleViewTerminal : undefined}
                         terminalUnsupported={props.session.active && !terminalSupported}
@@ -679,6 +746,8 @@ export function SessionChat(props: {
                         onVoiceMicToggle={voice ? handleVoiceMicToggle : undefined}
                         appendText={props.composerAppendText}
                         onAppendTextConsumed={props.onComposerAppendTextConsumed}
+                        compactComposerMode={props.compactComposerMode}
+                        compactSendStatus={props.compactComposerMode ? props.compactSendStatus : undefined}
                     />
                 </div>
             </AssistantRuntimeProvider>

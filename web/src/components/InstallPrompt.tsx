@@ -3,6 +3,13 @@ import { usePWAInstall } from '@/hooks/usePWAInstall'
 import { usePlatform } from '@/hooks/usePlatform'
 import { CloseIcon, ShareIcon, PlusCircleIcon } from '@/components/icons'
 import { useTranslation } from '@/lib/use-translation'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 
 export function InstallPrompt() {
     const { t } = useTranslation()
@@ -34,22 +41,14 @@ export function InstallPrompt() {
     if (canInstallIOS) {
         if (showIOSGuide) {
             return (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-                    <div className="w-full max-w-lg bg-[var(--app-bg)] rounded-t-2xl p-5 pb-8 space-y-4 animate-slide-up">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-base font-semibold text-[var(--app-fg)]">
-                                {t('install.title')}
-                            </h3>
-                            <button
-                                onClick={() => setShowIOSGuide(false)}
-                                className="p-1 -mr-1 text-[var(--app-hint)] active:opacity-60"
-                                aria-label="Close"
-                            >
-                                <CloseIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-3">
+                <AppDialog open onOpenChange={(open) => !open && setShowIOSGuide(false)}>
+                    <AppDialogContent
+                        presentation="sheet"
+                        dismissible={false}
+                        className="max-w-lg"
+                    >
+                        <AppDialogHeader title={t('install.title')} />
+                        <AppDialogBody className="space-y-3 p-5">
                             <div className="flex items-start gap-3">
                                 <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--app-fg)] text-[var(--app-bg)] flex items-center justify-center text-sm font-medium">
                                     1
@@ -82,8 +81,8 @@ export function InstallPrompt() {
                                     </p>
                                 </div>
                             </div>
-                        </div>
-
+                        </AppDialogBody>
+                        <AppDialogFooter className="pb-8">
                         <button
                             onClick={() => {
                                 setShowIOSGuide(false)
@@ -93,8 +92,9 @@ export function InstallPrompt() {
                         >
                             {t('button.dismiss')}
                         </button>
-                    </div>
-                </div>
+                        </AppDialogFooter>
+                    </AppDialogContent>
+                </AppDialog>
             )
         }
 

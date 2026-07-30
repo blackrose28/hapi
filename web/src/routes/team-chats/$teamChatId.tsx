@@ -13,6 +13,13 @@ import { useTeamChatMessages } from '@/hooks/queries/useTeamChatMessages'
 import { useTeamChatParticipants } from '@/hooks/queries/useTeamChatParticipants'
 import { useTeamChatMentionRequests } from '@/hooks/queries/useTeamChatMentionRequests'
 import type { TeamChatMessage, TeamParticipant } from '@/types/api'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 
 const PARTICIPANT_COLORS = ['#60a5fa', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#22d3ee', '#fb7185', '#818cf8']
 const TeamSessionChatModal = lazy(() => import('@/components/TeamChat/TeamSessionChatModal').then((module) => ({
@@ -141,16 +148,19 @@ export default function TeamChatDetailPage() {
             />
             {api && directChatParticipant?.sessionId ? (
                 <Suspense fallback={
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Loading direct chat"
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-                    >
-                        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] px-4 py-3 text-sm text-[var(--app-hint)] shadow-2xl">
-                            Loading direct chat…
-                        </div>
-                    </div>
+                    <AppDialog open onOpenChange={(open) => !open && setDirectChatParticipant(null)}>
+                        <AppDialogContent presentation="workspace" dismissible={false} className="max-w-sm">
+                            <AppDialogHeader
+                                title="Loading direct chat"
+                                mobileNavigation="back"
+                                mobileBackLabel="Back to Team Chat"
+                                onMobileBack={() => setDirectChatParticipant(null)}
+                            />
+                            <AppDialogBody className="px-4 py-3 text-sm text-[var(--app-hint)]">
+                                Loading direct chat…
+                            </AppDialogBody>
+                        </AppDialogContent>
+                    </AppDialog>
                 }>
                     <TeamSessionChatModal
                         api={api}
@@ -165,15 +175,22 @@ export default function TeamChatDetailPage() {
                 </Suspense>
             ) : null}
             {deleteConfirmOpen && teamChat && teamChatId ? (
-                <div role="dialog" aria-modal="true" aria-label={`Delete ${teamChat.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 text-[var(--app-fg)] shadow-2xl">
-                        <div className="text-base font-semibold">Delete Team Chat?</div>
-                        <div className="mt-2 text-sm text-[var(--app-hint)]">
-                            This archives <span className="font-medium text-[var(--app-fg)]">{teamChat.name}</span>.
-                        </div>
-                        <div className="mt-1 text-sm text-[var(--app-hint)]">Sessions in this Team Chat will not be deleted.</div>
+                <AppDialog open onOpenChange={(open) => !open && setDeleteConfirmOpen(false)}>
+                    <AppDialogContent presentation="alert" dismissible={false} className="max-w-md text-[var(--app-fg)]">
+                        <AppDialogHeader
+                            title="Delete Team Chat?"
+                            closeDisabled={isPending}
+                            subtitle={(
+                                <span>
+                                    This archives <span className="font-medium text-[var(--app-fg)]">{teamChat.name}</span>.
+                                </span>
+                            )}
+                        />
+                        <AppDialogBody className="p-4 text-sm text-[var(--app-hint)]">
+                            <div>Sessions in this Team Chat will not be deleted.</div>
                         {deleteError ? <div className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{deleteError}</div> : null}
-                        <div className="mt-4 flex justify-end gap-2">
+                        </AppDialogBody>
+                        <AppDialogFooter>
                             <button
                                 type="button"
                                 disabled={isPending}
@@ -206,9 +223,9 @@ export default function TeamChatDetailPage() {
                             >
                                 Delete Team Chat
                             </button>
-                        </div>
-                    </div>
-                </div>
+                        </AppDialogFooter>
+                    </AppDialogContent>
+                </AppDialog>
             ) : null}
         </>
     )

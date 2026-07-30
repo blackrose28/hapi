@@ -206,4 +206,51 @@ describe('NewSession Codex resume', () => {
         await waitFor(() => expect(modelSelect).toHaveValue('auto'))
     })
 
+    it('restores and reports a modal draft across workspace navigation', async () => {
+        const onDraftChange = vi.fn()
+        render(
+            <NewSession
+                api={{} as never}
+                machines={[makeMachine()]}
+                onSuccess={vi.fn()}
+                onCancel={vi.fn()}
+                initialDraft={{
+                    machineId: 'machine-1',
+                    directory: '/repo',
+                    agent: 'codex',
+                    model: 'auto',
+                    effort: 'auto',
+                    modelReasoningEffort: 'high',
+                    yoloMode: true,
+                    sessionType: 'worktree',
+                    worktreeName: 'mobile-dialogs',
+                    resumeCodex: false,
+                    resumeCodexSessionId: '',
+                    opencodeSelectedModel: null,
+                }}
+                onDraftChange={onDraftChange}
+            />
+        )
+
+        expect(screen.getByPlaceholderText('newSession.placeholder')).toHaveValue('/repo')
+        expect(screen.getByLabelText('codex')).toBeChecked()
+        expect(document.getElementById('session-type-worktree')).toBeChecked()
+        expect(screen.getByPlaceholderText('newSession.type.worktree.placeholder'))
+            .toHaveValue('mobile-dialogs')
+
+        fireEvent.change(screen.getByPlaceholderText('newSession.placeholder'), {
+            target: { value: '/repo/next' }
+        })
+
+        await waitFor(() => {
+            expect(onDraftChange).toHaveBeenLastCalledWith(expect.objectContaining({
+                machineId: 'machine-1',
+                directory: '/repo/next',
+                agent: 'codex',
+                sessionType: 'worktree',
+                worktreeName: 'mobile-dialogs',
+            }))
+        })
+    })
+
 })

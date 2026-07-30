@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CodexGoalState } from '@/chat/types'
 import type { Session, TeamChat, TeamParticipant } from '@/types/api'
+import { en, viVN, zhCN } from '@/lib/locales'
 import { SessionHeader } from './SessionHeader'
 
 const navigateMock = vi.fn()
@@ -44,9 +45,27 @@ vi.mock('@/hooks/mutations/useSessionActions', () => ({
 }))
 
 vi.mock('@/components/SessionActionMenu', () => ({
-    SessionActionMenu: (props: { isOpen: boolean; onArchive: () => void }) => (
-        props.isOpen ? <button type="button" onClick={props.onArchive}>Archive session</button> : null
-    )
+    SessionActionMenu: (props: {
+        isOpen: boolean
+        onArchive: () => void
+        onOpenFiles?: () => void
+        onUnpin?: () => void
+        filesVisibleOnDesktop?: boolean
+    }) => props.isOpen ? (
+        <>
+            <button type="button" onClick={props.onArchive}>Archive session</button>
+            {props.onOpenFiles ? (
+                <button
+                    type="button"
+                    className={props.filesVisibleOnDesktop ? undefined : 'session-action-menu__mobile-only'}
+                    onClick={props.onOpenFiles}
+                >
+                    session.title
+                </button>
+            ) : null}
+            {props.onUnpin ? <button type="button" onClick={props.onUnpin}>dashboard.unpin</button> : null}
+        </>
+    ) : null
 }))
 
 vi.mock('@/components/RenameSessionDialog', () => ({
@@ -72,7 +91,9 @@ vi.mock('@/lib/use-translation', () => ({
                 'session.tasks.progress': '{completed} of {total} completed',
                 'session.tasks.status.pending': 'Pending',
                 'session.tasks.status.in_progress': 'In progress',
-                'session.tasks.status.completed': 'Completed'
+                'session.tasks.status.completed': 'Completed',
+                'session.files.openIn': 'Localized open files in {path}',
+                'session.teamMemberships.more': 'Localized {count} more team memberships: {memberships}'
             }
             let value = messages[key] ?? key
             for (const [param, replacement] of Object.entries(params ?? {})) {
@@ -285,6 +306,135 @@ describe('SessionHeader editor entry point', () => {
         expect(onFocusSession).not.toHaveBeenCalled()
     })
 
+    it('uses the focused-modal close semantics for the compact header x button', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        const onBack = vi.fn()
+
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession()}
+                    onBack={onBack}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                    compactCloseLabel="Close focus session"
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close focus session' }))
+
+        expect(onBack).toHaveBeenCalledTimes(1)
+        expect(screen.queryByRole('button', { name: 'Unpin this session' })).not.toBeInTheDocument()
+    })
+
+    it('moves unpin into the compact action menu outside focus mode', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        const onBack = vi.fn()
+
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession()}
+                    onBack={onBack}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                />
+            </QueryClientProvider>
+        )
+
+        expect(screen.queryByRole('button', { name: 'Unpin this session' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'session.more' }))
+        fireEvent.click(screen.getByRole('button', { name: 'dashboard.unpin' }))
+
+        expect(onBack).toHaveBeenCalledTimes(1)
+    })
+
+    it('opens Files from the compact path pill for the current session', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession({ metadata: { path: '/workspace/hapi', host: 'host', machineId: 'machine-1', flavor: 'codex' } })}
+                    onBack={vi.fn()}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Localized open files in /workspace/hapi' }))
+
+        expect(navigateMock).toHaveBeenCalledWith(expect.objectContaining({
+            search: expect.any(Function)
+        }))
+        const searchUpdater = navigateMock.mock.calls.at(-1)?.[0]?.search
+        expect(searchUpdater({ keep: 'value' })).toEqual({
+            keep: 'value',
+            modal: 'files',
+            modalSessionId: 'session-1'
+        })
+    })
+
+    it('shows Files in the desktop More menu when the compact session has no path', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession({ metadata: undefined })}
+                    onBack={vi.fn()}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                    compactCloseLabel="Close focus session"
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'session.more' }))
+
+        expect(screen.getByRole('button', { name: 'session.title' })).not.toHaveClass('session-action-menu__mobile-only')
+    })
+
+    it('keeps Files mobile-only in More when the compact path trigger exists', () => {
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader
+                    session={makeSession({ metadata: { path: '/workspace/hapi', host: 'host', flavor: 'codex' } })}
+                    onBack={vi.fn()}
+                    api={null}
+                    compactMode
+                    pinIndex={1}
+                    compactCloseLabel="Close focus session"
+                />
+            </QueryClientProvider>
+        )
+
+        expect(screen.getByRole('button', { name: 'Localized open files in /workspace/hapi' })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'session.more' }))
+
+        expect(screen.getByRole('button', { name: 'session.title' })).toHaveClass('session-action-menu__mobile-only')
+    })
+
+    it('uses localized compact path trigger labels in every supported locale', () => {
+        expect(en['session.files.openIn']).toBe('Open files in {path}')
+        expect(viVN['session.files.openIn']).toBe('Mở tệp trong {path}')
+        expect(zhCN['session.files.openIn']).toBe('打开 {path} 中的文件')
+    })
+
+    it('provides localized compact membership overflow descriptions in every supported locale', () => {
+        expect(en['session.teamMemberships.more']).toBe('{count} more team memberships: {memberships}')
+        expect(viVN['session.teamMemberships.more']).toBe('Còn {count} nhóm chat khác: {memberships}')
+        expect(zhCN['session.teamMemberships.more']).toBe('还有 {count} 个团队聊天：{memberships}')
+    })
+
     it('shows the Codex goal button when a Codex session has goal state', () => {
         const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
         render(<QueryClientProvider client={qc}><SessionHeader session={makeSession()} onBack={vi.fn()} api={null} codexGoal={makeGoal()} onGoalCommand={vi.fn()} /></QueryClientProvider>)
@@ -389,6 +539,52 @@ describe('SessionHeader editor entry point', () => {
         render(<QueryClientProvider client={qc}><SessionHeader session={makeSession()} onBack={vi.fn()} api={{} as never} /></QueryClientProvider>)
 
         expect(screen.getByText('Frontend Team: @UI')).toBeInTheDocument()
+    })
+
+    it('shows compact overflow for additional Team Chat memberships', () => {
+        useSessionTeamMembershipsMock.mockReturnValue({
+            memberships: [
+                {
+                    teamChat: { id: 'team-1', namespace: 'default', name: 'Frontend Team', projectPath: '/repo', createdAt: 1, updatedAt: 2 },
+                    participant: { id: 'p1', teamChatId: 'team-1', type: 'session', sessionId: 'session-1', displayName: 'UI', role: 'frontend', color: '#60a5fa', joinedAt: 3 }
+                },
+                {
+                    teamChat: { id: 'team-2', namespace: 'default', name: 'Backend Team', projectPath: '/repo', createdAt: 1, updatedAt: 2 },
+                    participant: { id: 'p2', teamChatId: 'team-2', type: 'session', sessionId: 'session-1', displayName: 'API', role: 'backend', color: '#a78bfa', joinedAt: 3 }
+                },
+                {
+                    teamChat: { id: 'team-3', namespace: 'default', name: 'QA Team', projectPath: '/repo', createdAt: 1, updatedAt: 2 },
+                    participant: { id: 'p3', teamChatId: 'team-3', type: 'session', sessionId: 'session-1', displayName: 'Tester', role: 'tests', color: '#34d399', joinedAt: 3 }
+                }
+            ],
+            isLoading: false,
+            error: null,
+            refetch: vi.fn()
+        })
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+        render(
+            <QueryClientProvider client={qc}>
+                <SessionHeader session={makeSession()} onBack={vi.fn()} api={null} compactMode pinIndex={1} />
+            </QueryClientProvider>
+        )
+
+        expect(screen.getByText('Frontend Team: @UI')).toBeInTheDocument()
+        expect(screen.queryByText('Backend Team: @API')).not.toBeInTheDocument()
+        expect(screen.queryByText('QA Team: @Tester')).not.toBeInTheDocument()
+        const visualOverflow = screen.getByText('+2')
+        const overflowDescription = screen.getByText(
+            'Localized 2 more team memberships: Backend Team: @API, QA Team: @Tester'
+        )
+
+        expect(visualOverflow).toHaveAttribute('aria-hidden', 'true')
+        expect(overflowDescription).toHaveClass('sr-only')
+        expect(overflowDescription).not.toHaveAttribute('aria-hidden')
+        expect(visualOverflow.parentElement).toHaveAttribute(
+            'title',
+            'Localized 2 more team memberships: Backend Team: @API, QA Team: @Tester'
+        )
+        expect(visualOverflow.parentElement).not.toHaveAttribute('aria-label')
     })
 
     it('creates a Team Chat with the current session', async () => {
@@ -539,10 +735,9 @@ describe('SessionHeader editor entry point', () => {
             </QueryClientProvider>
         )
 
-        fireEvent.doubleClick(screen.getByRole('button', { name: 'button.files' }))
-        fireEvent.doubleClick(screen.getByRole('button', { name: 'button.terminal' }))
+        fireEvent.doubleClick(screen.getByRole('button', { name: 'Localized open files in /repo' }))
+        fireEvent.doubleClick(screen.getByRole('button', { name: 'chat.terminal' }))
         fireEvent.doubleClick(screen.getByRole('button', { name: 'session.more' }))
-        fireEvent.doubleClick(screen.getByRole('button', { name: 'Unpin this session' }))
 
         expect(onFocusSession).not.toHaveBeenCalled()
     })

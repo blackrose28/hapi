@@ -1,17 +1,24 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import '@xterm/xterm/css/xterm.css'
 import { ensureBuiltinFontLoaded, getFontProvider } from '@/lib/terminalFont'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { getCompactTerminalFontSize, getInitialTerminalFontSize } from '@/hooks/useTerminalFontSize'
+import { MobileTerminalInteractionOverlay } from './MobileTerminalInteractionOverlay'
+import { EMPTY_TERMINAL_SEARCH_STATE, type TerminalSearchState } from './terminalSearch'
+import { useMobileTerminalInteraction } from './useMobileTerminalInteraction'
+import { useTerminalSearchAddon } from './useTerminalSearchAddon'
 
 function resolveThemeColors(): { background: string; foreground: string; selectionBackground: string } {
     const styles = getComputedStyle(document.documentElement)
     const background = styles.getPropertyValue('--app-bg').trim() || '#000000'
     const foreground = styles.getPropertyValue('--app-fg').trim() || '#ffffff'
-    const selectionBackground = styles.getPropertyValue('--app-subtle-bg').trim() || 'rgba(255, 255, 255, 0.2)'
+    const selectionBackground = styles
+        .getPropertyValue('--app-terminal-selection-bg')
+        .trim() || 'rgba(99, 102, 241, 0.38)'
     return { background, foreground, selectionBackground }
 }
 
@@ -20,10 +27,28 @@ export function TerminalView(props: {
     onResize?: (cols: number, rows: number) => void
     className?: string
     compactFontSize?: boolean
+    mobileInteractionEnabled?: boolean
+    dismissMobileInteraction?: boolean
+    searchActive?: boolean
+    onSearchStateChange?: (state: TerminalSearchState) => void
 }) {
-    const containerRef = useRef<HTMLDivElement | null>(null)
+    const mobile = useMediaQuery('(max-width: 1023px)')
+    const [terminal, setTerminal] = useState<Terminal | null>(null)
+    const [root, setRoot] = useState<HTMLDivElement | null>(null)
+    const xtermHostRef = useRef<HTMLDivElement | null>(null)
     const onMountRef = useRef(props.onMount)
     const onResizeRef = useRef(props.onResize)
+    const interaction = useMobileTerminalInteraction({
+        terminal,
+        root,
+        mobile,
+        enabled: props.mobileInteractionEnabled ?? true,
+        dismissRequested: props.dismissMobileInteraction ?? false,
+    })
+    const searchState = useTerminalSearchAddon({
+        terminal,
+        active: props.searchActive ?? false,
+    })
 
     useEffect(() => {
         onMountRef.current = props.onMount
@@ -34,8 +59,18 @@ export function TerminalView(props: {
     }, [props.onResize])
 
     useEffect(() => {
-        const container = containerRef.current
-        if (!container) return
+        props.onSearchStateChange?.(searchState)
+    }, [props.onSearchStateChange, searchState])
+
+    useEffect(() => {
+        return () => {
+            props.onSearchStateChange?.(EMPTY_TERMINAL_SEARCH_STATE)
+        }
+    }, [props.onSearchStateChange, terminal])
+
+    useEffect(() => {
+        const xtermHost = xtermHostRef.current
+        if (!xtermHost) return
 
         const abortController = new AbortController()
 
@@ -45,6 +80,7 @@ export function TerminalView(props: {
             : getInitialTerminalFontSize()
         const { background, foreground, selectionBackground } = resolveThemeColors()
         const terminal = new Terminal({
+            allowProposedApi: true,
             cursorBlink: true,
             fontFamily: fontProvider.getFontFamily(),
             fontSize,
@@ -64,7 +100,8 @@ export function TerminalView(props: {
         terminal.loadAddon(fitAddon)
         terminal.loadAddon(webLinksAddon)
         terminal.loadAddon(canvasAddon)
-        terminal.open(container)
+        terminal.open(xtermHost)
+        setTerminal(terminal)
 
         const observer = new ResizeObserver(() => {
             requestAnimationFrame(() => {
@@ -72,7 +109,7 @@ export function TerminalView(props: {
                 onResizeRef.current?.(terminal.cols, terminal.rows)
             })
         })
-        observer.observe(container)
+        observer.observe(xtermHost)
 
         const refreshFont = (forceRemeasure = false) => {
             if (abortController.signal.aborted) return
@@ -112,6 +149,7 @@ export function TerminalView(props: {
             webLinksAddon.dispose()
             canvasAddon.dispose()
             terminal.dispose()
+            setTerminal(null)
         })
 
         requestAnimationFrame(() => {
@@ -125,8 +163,11 @@ export function TerminalView(props: {
 
     return (
         <div
-            ref={containerRef}
-            className={`h-full w-full ${props.className ?? ''}`}
-        />
+            ref={setRoot}
+            className={`relative h-full w-full overflow-hidden ${props.className ?? ''}`}
+        >
+            <div ref={xtermHostRef} className="h-full w-full" />
+            <MobileTerminalInteractionOverlay {...interaction.overlayProps} />
+        </div>
     )
 }

@@ -60,6 +60,10 @@ describe('useSendMessage', () => {
         await waitFor(() => {
             expect(onSuccess).toHaveBeenCalledWith('session-A')
         })
+        expect(result.current.sendStatus).toEqual({
+            attemptId: 1,
+            state: 'accepted'
+        })
     })
 
     it('calls onSuccess with resolved session ID, not the original', async () => {
@@ -104,6 +108,10 @@ describe('useSendMessage', () => {
         })
 
         expect(onSuccess).not.toHaveBeenCalled()
+        expect(result.current.sendStatus).toEqual({
+            attemptId: 1,
+            state: 'error'
+        })
     })
 
     it('does not call onSuccess when blocked', () => {

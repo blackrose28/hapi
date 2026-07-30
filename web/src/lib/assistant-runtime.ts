@@ -223,20 +223,30 @@ export function useHappyRuntime(props: {
     onAbort: () => Promise<void>
     attachmentAdapter?: AttachmentAdapter
     allowSendWhenInactive?: boolean
+    allowDraftWhileRunning?: boolean
+    isAgentRunning?: boolean
 }) {
+    const isAgentRunning = props.isAgentRunning ?? props.session.thinking
+
     // Use cached message converter for performance optimization
     // This prevents re-converting all messages on every render
     const convertedMessages = useExternalMessageConverter<ChatBlock>({
         callback: toThreadMessageLike,
         messages: props.blocks as ChatBlock[],
-        isRunning: props.session.thinking,
+        isRunning: isAgentRunning,
     })
 
+    const sessionUnavailable = !props.session.active && !props.allowSendWhenInactive
+    const internalSendBlocked = props.isSending
+        || sessionUnavailable
+        || (props.allowDraftWhileRunning === true && isAgentRunning)
+
     const onNew = useCallback(async (message: AppendMessage) => {
+        if (internalSendBlocked) return
         const { text, attachments } = extractMessageContent(message)
         if (!text && attachments.length === 0) return
         props.onSendMessage(text, attachments.length > 0 ? attachments : undefined)
-    }, [props.onSendMessage])
+    }, [internalSendBlocked, props.onSendMessage])
 
     const onCancel = useCallback(async () => {
         await props.onAbort()
@@ -245,8 +255,10 @@ export function useHappyRuntime(props: {
     // Memoize the adapter to avoid recreating on every render
     // useExternalStoreRuntime may use adapter identity for subscriptions
     const adapter = useMemo(() => ({
-        isDisabled: props.isSending || (!props.session.active && !props.allowSendWhenInactive),
-        isRunning: props.session.thinking,
+        isDisabled: props.allowDraftWhileRunning && isAgentRunning && !sessionUnavailable
+            ? false
+            : props.isSending || sessionUnavailable,
+        isRunning: isAgentRunning,
         messages: convertedMessages,
         onNew,
         onCancel,
@@ -256,7 +268,9 @@ export function useHappyRuntime(props: {
         props.session.active,
         props.isSending,
         props.allowSendWhenInactive,
-        props.session.thinking,
+        props.allowDraftWhileRunning,
+        isAgentRunning,
+        sessionUnavailable,
         convertedMessages,
         onNew,
         onCancel,

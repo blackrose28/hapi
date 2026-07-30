@@ -37,6 +37,8 @@ describe('SessionGoalControl', () => {
         fireEvent.click(button)
 
         expect(screen.getByRole('dialog')).toBeInTheDocument()
+        expect(screen.getByRole('dialog'))
+            .toHaveAttribute('data-app-dialog-presentation', 'sheet')
         expect(screen.getByDisplayValue('Ship Codex goal UI')).toBeInTheDocument()
         expect(screen.getByText('active · 12k/200k tokens · 1m 30s')).toBeInTheDocument()
         expect(screen.getByText('This goal is native Codex state. When active, Codex may continue working toward it when idle.')).toBeInTheDocument()

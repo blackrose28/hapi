@@ -1,6 +1,12 @@
 import { diffLines } from 'diff'
 import { useMemo } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogHeader,
+    AppDialogTrigger,
+} from '@/components/ui/app-dialog'
 import { usePointerFocusRing } from '@/hooks/usePointerFocusRing'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
@@ -41,8 +47,8 @@ export function DiffView(props: {
     }
 
     return (
-        <Dialog>
-            <DialogTrigger asChild>
+        <AppDialog>
+            <AppDialogTrigger asChild>
                 <button
                     type="button"
                     className={cn(
@@ -71,19 +77,14 @@ export function DiffView(props: {
                         </div>
                     </div>
                 </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle className="break-all">{title}</DialogTitle>
-                    <DialogDescription className="font-mono break-all">
-                        {stats.label}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="mt-3 max-h-[75vh] overflow-auto">
+            </AppDialogTrigger>
+            <AppDialogContent presentation="workspace" className="max-w-4xl">
+                <AppDialogHeader title={title} subtitle={stats.label} />
+                <AppDialogBody className="max-h-[75vh] overflow-auto p-3">
                     {DiffInline}
-                </div>
-            </DialogContent>
-        </Dialog>
+                </AppDialogBody>
+            </AppDialogContent>
+        </AppDialog>
     )
 }
 

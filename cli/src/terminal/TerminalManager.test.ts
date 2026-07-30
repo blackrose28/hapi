@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { TerminalStateSchema, TerminalWarningPayloadSchema, type TerminalWarningPayload } from '@hapi/protocol'
 import { logger } from '@/ui/logger'
+import { existsSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { MAX_OUTPUT_BUFFER_CHARS, TerminalManager } from './TerminalManager'
 
 type SpawnOptions = {
@@ -25,14 +27,17 @@ type FakeTerminal = {
 
 const originalSpawn = Bun.spawn
 const originalProcessKill = process.kill
+const originalShell = process.env.SHELL
 
 function installFakeSpawn(fakeOptions: {
     markKilledOnKill?: boolean
     pid?: number
     killError?: (signal: string) => Error
 } = {}) {
+    process.env.SHELL = '/bin/zsh'
     let latestTerminal: FakeTerminal | null = null
     let latestOptions: SpawnOptions | null = null
+    let latestCommand: string[] | null = null
     let spawnCount = 0
     const processes: Array<{
         killed: boolean
@@ -45,6 +50,7 @@ function installFakeSpawn(fakeOptions: {
 
     Bun.spawn = ((command: string[], options: SpawnOptions) => {
         spawnCount += 1
+        latestCommand = command
         latestOptions = options
         const terminal: FakeTerminal & { closed: boolean; writes: string[] } = {
             closed: false,
@@ -90,6 +96,9 @@ function installFakeSpawn(fakeOptions: {
         get latestEnv() {
             return latestOptions?.env ?? null
         },
+        get latestCommand() {
+            return latestCommand
+        },
         get latestCwd() {
             return latestOptions?.cwd ?? null
         },
@@ -117,6 +126,86 @@ describe('TerminalManager', () => {
     afterEach(() => {
         Bun.spawn = originalSpawn
         process.kill = originalProcessKill
+        if (originalShell === undefined) {
+            delete process.env.SHELL
+        } else {
+            process.env.SHELL = originalShell
+        }
+    })
+
+    it('spawns Bash with a private history wrapper and serves its live snapshot', () => {
+        const fakeSpawn = installFakeSpawn()
+        process.env.SHELL = '/bin/bash'
+        const manager = new TerminalManager({
+            sessionId: 'session-1',
+            getSessionPath: () => '/tmp',
+            onReady: () => {},
+            onOutput: () => {},
+            onExit: () => {},
+            onError: () => {},
+            idleTimeoutMs: 0
+        })
+
+        manager.create('terminal-1', 80, 24)
+
+        expect(fakeSpawn.latestCommand).toEqual(['/bin/bash', '--rcfile', expect.any(String)])
+        expect(fakeSpawn.latestEnv?.HAPI_HISTORY_SNAPSHOT).toEqual(expect.any(String))
+        expect(manager.getHistory({
+            sessionId: 'session-1',
+            terminalId: 'terminal-1',
+            requestId: 'request-1',
+            limit: 20
+        })).toMatchObject({
+            status: 'not_ready',
+            shell: 'bash',
+            entries: []
+        })
+
+        const snapshotPath = fakeSpawn.latestEnv!.HAPI_HISTORY_SNAPSHOT!
+        writeFileSync(snapshotPath, '  4  pwd\n  5  git status\n')
+        expect(manager.getHistory({
+            sessionId: 'session-1',
+            terminalId: 'terminal-1',
+            requestId: 'request-2',
+            limit: 20
+        })).toMatchObject({
+            status: 'ok',
+            entries: [
+                { index: 5, command: 'git status' },
+                { index: 4, command: 'pwd' }
+            ]
+        })
+
+        const runtimeDirectory = dirname(snapshotPath)
+        manager.close('terminal-1')
+        expect(existsSync(runtimeDirectory)).toBe(false)
+    })
+
+    it('keeps non-Bash terminals working and reports history as unsupported', () => {
+        const fakeSpawn = installFakeSpawn()
+        process.env.SHELL = '/bin/zsh'
+        const manager = new TerminalManager({
+            machineId: 'machine-1',
+            getSessionPath: () => '/tmp',
+            onReady: () => {},
+            onOutput: () => {},
+            onExit: () => {},
+            onError: () => {},
+            idleTimeoutMs: 0
+        })
+
+        manager.create('terminal-1', 80, 24)
+
+        expect(fakeSpawn.latestCommand).toEqual(['/bin/zsh'])
+        expect(manager.getHistory({
+            machineId: 'machine-1',
+            terminalId: 'terminal-1',
+            requestId: 'request-1'
+        })).toMatchObject({
+            status: 'unsupported_shell',
+            shell: 'zsh',
+            entries: []
+        })
     })
 
     it('replays buffered output when reattaching to an existing terminal', () => {

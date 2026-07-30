@@ -1,6 +1,7 @@
 import {
     TerminalErrorPayloadSchema,
     TerminalExitPayloadSchema,
+    TerminalHistoryResultSchema,
     TerminalListPayloadSchema,
     TerminalOutputPayloadSchema,
     TerminalReadyPayloadSchema,
@@ -10,6 +11,10 @@ import {
 import type { StoredMachine, StoredSession } from '../../../store'
 import type { TerminalRegistry } from '../../terminalRegistry'
 import type { TerminalSessionStateStore } from '../../terminalSessionState'
+import {
+    TerminalHistoryRequestRegistry,
+    type TerminalHistoryScope
+} from '../../terminalHistoryRequests'
 import type { CliSocketWithData, SocketServer, SocketWithData } from '../../socketTypes'
 import { terminalScopeRoom } from '../../terminalRooms'
 import type { AccessErrorReason, AccessResult } from './types'
@@ -31,6 +36,7 @@ const terminalWarningSchema = TerminalWarningPayloadSchema
 
 export type TerminalHandlersDeps = {
     terminalRegistry: TerminalRegistry
+    terminalHistoryRequests?: TerminalHistoryRequestRegistry
     terminalSessionState?: TerminalSessionStateStore
     terminalNamespace: SocketNamespace
     resolveSessionAccess: ResolveSessionAccess
@@ -41,6 +47,7 @@ export type TerminalHandlersDeps = {
 
 export function registerTerminalHandlers(socket: CliSocketWithData, deps: TerminalHandlersDeps): void {
     const { terminalRegistry, terminalSessionState, terminalNamespace, resolveSessionAccess, resolveMachineAccess, emitAccessError, resolveCapability } = deps
+    const terminalHistoryRequests = deps.terminalHistoryRequests ?? new TerminalHistoryRequestRegistry()
 
     const authorizeTypedScope = (scope: TerminalScopeTyped): string | null => {
         if (scope.scopeType === 'session') {
@@ -224,9 +231,57 @@ export function registerTerminalHandlers(socket: CliSocketWithData, deps: Termin
 
         forwardTerminalEvent('terminal:error', parsed.data, true)
     })
+
+    socket.on('terminal:history-result', (data: unknown) => {
+        const parsed = TerminalHistoryResultSchema.safeParse(data)
+        if (!parsed.success) {
+            return
+        }
+        const scope: TerminalHistoryScope = 'sessionId' in parsed.data
+            ? { sessionId: parsed.data.sessionId }
+            : { machineId: parsed.data.machineId }
+        const typedScope: TerminalScopeTyped = 'sessionId' in scope
+            ? { scopeType: 'session', sessionId: scope.sessionId }
+            : { scopeType: 'machine', machineId: scope.machineId }
+        const namespace = authorizeTypedScope(typedScope)
+        if (!namespace) {
+            return
+        }
+        const entry = terminalRegistry.get(parsed.data.terminalId)
+        if (
+            !entry
+            || entry.cliSocketId !== socket.id
+            || entry.namespace !== namespace
+            || entry.sessionId !== ('sessionId' in scope ? scope.sessionId : undefined)
+            || entry.machineId !== ('machineId' in scope ? scope.machineId : undefined)
+        ) {
+            return
+        }
+
+        const pending = terminalHistoryRequests.consume(parsed.data.requestId, {
+            cliSocketId: socket.id,
+            terminalId: parsed.data.terminalId,
+            namespace,
+            scope
+        })
+        if (!pending) {
+            return
+        }
+        const webSocket = terminalNamespace.sockets.get(pending.webSocketId)
+        webSocket?.emit('terminal:history-result', {
+            ...parsed.data,
+            requestId: pending.webRequestId
+        })
+    })
 }
 
-export function cleanupTerminalHandlers(socket: CliSocketWithData, deps: { terminalRegistry: TerminalRegistry; terminalNamespace: SocketNamespace; resolveCapability: ResourceCapabilityResolver }): void {
+export function cleanupTerminalHandlers(socket: CliSocketWithData, deps: {
+    terminalRegistry: TerminalRegistry
+    terminalHistoryRequests?: TerminalHistoryRequestRegistry
+    terminalNamespace: SocketNamespace
+    resolveCapability: ResourceCapabilityResolver
+}): void {
+    deps.terminalHistoryRequests?.removeByCliSocket(socket.id)
     const removed = deps.terminalRegistry.removeByCliSocket(socket.id)
     for (const entry of removed) {
         const terminalSocket = deps.terminalNamespace.sockets.get(entry.socketId)

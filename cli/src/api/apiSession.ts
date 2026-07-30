@@ -14,9 +14,11 @@ import type { MarkTeamMentionNoActionInput, ReportToTeamInput, SessionEndReason,
 import { TeamChatMessageSchema, TeamMentionRequestSchema } from '@hapi/protocol/schemas'
 import type { ClientToServerEvents, ServerToClientEvents, Update } from '@hapi/protocol'
 import {
+    CLI_CAPABILITIES,
     TerminalCloseAllPayloadSchema,
     TerminalClosePayloadSchema,
     TerminalDetachPayloadSchema,
+    TerminalHistoryRequestSchema,
     TerminalKeepalivePayloadSchema,
     TerminalListRequestSchema,
     TerminalOpenPayloadSchema,
@@ -123,7 +125,7 @@ export class ApiSessionClient extends EventEmitter {
             registerCommonHandlers(this.rpcHandlerManager, this.metadata.path)
         }
 
-        const socketAuth = { kind: 'runner' as const, credential: auth.credential, machineId: auth.machineId, clientType: 'session-scoped' as const, sessionId: this.sessionId }
+        const socketAuth = { kind: 'runner' as const, credential: auth.credential, machineId: auth.machineId, clientType: 'session-scoped' as const, sessionId: this.sessionId, capabilities: CLI_CAPABILITIES }
         this.socket = io(`${configuration.apiUrl}/cli`, {
             auth: socketAuth,
             path: '/socket.io/',
@@ -219,6 +221,10 @@ export class ApiSessionClient extends EventEmitter {
 
         this.socket.on('terminal:detach', handleTerminalEvent(TerminalDetachPayloadSchema, (payload) => {
             this.terminalManager.detach(payload.terminalId)
+        }))
+
+        this.socket.on('terminal:history', handleTerminalEvent(TerminalHistoryRequestSchema, (payload) => {
+            this.socket.emit('terminal:history-result', this.terminalManager.getHistory(payload))
         }))
 
         this.socket.on('terminal:list', (data: unknown) => {

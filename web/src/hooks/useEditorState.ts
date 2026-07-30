@@ -62,11 +62,33 @@ export type InitialEditorState = {
     activeSessionId?: string | null
 }
 
+function dedupeSessionTerminalTabs(tabs: EditorTab[]): EditorTab[] {
+    const seenSessionIds = new Set<string>()
+
+    return tabs.filter((tab) => {
+        if (tab.type !== 'terminal' || !tab.sessionId) {
+            return true
+        }
+        if (seenSessionIds.has(tab.sessionId)) {
+            return false
+        }
+        seenSessionIds.add(tab.sessionId)
+        return true
+    })
+}
+
 export function useEditorState(initialMachine?: string, initialProject?: string, initialState?: InitialEditorState): UseEditorStateResult {
-    const initialTabs = initialState?.tabs ?? []
+    const persistedTabs = initialState?.tabs ?? []
+    const initialTabs = dedupeSessionTerminalTabs(persistedTabs)
+    const persistedActiveTab = initialState?.activeTabId
+        ? persistedTabs.find((tab) => tab.id === initialState.activeTabId)
+        : undefined
+    const restoredActiveTab = persistedActiveTab?.type === 'terminal' && persistedActiveTab.sessionId
+        ? initialTabs.find((tab) => tab.type === 'terminal' && tab.sessionId === persistedActiveTab.sessionId)
+        : undefined
     const initialActiveTabId = initialState?.activeTabId && initialTabs.some(tab => tab.id === initialState.activeTabId)
         ? initialState.activeTabId
-        : initialTabs[0]?.id ?? null
+        : restoredActiveTab?.id ?? initialTabs[0]?.id ?? null
     const [machineId, setMachineId] = useState<string | null>(initialMachine ?? initialState?.machineId ?? null)
     const [projectPath, setProjectPath] = useState<string | null>(initialProject ?? initialState?.projectPath ?? null)
     const [tabs, setTabsState] = useState<EditorTab[]>(initialTabs)
@@ -118,6 +140,15 @@ export function useEditorState(initialMachine?: string, initialProject?: string,
         const cwd = options && typeof options === 'object' && typeof options.cwd === 'string' && options.cwd.trim()
             ? options.cwd
             : undefined
+        if (sessionId) {
+            const existingSessionTerminal = tabsRef.current.find(
+                (tab) => tab.type === 'terminal' && tab.sessionId === sessionId
+            )
+            if (existingSessionTerminal) {
+                setActiveTabId(existingSessionTerminal.id)
+                return
+            }
+        }
         const terminalCount = tabsRef.current.filter((tab) => tab.type === 'terminal').length
         const newTab: EditorTab = {
             id: generateTabId(),

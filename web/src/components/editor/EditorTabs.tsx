@@ -14,7 +14,13 @@ import { TextMessagePartProvider } from '@assistant-ui/react'
 import type { EditorTab } from '@/hooks/useEditorState'
 import type { ApiClient, ApiError } from '@/api/client'
 import { FileIcon } from '@/components/FileIcon'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 import { useEditorFile } from '@/hooks/queries/useEditorFile'
 import { MARKDOWN_PLUGINS, MARKDOWN_REHYPE_PLUGINS } from '@/components/assistant-ui/markdown-text'
 import { SyntaxHighlighter } from '@/components/assistant-ui/shiki-highlighter'
@@ -857,7 +863,7 @@ export function EditorTabs(props: {
                 )}
             </div>
 
-            <Dialog
+            <AppDialog
                 open={pendingCloseTab !== null}
                 onOpenChange={(open) => {
                     if (open || (pendingCloseTab && savingTabId === pendingCloseTab.id)) return
@@ -866,14 +872,17 @@ export function EditorTabs(props: {
                 }}
             >
                 {pendingCloseTab && (
-                    <DialogContent className="bottom-0 top-auto w-full max-w-none translate-y-0 rounded-b-none rounded-t-xl p-4 sm:max-w-md sm:left-1/2 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:p-6">
-                        <div className="mx-auto flex max-w-md flex-col gap-3">
-                            <DialogHeader>
-                                <DialogTitle>Close unsaved tab?</DialogTitle>
-                                <DialogDescription>{pendingCloseTab.label} has unsaved changes.</DialogDescription>
-                            </DialogHeader>
-                            {pendingCloseError && <div className="text-xs text-red-500">{pendingCloseError}</div>}
-                            <div className="flex flex-col gap-2">
+                    <AppDialogContent presentation="alert" className="max-w-md">
+                        <AppDialogHeader
+                            title="Close unsaved tab?"
+                            subtitle={`${pendingCloseTab.label} has unsaved changes.`}
+                        />
+                        {pendingCloseError ? (
+                            <AppDialogBody className="px-4 pt-3 text-xs text-red-500">
+                                {pendingCloseError}
+                            </AppDialogBody>
+                        ) : null}
+                        <AppDialogFooter className="mx-auto w-full max-w-md flex-col">
                                 <button
                                     type="button"
                                     className="rounded bg-[#6366f1] px-3 py-2 text-sm text-white disabled:opacity-50"
@@ -901,11 +910,10 @@ export function EditorTabs(props: {
                                 >
                                     Cancel
                                 </button>
-                            </div>
-                        </div>
-                    </DialogContent>
+                        </AppDialogFooter>
+                    </AppDialogContent>
                 )}
-            </Dialog>
+            </AppDialog>
         </div>
     )
 }

@@ -5,11 +5,16 @@ import { useAppContext } from '@/lib/app-context'
 import { useTranslation } from '@/lib/use-translation'
 import { useMachines } from '@/hooks/queries/useMachines'
 import { queryKeys } from '@/lib/query-keys'
-import { DialogContent, DialogTitle, DialogHeader, DialogDescription } from '@/components/ui/dialog'
+import { AppDialogBody, AppDialogContent, AppDialogHeader } from '@/components/ui/app-dialog'
 import { NewSession } from '@/components/NewSession'
+import type { NewSessionDraft } from '@/components/NewSession/types'
 import type { RootSearch } from '@/router'
 
-export function NewSessionModal(props: { onClose: () => void }) {
+export function NewSessionModal(props: {
+    onClose: () => void
+    draft?: NewSessionDraft | null
+    onDraftChange?: (draft: NewSessionDraft) => void
+}) {
     const { api } = useAppContext()
     const navigate = useNavigate()
     const queryClient = useQueryClient()
@@ -18,6 +23,13 @@ export function NewSessionModal(props: { onClose: () => void }) {
     const search = useSearch({ strict: false }) as RootSearch
     const initialDirectory = search.modalPath
     const initialMachineId = search.modalMachineId
+    const initialDraft = props.draft
+        ? {
+            ...props.draft,
+            machineId: initialMachineId ?? props.draft.machineId,
+            directory: initialDirectory ?? props.draft.directory,
+        }
+        : null
 
     const handleSuccess = useCallback((sessionId: string) => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.sessions })
@@ -131,19 +143,20 @@ export function NewSessionModal(props: { onClose: () => void }) {
                 ...prev,
                 modal: 'browser',
                 modalMachineId: args.machineId,
+                modalPath: args.directory || undefined,
+                modalParent: 'new-session',
                 modalReturnTo: search.modalReturnTo
             })
         } as any)
     }, [navigate, search.modalReturnTo])
 
     return (
-        <DialogContent className="flex flex-col max-h-[85vh] w-[95vw] max-w-2xl p-0 gap-0 overflow-hidden">
-            <DialogHeader className="p-4 pb-3 border-b border-[var(--app-border)]">
-                <DialogTitle className="text-xl font-semibold">{t('newSession.title')}</DialogTitle>
-                <DialogDescription className="sr-only">Create a new session</DialogDescription>
-            </DialogHeader>
-
-            <div className="app-scroll-y p-4">
+        <AppDialogContent
+            presentation="workspace"
+            className="max-h-[85vh] w-[95vw] max-w-2xl"
+        >
+            <AppDialogHeader title={t('newSession.title')} subtitle="Create a new session" />
+            <AppDialogBody className="app-scroll-y p-4">
                 {machinesError ? (
                     <div className="mb-3 p-3 text-sm text-red-600 rounded bg-red-50">
                         {machinesError}
@@ -159,8 +172,10 @@ export function NewSessionModal(props: { onClose: () => void }) {
                     onChooseFolder={handleChooseFolder}
                     initialDirectory={initialDirectory}
                     initialMachineId={initialMachineId}
+                    initialDraft={initialDraft}
+                    onDraftChange={props.onDraftChange}
                 />
-            </div>
-        </DialogContent>
+            </AppDialogBody>
+        </AppDialogContent>
     )
 }

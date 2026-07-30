@@ -10,6 +10,13 @@ import { EditorTabs } from './EditorTabs'
 import { EditorTerminal } from './EditorTerminal'
 import { useTranslation } from '@/lib/use-translation'
 import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 
 export type MobileEditorView = 'files' | 'editor' | 'git' | 'chat' | 'terminal'
 
@@ -157,17 +164,15 @@ function MobileConfirmModal(props: {
         })
         : null
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3" role="presentation">
-            <div className="w-full max-w-sm rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 shadow-xl" role="dialog" aria-modal="true">
-                <div className="text-sm font-semibold text-[var(--app-fg)]">
-                    {isDelete ? 'Delete archived session?' : 'Archive session?'}
-                </div>
-                <div className="mt-1 whitespace-pre-line text-xs text-[var(--app-hint)]">
-                    {isDelete
+        <AppDialog open onOpenChange={(open) => !open && props.onCancel()}>
+            <AppDialogContent presentation="alert" dismissible={false} className="max-w-sm">
+                <AppDialogHeader
+                    title={isDelete ? 'Delete archived session?' : 'Archive session?'}
+                    subtitle={isDelete
                         ? 'This permanently removes the archived session and its messages.'
                         : archiveDescription}
-                </div>
-                <div className="mt-4 flex justify-end gap-2">
+                />
+                <AppDialogFooter>
                     <button
                         type="button"
                         className="rounded-md border border-[var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[var(--app-fg)]"
@@ -182,9 +187,9 @@ function MobileConfirmModal(props: {
                     >
                         {isDelete ? 'Delete' : 'Archive'}
                     </button>
-                </div>
-            </div>
-        </div>
+                </AppDialogFooter>
+            </AppDialogContent>
+        </AppDialog>
     )
 }
 
@@ -201,15 +206,14 @@ function MobileNewFileModal(props: {
     if (!props.open) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3" role="presentation">
-            <div
-                className="w-full max-w-sm rounded-xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 shadow-xl"
-                role="dialog"
-                aria-modal="true"
-                aria-label="New file"
-            >
-                <div className="text-sm font-semibold text-[var(--app-fg)]">New file</div>
-                <div className="mt-1 text-xs text-[var(--app-hint)]">Create inside</div>
+        <AppDialog open onOpenChange={(open) => !open && props.onCancel()}>
+            <AppDialogContent presentation="alert" dismissible={false} className="max-w-sm">
+                <AppDialogHeader
+                    title="New file"
+                    subtitle="Create inside"
+                    closeDisabled={props.isCreating}
+                />
+                <AppDialogBody className="p-4">
                 <div className="mt-1 truncate rounded-md border border-[var(--app-border)] bg-[var(--app-subtle-bg)] px-2 py-1.5 text-xs text-[var(--app-fg)]">
                     {props.parentPath ?? 'Select a project first'}
                 </div>
@@ -236,7 +240,8 @@ function MobileNewFileModal(props: {
                         {props.error}
                     </div>
                 ) : null}
-                <div className="mt-4 flex justify-end gap-2">
+                </AppDialogBody>
+                <AppDialogFooter>
                     <button
                         type="button"
                         className="rounded-md border border-[var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[var(--app-fg)] disabled:opacity-60"
@@ -253,9 +258,9 @@ function MobileNewFileModal(props: {
                     >
                         {props.isCreating ? 'Creating...' : 'Create'}
                     </button>
-                </div>
-            </div>
-        </div>
+                </AppDialogFooter>
+            </AppDialogContent>
+        </AppDialog>
     )
 }
 

@@ -128,9 +128,13 @@ export class SSEManager {
                 continue
             }
 
-            void Promise.resolve(connection.send(event)).catch(() => {
+            try {
+                void Promise.resolve(connection.send(event)).catch(() => {
+                    this.unsubscribe(connection.id)
+                })
+            } catch {
                 this.unsubscribe(connection.id)
-            })
+            }
         }
     }
 
@@ -203,6 +207,10 @@ export class SSEManager {
 
         if (event.type === 'shared-hub-updated') {
             return connection.all && connection.organizationRole === 'admin'
+        }
+
+        if (event.type === 'terminal-snippets-updated') {
+            return true
         }
 
         const resource = this.resourceForEvent(event)

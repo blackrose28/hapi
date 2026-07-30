@@ -72,7 +72,7 @@ function ChevronDownIcon(props: { className?: string }) {
     )
 }
 
-import { DialogContent, DialogTitle, DialogHeader, DialogDescription } from '@/components/ui/dialog'
+import { AppDialogBody, AppDialogContent, AppDialogHeader } from '@/components/ui/app-dialog'
 
 
 export function SettingsModal(props: { onClose: () => void }) {
@@ -180,13 +180,17 @@ export function SettingsModal(props: { onClose: () => void }) {
     }, [isOpen, isAppearanceOpen, isFontOpen, isTerminalFontOpen, isVoiceOpen])
 
     return (
-        <DialogContent className="flex flex-col max-h-[85vh] w-[95vw] max-w-2xl p-0 gap-0 overflow-hidden">
-            <DialogHeader className="p-4 pb-2 border-b border-[var(--app-border)]">
-                <DialogTitle className="text-xl font-semibold">{t('settings.title')}</DialogTitle>
-                <DialogDescription className="sr-only">Settings</DialogDescription>
-            </DialogHeader>
-
-            <div className="app-scroll-y flex-1 min-h-0 bg-[var(--app-bg)]">
+        <AppDialogContent
+            presentation="workspace"
+            className="max-h-[85vh] w-[95vw] max-w-2xl"
+        >
+            <AppDialogHeader
+                title={t('settings.title')}
+                mobileNavigation="back"
+                mobileBackLabel="Back"
+                onMobileBack={props.onClose}
+            />
+            <AppDialogBody className="app-scroll-y bg-[var(--app-bg)]">
                 <div className="mx-auto w-full max-w-content pb-4">
                     {/* Language section */}
                     <div className="border-b border-[var(--app-divider)]">
@@ -484,7 +488,7 @@ export function SettingsModal(props: { onClose: () => void }) {
                         </div>
                     </div>
                 </div>
-            </div>
-        </DialogContent>
+            </AppDialogBody>
+        </AppDialogContent>
     )
 }

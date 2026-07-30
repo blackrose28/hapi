@@ -17,6 +17,7 @@
     --app-border: rgba(0, 0, 0, 0.1);
     --app-divider: rgba(0, 0, 0, 0.08);
     --app-subtle-bg: rgba(0, 0, 0, 0.05);
+    --app-terminal-selection-bg: rgba(79, 70, 229, 0.36);
     --app-code-bg: #f6f8fa;
     --app-inline-code-bg: rgba(0, 0, 0, 0.08);
 
@@ -83,6 +84,7 @@
     --app-border: rgba(255, 255, 255, 0.1);
     --app-divider: rgba(255, 255, 255, 0.08);
     --app-subtle-bg: rgba(255, 255, 255, 0.05);
+    --app-terminal-selection-bg: rgba(129, 140, 248, 0.40);
     --app-code-bg: #282c34;
     --app-inline-code-bg: rgba(255, 255, 255, 0.1);
 
@@ -758,6 +760,341 @@ html[data-theme="dark"] .shiki span {
 
     .activity-row,
     .processing-card {
+        transition: none;
+        transform: none !important;
+    }
+}
+
+/* ─── Compact Agent Mode composer ─────────────────────────────────────────── */
+
+.compact-composer {
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--app-fg) 11%, transparent);
+    border-radius: 999px;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--app-fg) 2%, transparent), transparent),
+        var(--app-secondary-bg);
+    box-shadow:
+        0 1px 0 color-mix(in srgb, var(--app-fg) 4%, transparent),
+        0 8px 24px color-mix(in srgb, var(--app-fg) 4%, transparent);
+    transition: border-radius 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.compact-composer:focus-within {
+    border-color: color-mix(in srgb, #7c6cff 62%, var(--app-border));
+    box-shadow:
+        0 0 0 3px color-mix(in srgb, #7c6cff 11%, transparent),
+        0 10px 28px color-mix(in srgb, var(--app-fg) 5%, transparent);
+}
+
+.compact-composer[data-multiline="true"],
+.compact-composer[data-has-attachments="true"] {
+    border-radius: 18px;
+}
+
+.compact-composer__attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 8px 0;
+}
+
+.compact-composer__attachments > * {
+    min-width: 0;
+    max-width: 100%;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.compact-composer__row {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+    padding: 6px;
+}
+
+.compact-composer[data-multiline="true"] .compact-composer__row {
+    align-items: flex-end;
+}
+
+.compact-composer__input {
+    min-width: 0;
+    min-height: 24px;
+    max-height: 7rem;
+    flex: 1 1 auto;
+    resize: none;
+    overflow-y: auto;
+    border: 0;
+    background: transparent;
+    padding: 3px 2px;
+    color: var(--app-fg);
+    font-size: 0.8125rem;
+    line-height: 1.35rem;
+    scrollbar-color: color-mix(in srgb, var(--app-hint) 55%, transparent) transparent;
+    scrollbar-width: thin;
+}
+
+.compact-composer__input::placeholder {
+    color: var(--app-hint);
+}
+
+.compact-composer__input:focus {
+    outline: none;
+}
+
+.compact-composer__input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.compact-composer__input::-webkit-scrollbar {
+    width: 5px;
+}
+
+.compact-composer__input::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.compact-composer__input::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-hint) 55%, transparent);
+}
+
+.compact-composer__attachment,
+.compact-composer__action {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.compact-composer__attachment {
+    color: var(--app-hint);
+}
+
+.compact-composer__attachment:hover:not(:disabled) {
+    border-color: var(--app-border);
+    background: var(--app-subtle-bg);
+    color: var(--app-fg);
+}
+
+.compact-composer__action[data-state="idle"] {
+    background: color-mix(in srgb, var(--app-hint) 35%, transparent);
+    color: color-mix(in srgb, var(--app-bg) 88%, white);
+}
+
+.compact-composer__action[data-state="ready"] {
+    background: linear-gradient(145deg, #8b7cff, #6856e8);
+    color: #fff;
+    box-shadow: 0 5px 14px rgb(105 86 232 / 28%);
+}
+
+.compact-composer__action[data-state="running"] {
+    background: linear-gradient(145deg, #ff625f, #dc3f45);
+    color: #fff;
+    box-shadow: 0 5px 14px rgb(220 63 69 / 24%);
+}
+
+.compact-composer__attachment:hover:not(:disabled),
+.compact-composer__action:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.compact-composer__attachment:focus-visible,
+.compact-composer__action:focus-visible,
+.compact-runtime-controls__switch:focus-visible,
+.compact-runtime-controls select:focus-visible {
+    outline: 2px solid color-mix(in srgb, #7c6cff 72%, white);
+    outline-offset: 2px;
+}
+
+.compact-composer__attachment:disabled,
+.compact-composer__action:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+}
+
+.compact-composer__status {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 6px 3px max(4px, env(safe-area-inset-bottom));
+    container-type: inline-size;
+}
+
+.compact-composer__telemetry {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 9px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.compact-runtime-controls {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+}
+
+.compact-runtime-controls__selectors {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+}
+
+.compact-runtime-controls__switch {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 26px;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-subtle-bg);
+    color: var(--app-hint);
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.compact-runtime-controls__switch:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--app-link) 30%, var(--app-border));
+    background: var(--app-secondary-bg);
+    color: var(--app-link);
+}
+
+.compact-runtime-controls__switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.compact-runtime-controls__field {
+    display: block;
+    min-width: 0;
+}
+
+.compact-runtime-controls select {
+    display: block;
+    width: 100%;
+    max-width: 118px;
+    height: 26px;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 7px;
+    background: var(--app-subtle-bg);
+    padding: 0 20px 0 7px;
+    color: var(--app-hint);
+    font-size: 0.625rem;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.compact-runtime-controls select:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--app-link) 30%, var(--app-border));
+    background: var(--app-secondary-bg);
+    color: var(--app-fg);
+}
+
+.compact-runtime-controls select:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+@container (max-width: 520px) {
+    .compact-composer__telemetry {
+        width: 100%;
+        min-height: 18px;
+        flex: 1 0 100%;
+        padding: 0 2px;
+    }
+
+    .compact-runtime-controls {
+        width: 100%;
+        flex: 1 0 100%;
+        gap: 6px;
+    }
+
+    .compact-runtime-controls__selectors {
+        display: grid;
+        min-width: 0;
+        flex: 1 1 auto;
+        grid-template-columns: repeat(var(--compact-runtime-control-count), minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .compact-runtime-controls__switch {
+        width: 30px;
+        height: 30px;
+        flex-basis: 30px;
+    }
+
+    .compact-runtime-controls select {
+        max-width: none;
+        height: 30px;
+        padding-right: 18px;
+        font-size: 0.6875rem;
+    }
+}
+
+/* Fallback for browsers without container query support. */
+@media (max-width: 520px) {
+    .compact-composer__telemetry {
+        width: 100%;
+        min-height: 18px;
+        flex: 1 0 100%;
+        padding: 0 2px;
+    }
+
+    .compact-runtime-controls {
+        width: 100%;
+        flex: 1 0 100%;
+        gap: 6px;
+    }
+
+    .compact-runtime-controls__selectors {
+        display: grid;
+        min-width: 0;
+        flex: 1 1 auto;
+        grid-template-columns: repeat(var(--compact-runtime-control-count), minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .compact-runtime-controls__switch {
+        width: 30px;
+        height: 30px;
+        flex-basis: 30px;
+    }
+
+    .compact-runtime-controls select {
+        max-width: none;
+        height: 30px;
+        padding-right: 18px;
+        font-size: 0.6875rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .compact-composer,
+    .compact-composer__attachment,
+    .compact-composer__action,
+    .compact-runtime-controls__switch,
+    .compact-runtime-controls select {
         transition: none;
         transform: none !important;
     }

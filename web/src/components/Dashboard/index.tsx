@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import type { Ref } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import type { RootSearch } from '@/router'
@@ -237,9 +238,11 @@ interface PinnedPanelProps {
     isActive?: boolean
     onFocus?: () => void
     onFocusSession?: () => void
+    onCloseFocus?: () => void
+    closeButtonRef?: Ref<HTMLButtonElement>
 }
 
-function PinnedPanel({ sessionId, api, onUnpin, onSessionResolved, pinIndex, compact, isActive, onFocus, onFocusSession }: PinnedPanelProps) {
+function PinnedPanel({ sessionId, api, onUnpin, onSessionResolved, pinIndex, compact, isActive, onFocus, onFocusSession, onCloseFocus, closeButtonRef }: PinnedPanelProps) {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { session, refetch: refetchSession } = useSession(api, sessionId)
@@ -266,7 +269,7 @@ function PinnedPanel({ sessionId, api, onUnpin, onSessionResolved, pinIndex, com
         return await getSlashSuggestions(query)
     }, [getSkillSuggestions, getSlashSuggestions])
 
-    const { sendMessage, retryMessage, isSending } = useSendMessage(api, sessionId, {
+    const { sendMessage, retryMessage, isSending, sendStatus } = useSendMessage(api, sessionId, {
         isSessionThinking: session?.thinking ?? false,
         onSuccess: (sentSessionId) => {
             clearDraftsAfterSend(sentSessionId, sessionId)
@@ -328,9 +331,11 @@ function PinnedPanel({ sessionId, api, onUnpin, onSessionResolved, pinIndex, com
                 isLoadingMessages={messagesLoading}
                 isLoadingMoreMessages={messagesLoadingMore}
                 isSending={isSending}
+                compactSendStatus={sendStatus}
                 pendingCount={pendingCount}
                 messagesVersion={messagesVersion}
-                onBack={onUnpin}
+                onBack={onCloseFocus ?? onUnpin}
+                onSessionDeleted={onUnpin}
                 onRefresh={refreshSession}
                 onLoadMore={loadMoreMessages}
                 onSend={(text: string, attachments?: AttachmentMetadata[]) => sendMessage(text, attachments)}
@@ -341,8 +346,11 @@ function PinnedPanel({ sessionId, api, onUnpin, onSessionResolved, pinIndex, com
                 availableSlashCommands={slashCommands}
                 disableVoice
                 compactMode={true}
+                compactComposerMode={true}
                 pinIndex={pinIndex}
                 onFocusSession={onFocusSession}
+                compactCloseLabel={onCloseFocus ? 'Close focus session' : undefined}
+                compactCloseButtonRef={closeButtonRef}
             />
 
         </div>
@@ -1628,21 +1636,12 @@ export function Dashboard({ api }: DashboardProps) {
                                         if (s.id === modalNewSessionId) clearNewSessionHighlight()
                                     }}
                                 >
-                                    {isFocused ? (
-                                        <button
-                                            ref={focusedCloseButtonRef}
-                                            type="button"
-                                            aria-label="Close focus session"
-                                            className="db__pinned-focus-close"
-                                            onClick={closeFocusedPinnedSession}
-                                        >
-                                            Close
-                                        </button>
-                                    ) : null}
                                     <PinnedPanel
                                         sessionId={s.id}
                                         api={api}
                                         onUnpin={() => handleUnpin(s.id)}
+                                        onCloseFocus={isFocused ? closeFocusedPinnedSession : undefined}
+                                        closeButtonRef={isFocused ? focusedCloseButtonRef : undefined}
                                         onSessionResolved={(newId) => {
                                             setPinnedIds(prev => prev.map(id => id === s.id ? newId : id))
                                             setFocusedPinnedSessionId(current => current === s.id ? newId : current)

@@ -299,6 +299,56 @@ export const TerminalErrorPayloadSchema = z.union([
 ])
 
 export type TerminalErrorPayload = z.infer<typeof TerminalErrorPayloadSchema>
+
+export const TerminalHistoryEntrySchema = z.object({
+    index: z.number().int().nonnegative(),
+    command: z.string().min(1)
+}).strict()
+export type TerminalHistoryEntry = z.infer<typeof TerminalHistoryEntrySchema>
+
+export const TERMINAL_HISTORY_CLI_CAPABILITY = 'terminal-history-v1' as const
+export const CLI_CAPABILITIES = [TERMINAL_HISTORY_CLI_CAPABILITY] as const
+export const CliCapabilitySchema = z.enum(CLI_CAPABILITIES)
+export const CliCapabilitiesSchema = z.array(
+    z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9._:-]*$/)
+).max(32)
+export type CliCapability = z.infer<typeof CliCapabilitySchema>
+
+export const TerminalHistoryStatusSchema = z.enum([
+    'ok',
+    'unsupported_shell',
+    'not_ready',
+    'read_failed',
+    'cli_outdated'
+])
+export type TerminalHistoryStatus = z.infer<typeof TerminalHistoryStatusSchema>
+
+const TerminalHistoryRequestShape = {
+    terminalId: z.string().min(1),
+    requestId: z.string().min(1),
+    limit: z.number().int().min(1).max(100).optional()
+}
+
+export const TerminalHistoryRequestSchema = z.union([
+    z.object({ sessionId: z.string().min(1), ...TerminalHistoryRequestShape }).strict(),
+    z.object({ machineId: z.string().min(1), ...TerminalHistoryRequestShape }).strict()
+])
+export type TerminalHistoryRequest = z.infer<typeof TerminalHistoryRequestSchema>
+
+const TerminalHistoryResultShape = {
+    terminalId: z.string().min(1),
+    requestId: z.string().min(1),
+    status: TerminalHistoryStatusSchema,
+    shell: z.string().min(1).optional(),
+    entries: z.array(TerminalHistoryEntrySchema).max(100)
+}
+
+export const TerminalHistoryResultSchema = z.union([
+    z.object({ sessionId: z.string().min(1), ...TerminalHistoryResultShape }).strict(),
+    z.object({ machineId: z.string().min(1), ...TerminalHistoryResultShape }).strict()
+])
+export type TerminalHistoryResult = z.infer<typeof TerminalHistoryResultSchema>
+
 export const SessionEndReasonSchema = z.enum(['completed', 'terminated', 'error'])
 export type SessionEndReason = z.infer<typeof SessionEndReasonSchema>
 
@@ -366,6 +416,7 @@ export interface ServerToClientEvents {
     'terminal:list': (data: TerminalListRequest) => void
     'terminal:keepalive': (data: TerminalKeepalivePayload) => void
     'terminal:close-all': (data: TerminalCloseAllPayload) => void
+    'terminal:history': (data: TerminalHistoryRequest) => void
     error: (data: { message: string; code?: SocketErrorReason; scope?: 'session' | 'machine'; id?: string }) => void
 }
 
@@ -452,6 +503,7 @@ export interface ClientToServerEvents {
     'terminal:error': (data: TerminalErrorPayload) => void
     'terminal:list': (data: TerminalListPayload) => void
     'terminal:warning': (data: TerminalWarningPayload) => void
+    'terminal:history-result': (data: TerminalHistoryResult) => void
     ping: (callback: () => void) => void
     'usage-report': (data: unknown) => void
 }

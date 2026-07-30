@@ -62,6 +62,16 @@ export type StoredPushSubscription = {
     createdAt: number
 }
 
+export type StoredTerminalSnippet = {
+    id: string
+    namespace: string
+    name: string
+    command: string
+    description: string | null
+    createdAt: number
+    updatedAt: number
+}
+
 export type StoredTeamChat = {
     id: string
     namespace: string

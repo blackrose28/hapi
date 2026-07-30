@@ -16,6 +16,13 @@ import { getModelOptionsForFlavor } from '@/components/AssistantChat/modelOption
 import { getClaudeComposerEffortOptions } from '@/components/AssistantChat/claudeEffortOptions'
 import { getCodexComposerReasoningEffortOptions } from '@/components/AssistantChat/codexReasoningEffortOptions'
 import { cn } from '@/lib/utils'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 import { getParticipantAccent } from './teamColors'
 
 type AttentionItem =
@@ -721,26 +728,20 @@ export function TeamChatRightPanel(props: {
                 ) : null}
             </div>
             {isAddingMember ? (
-                <div
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Add member"
-                    className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+                <AppDialog
+                    open
+                    onOpenChange={(open) => !open && setIsAddingMember(false)}
                 >
-                    <div className="flex h-full w-full flex-col border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-fg)] shadow-2xl sm:h-auto sm:max-h-[calc(100vh-32px)] sm:max-w-3xl sm:rounded-2xl lg:max-w-5xl">
-                        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
-                            <div>
-                                <div className="text-base font-semibold">Add member</div>
-                                <div className="mt-0.5 text-xs text-[var(--app-hint)]">Add an existing session or create a new one with a Team alias.</div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsAddingMember(false)}
-                                className="rounded-md border border-[var(--app-border)] px-2.5 py-1 text-sm text-[var(--app-fg)] transition-colors hover:bg-[var(--app-secondary-bg)]"
-                            >
-                                Close
-                            </button>
-                        </div>
+                    <AppDialogContent
+                        presentation="workspace"
+                        dismissible={false}
+                        className="text-[var(--app-fg)] sm:h-auto sm:max-h-[calc(100dvh-32px)] sm:max-w-3xl lg:max-w-5xl"
+                    >
+                        <AppDialogHeader
+                            title="Add member"
+                            subtitle="Add an existing session or create a new one with a Team alias."
+                            closeDisabled={isSubmittingMember}
+                        />
                         <div className="flex shrink-0 gap-2 border-b border-[var(--app-border)] px-4 py-2" role="tablist" aria-label="Add member mode">
                             {props.onAddSession ? (
                                 <button
@@ -775,7 +776,7 @@ export function TeamChatRightPanel(props: {
                                 </button>
                             ) : null}
                         </div>
-                        <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+                        <AppDialogBody className="overflow-auto px-4 py-3">
                             {addMemberTab === 'existing' && props.onAddSession ? (
                                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
                                     <div>
@@ -930,9 +931,9 @@ export function TeamChatRightPanel(props: {
                             ) : null}
 
                             {dialogError ? <div className="mt-3 rounded-lg bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{dialogError}</div> : null}
-                        </div>
+                        </AppDialogBody>
                         {addMemberTab === 'existing' ? (
-                            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] px-4 py-3">
+                            <AppDialogFooter className="justify-between">
                                 <div className="min-w-0 truncate text-xs text-[var(--app-hint)]">Adds the selected session with a room-specific alias.</div>
                                 <div className="flex shrink-0 gap-2">
                                     <button
@@ -952,10 +953,10 @@ export function TeamChatRightPanel(props: {
                                         {isSubmittingMember ? 'Adding…' : 'Add to Team'}
                                     </button>
                                 </div>
-                            </div>
+                            </AppDialogFooter>
                         ) : null}
-                    </div>
-                </div>
+                    </AppDialogContent>
+                </AppDialog>
             ) : props.onAddSession && addableSessions.length === 0 ? (
                 <div className="mt-2 text-xs text-[var(--app-hint)]">All available sessions are already in this Team Chat.</div>
             ) : null}
@@ -1078,29 +1079,25 @@ export function TeamChatRightPanel(props: {
                 })}
             </div>
             {configParticipant ? (
-                <div
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label={`Cấu hình @${configParticipant.displayName}`}
-                    className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+                <AppDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setConfigParticipant(null)
+                            setDialogError(null)
+                        }
+                    }}
                 >
-                    <div className="flex h-full w-full max-w-2xl flex-col border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-fg)] shadow-2xl sm:h-auto sm:max-h-[calc(100vh-32px)] sm:rounded-2xl">
-                        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
-                            <div>
-                                <div className="text-base font-semibold">Cấu hình @{configParticipant.displayName}</div>
-                                <div className="mt-0.5 text-xs text-[var(--app-hint)]">Member settings apply only in this Team Chat. Session settings affect the original session.</div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setConfigParticipant(null)
-                                    setDialogError(null)
-                                }}
-                                className="rounded-md border border-[var(--app-border)] px-2.5 py-1 text-sm text-[var(--app-fg)] transition-colors hover:bg-[var(--app-secondary-bg)]"
-                            >
-                                Close
-                            </button>
-                        </div>
+                    <AppDialogContent
+                        presentation="workspace"
+                        dismissible={false}
+                        className="max-w-2xl text-[var(--app-fg)] sm:h-auto sm:max-h-[calc(100dvh-32px)]"
+                    >
+                        <AppDialogHeader
+                            title={`Cấu hình @${configParticipant.displayName}`}
+                            subtitle="Member settings apply only in this Team Chat. Session settings affect the original session."
+                            closeDisabled={isSubmittingMember}
+                        />
                         <div role="tablist" aria-label="Member config sections" className="flex shrink-0 gap-2 border-b border-[var(--app-border)] px-4 py-2">
                             <button
                                 type="button"
@@ -1122,7 +1119,7 @@ export function TeamChatRightPanel(props: {
                                 Session
                             </button>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+                        <AppDialogBody className="overflow-auto px-4 py-3">
                             {configTab === 'member' ? (
                                 <div className="space-y-3">
                                     <div>
@@ -1185,9 +1182,9 @@ export function TeamChatRightPanel(props: {
                                 />
                             )}
                             {dialogError ? <div className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{dialogError}</div> : null}
-                        </div>
+                        </AppDialogBody>
                         {configTab === 'member' ? (
-                            <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--app-border)] px-4 py-3">
+                            <AppDialogFooter>
                                 <button
                                     type="button"
                                     disabled={isSubmittingMember}
@@ -1204,25 +1201,35 @@ export function TeamChatRightPanel(props: {
                                 >
                                     {isSubmittingMember ? 'Saving…' : 'Save member config'}
                                 </button>
-                            </div>
+                            </AppDialogFooter>
                         ) : null}
-                    </div>
-                </div>
+                    </AppDialogContent>
+                </AppDialog>
             ) : null}
             {removeParticipant ? (
-                <div
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label={`Remove @${removeParticipant.displayName}`}
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+                <AppDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setRemoveParticipant(null)
+                            setDialogError(null)
+                        }
+                    }}
                 >
-                    <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 text-[var(--app-fg)] shadow-2xl">
-                        <div className="text-base font-semibold">Remove @{removeParticipant.displayName}?</div>
-                        <div className="mt-2 text-sm text-[var(--app-hint)]">
-                            Remove this member khỏi Team Chat này. Session gốc sẽ không bị xoá.
-                        </div>
-                        {dialogError ? <div className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{dialogError}</div> : null}
-                        <div className="mt-4 flex justify-end gap-2">
+                    <AppDialogContent presentation="alert" dismissible={false} className="max-w-md text-[var(--app-fg)]">
+                        <AppDialogHeader
+                            title={`Remove @${removeParticipant.displayName}?`}
+                            subtitle="Remove this member khỏi Team Chat này. Session gốc sẽ không bị xoá."
+                            closeDisabled={isSubmittingMember}
+                        />
+                        {dialogError ? (
+                            <AppDialogBody className="p-4">
+                                <div className="rounded-md bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">
+                                    {dialogError}
+                                </div>
+                            </AppDialogBody>
+                        ) : null}
+                        <AppDialogFooter>
                             <button
                                 type="button"
                                 disabled={isSubmittingMember}
@@ -1255,9 +1262,9 @@ export function TeamChatRightPanel(props: {
                             >
                                 Remove
                             </button>
-                        </div>
-                    </div>
-                </div>
+                        </AppDialogFooter>
+                    </AppDialogContent>
+                </AppDialog>
             ) : null}
         </aside>
     )

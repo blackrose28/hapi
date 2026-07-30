@@ -1,8 +1,9 @@
-import { act, cleanup, render, renderHook, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TerminalState } from '@hapi/protocol'
 import { SessionTerminalTabs } from '@/components/Terminal/SessionTerminalTabs'
-import { useSessionTerminalSocket } from './useTerminalSocket'
+import { useSessionTerminalSocket, useTerminalSocket } from './useTerminalSocket'
 
 type Handler = (payload?: unknown) => void
 
@@ -226,6 +227,77 @@ describe('useSessionTerminalSocket warning merge', () => {
         expect(socket.emits.map((emit) => emit.event)).not.toContain('terminal:write')
     })
 
+    it('rejects a session write when the socket disconnects after the UI became enabled', () => {
+        const { result, socket } = renderSessionHook()
+
+        socket.connected = false
+        let accepted: boolean | undefined
+        act(() => {
+            accepted = result.current.write('t1', 'pwd')
+        })
+
+        expect(accepted).toBe(false)
+        expect(socket.emits).not.toContainEqual({
+            event: 'terminal:write',
+            payload: { terminalId: 't1', data: 'pwd' }
+        })
+    })
+
+    it('returns true only when a session write is emitted', () => {
+        const { result, socket } = renderSessionHook()
+
+        let accepted: boolean | undefined
+        act(() => {
+            accepted = result.current.write('t1', 'pwd')
+        })
+
+        expect(accepted).toBe(true)
+        expect(socket.emits).toContainEqual({
+            event: 'terminal:write',
+            payload: { terminalId: 't1', data: 'pwd' }
+        })
+    })
+
+    it('requests session terminal history and delivers only matching session results', () => {
+        const { result, socket } = renderSessionHook()
+        const received: unknown[] = []
+        act(() => result.current.onHistory((payload) => received.push(payload)))
+
+        let accepted: boolean | undefined
+        act(() => {
+            accepted = result.current.requestHistory('t1', 'request-1', 100)
+        })
+
+        expect(accepted).toBe(true)
+        expect(socket.emits).toContainEqual({
+            event: 'terminal:history',
+            payload: { terminalId: 't1', requestId: 'request-1', limit: 100 }
+        })
+
+        act(() => socket.trigger('terminal:history-result', {
+            sessionId: 'other-session',
+            terminalId: 't1',
+            requestId: 'request-1',
+            status: 'ok',
+            entries: []
+        }))
+        act(() => socket.trigger('terminal:history-result', {
+            sessionId: 'session-1',
+            terminalId: 't1',
+            requestId: 'request-1',
+            status: 'ok',
+            entries: [{ index: 1, command: 'pwd' }]
+        }))
+
+        expect(received).toEqual([{
+            sessionId: 'session-1',
+            terminalId: 't1',
+            requestId: 'request-1',
+            status: 'ok',
+            entries: [{ index: 1, command: 'pwd' }]
+        }])
+    })
+
     it('stores recovery reason from terminal list payload', () => {
         const { result, socket } = renderSessionHook()
 
@@ -269,5 +341,117 @@ describe('useSessionTerminalSocket warning merge', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Terminal is idle')
         expect(screen.queryByText(/token=SECRET/)).not.toBeInTheDocument()
         expect(document.body.textContent).not.toContain('SECRET')
+    })
+
+    it('keeps snippets open with an error and no success when the session socket drops before insert', () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false }
+            }
+        })
+        render(
+            <QueryClientProvider client={queryClient}>
+                <SessionTerminalTabs sessionId="session-1" active terminalSupported />
+            </QueryClientProvider>
+        )
+        const socket = socketMocks.sockets.at(-1)
+        if (!socket) throw new Error('socket not created')
+
+        act(() => socket.trigger('connect'))
+        act(() => socket.trigger('terminal:list', listPayload([state('t1')])) )
+        fireEvent.click(screen.getByRole('button', { name: 'terminal.controls.snippets' }))
+        expect(screen.getByRole('region', { name: 'terminal.snippets.title' })).toBeVisible()
+
+        socket.connected = false
+        fireEvent.click(screen.getByRole('button', {
+            name: 'terminal.snippets.insert terminal.snippets.builtin.pwd.name'
+        }))
+
+        expect(screen.getByRole('region', { name: 'terminal.snippets.title' })).toBeVisible()
+        expect(screen.getByRole('status')).toHaveTextContent('terminal.snippets.insertFailed')
+        expect(screen.queryByText('terminal.snippets.inserted')).not.toBeInTheDocument()
+        expect(socket.emits).not.toContainEqual({
+            event: 'terminal:write',
+            payload: { terminalId: 't1', data: 'pwd' }
+        })
+    })
+})
+
+describe('useTerminalSocket writes', () => {
+    beforeEach(() => {
+        socketMocks.sockets.length = 0
+        vi.clearAllMocks()
+    })
+
+    afterEach(() => cleanup())
+
+    function renderMachineHook() {
+        const rendered = renderHook(() => useTerminalSocket({
+            baseUrl: 'http://hub.local',
+            machineId: 'machine-1',
+            terminalId: 'terminal-1'
+        }))
+        act(() => rendered.result.current.connect(80, 24))
+        const socket = socketMocks.sockets.at(-1)
+        if (!socket) throw new Error('socket not created')
+        act(() => socket.trigger('connect'))
+        act(() => socket.trigger('terminal:ready', { terminalId: 'terminal-1' }))
+        return { ...rendered, socket }
+    }
+
+    it('rejects a machine write when the socket disconnects after the UI became enabled', () => {
+        const { result, socket } = renderMachineHook()
+
+        socket.connected = false
+        let accepted: boolean | undefined
+        act(() => {
+            accepted = result.current.write('pwd')
+        })
+
+        expect(accepted).toBe(false)
+        expect(socket.emits).not.toContainEqual({
+            event: 'terminal:write',
+            payload: { terminalId: 'terminal-1', data: 'pwd' }
+        })
+    })
+
+    it('returns true only when a machine write is emitted', () => {
+        const { result, socket } = renderMachineHook()
+
+        let accepted: boolean | undefined
+        act(() => {
+            accepted = result.current.write('pwd')
+        })
+
+        expect(accepted).toBe(true)
+        expect(socket.emits).toContainEqual({
+            event: 'terminal:write',
+            payload: { terminalId: 'terminal-1', data: 'pwd' }
+        })
+    })
+
+    it('requests machine terminal history and rejects requests after disconnect', () => {
+        const { result, socket } = renderMachineHook()
+        const received: unknown[] = []
+        act(() => result.current.onHistory((payload) => received.push(payload)))
+
+        expect(result.current.requestHistory('request-1', 50)).toBe(true)
+        expect(socket.emits).toContainEqual({
+            event: 'terminal:history',
+            payload: { terminalId: 'terminal-1', requestId: 'request-1', limit: 50 }
+        })
+
+        act(() => socket.trigger('terminal:history-result', {
+            machineId: 'machine-1',
+            terminalId: 'terminal-1',
+            requestId: 'request-1',
+            status: 'ok',
+            entries: [{ index: 2, command: 'ls' }]
+        }))
+        expect(received).toHaveLength(1)
+
+        socket.connected = false
+        expect(result.current.requestHistory('request-2')).toBe(false)
     })
 })

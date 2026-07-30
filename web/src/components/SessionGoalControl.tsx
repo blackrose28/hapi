@@ -2,13 +2,12 @@ import * as React from 'react'
 import type { CodexGoalState } from '@/chat/types'
 import { Button } from '@/components/ui/button'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger
-} from '@/components/ui/dialog'
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogHeader,
+    AppDialogTrigger,
+} from '@/components/ui/app-dialog'
 import { cn } from '@/lib/utils'
 
 function formatTokenCount(tokens: number): string {
@@ -119,8 +118,8 @@ export function SessionGoalControl(props: {
     const objectiveErrorId = 'codex-goal-objective-error'
 
     return (
-        <Dialog>
-            <DialogTrigger asChild>
+        <AppDialog>
+            <AppDialogTrigger asChild>
                 <Button
                     type="button"
                     variant="outline"
@@ -136,16 +135,14 @@ export function SessionGoalControl(props: {
                 >
                     <span aria-hidden="true">🎯</span>
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Codex goal</DialogTitle>
-                    <DialogDescription>
-                        This goal is native Codex state. When active, Codex may continue working toward it when idle.
-                    </DialogDescription>
-                </DialogHeader>
+            </AppDialogTrigger>
+            <AppDialogContent presentation="sheet" className="max-w-md">
+                <AppDialogHeader
+                    title="Codex goal"
+                    subtitle="This goal is native Codex state. When active, Codex may continue working toward it when idle."
+                />
 
-                <div className="mt-4 space-y-4">
+                <AppDialogBody className="space-y-4 overflow-y-auto p-4">
                     <div className="rounded-lg border border-[var(--app-border)] bg-[var(--app-subtle-bg)] p-3">
                         <p className="text-xs font-medium uppercase tracking-wide text-[var(--app-hint)]">Progress</p>
                         <p className="mt-1 text-sm text-[var(--app-fg)]">{progress}</p>
@@ -197,8 +194,8 @@ export function SessionGoalControl(props: {
                             </Button>
                         </div>
                     </form>
-                </div>
-            </DialogContent>
-        </Dialog>
+                </AppDialogBody>
+            </AppDialogContent>
+        </AppDialog>
     )
 }

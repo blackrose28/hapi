@@ -16,9 +16,15 @@ type SendMessageInput = {
     localId: string
     createdAt: number
     attachments?: AttachmentMetadata[]
+    attemptId: number
 }
 
 type BlockedReason = 'no-api' | 'no-session' | 'pending'
+
+export type SendStatus = {
+    attemptId: number
+    state: 'idle' | 'pending' | 'accepted' | 'error'
+}
 
 type UseSendMessageOptions = {
     resolveSessionId?: (sessionId: string) => Promise<string>
@@ -75,9 +81,12 @@ export function useSendMessage(
     sendMessage: (text: string, attachments?: AttachmentMetadata[]) => void
     retryMessage: (localId: string) => void
     isSending: boolean
+    sendStatus: SendStatus
 } {
     const { haptic } = usePlatform()
     const [isResolving, setIsResolving] = useState(false)
+    const [sendStatus, setSendStatus] = useState<SendStatus>({ attemptId: 0, state: 'idle' })
+    const sendAttemptRef = useRef(0)
     const resolveGuardRef = useRef(false)
     const isSessionThinkingRef = useRef(options?.isSessionThinking ?? false)
     isSessionThinkingRef.current = options?.isSessionThinking ?? false
@@ -99,6 +108,7 @@ export function useSendMessage(
             return { status }
         },
         onSuccess: (result, input) => {
+            setSendStatus({ attemptId: input.attemptId, state: 'accepted' })
             if (result.status === 'resuming') {
                 // Session is resuming — keep message as queued and schedule retry
                 updateMessageStatus(input.sessionId, input.localId, 'queued')
@@ -114,6 +124,7 @@ export function useSendMessage(
             options?.onSuccess?.(input.sessionId)
         },
         onError: (_, input) => {
+            setSendStatus({ attemptId: input.attemptId, state: 'error' })
             updateMessageStatus(input.sessionId, input.localId, 'failed')
             haptic.notification('error')
         },
@@ -130,6 +141,7 @@ export function useSendMessage(
             if (!api) return
             const nextCount = count + 1
             if (nextCount > MAX_RESUME_RETRIES) {
+                setSendStatus({ attemptId: input.attemptId, state: 'error' })
                 updateMessageStatus(input.sessionId, input.localId, 'failed')
                 haptic.notification('error')
                 return
@@ -140,11 +152,13 @@ export function useSendMessage(
                     // Still resuming — retry again
                     scheduleResumeRetry(input, nextCount)
                 } else {
+                    setSendStatus({ attemptId: input.attemptId, state: 'accepted' })
                     updateMessageStatus(input.sessionId, input.localId, 'sent')
                     haptic.notification('success')
                     options?.onSuccess?.(input.sessionId)
                 }
             } catch {
+                setSendStatus({ attemptId: input.attemptId, state: 'error' })
                 updateMessageStatus(input.sessionId, input.localId, 'failed')
                 haptic.notification('error')
             }
@@ -153,18 +167,24 @@ export function useSendMessage(
     }, [api, haptic, options])
 
     const sendMessage = (text: string, attachments?: AttachmentMetadata[]) => {
+        if (mutation.isPending || resolveGuardRef.current) {
+            options?.onBlocked?.('pending')
+            return
+        }
+        const attemptId = sendAttemptRef.current + 1
+        sendAttemptRef.current = attemptId
+        setSendStatus({ attemptId, state: 'pending' })
+
         if (!api) {
+            setSendStatus({ attemptId, state: 'error' })
             options?.onBlocked?.('no-api')
             haptic.notification('error')
             return
         }
         if (!sessionId) {
+            setSendStatus({ attemptId, state: 'error' })
             options?.onBlocked?.('no-session')
             haptic.notification('error')
-            return
-        }
-        if (mutation.isPending || resolveGuardRef.current) {
-            options?.onBlocked?.('pending')
             return
         }
         const localId = makeClientSideId('local')
@@ -181,6 +201,7 @@ export function useSendMessage(
                         targetSessionId = resolved
                     }
                 } catch (error) {
+                    setSendStatus({ attemptId, state: 'error' })
                     haptic.notification('error')
                     console.error('Failed to resolve session before send:', error)
                     return
@@ -195,6 +216,7 @@ export function useSendMessage(
                 localId,
                 createdAt,
                 attachments,
+                attemptId,
             })
         })()
     }
@@ -218,6 +240,9 @@ export function useSendMessage(
         const message = findMessageByLocalId(sessionId, localId)
         if (!message?.originalText) return
 
+        const attemptId = sendAttemptRef.current + 1
+        sendAttemptRef.current = attemptId
+        setSendStatus({ attemptId, state: 'pending' })
         updateMessageStatus(sessionId, localId, 'sending')
 
         mutation.mutate({
@@ -225,6 +250,7 @@ export function useSendMessage(
             text: message.originalText,
             localId,
             createdAt: message.createdAt,
+            attemptId,
         })
     }
 
@@ -232,5 +258,6 @@ export function useSendMessage(
         sendMessage,
         retryMessage,
         isSending: mutation.isPending || isResolving,
+        sendStatus,
     }
 }

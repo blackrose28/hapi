@@ -74,7 +74,9 @@ export function useAuth(baseUrl: string): {
         setSession(null)
     }, [baseUrl])
 
-    const api = session ? new ApiClient({ baseUrl }) : null
+    const api = session
+        ? new ApiClient({ baseUrl, cacheScopeId: `${session.organizationId}:${session.membershipId}` })
+        : null
 
     return { session, api, isLoading, error, login, loginWithInvitation, logout }
 }

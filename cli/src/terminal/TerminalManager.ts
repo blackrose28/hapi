@@ -4,16 +4,31 @@ import type {
     TerminalCloseReason,
     TerminalErrorPayload,
     TerminalExitPayload,
+    TerminalHistoryRequest,
+    TerminalHistoryResult,
     TerminalOutputPayload,
     TerminalReadyPayload,
     TerminalState,
     TerminalWarningPayload
 } from '@hapi/protocol'
+import { existsSync, readFileSync } from 'node:fs'
+import { basename } from 'node:path'
+import {
+    cleanupBashHistoryRuntime,
+    createBashHistoryRuntime,
+    parseBashHistorySnapshot,
+    type BashHistoryRuntime
+} from './bashHistory'
 import type { TerminalSession } from './types'
 
 type WarningTimerHandle = ReturnType<typeof setTimeout> | unknown
 type LifecycleTimerHandle = ReturnType<typeof setTimeout> | unknown
 type ProcessKillTimerHandle = ReturnType<typeof setTimeout> | unknown
+
+type TerminalHistoryCapability =
+    | { status: 'ready'; shell: 'bash'; runtime: BashHistoryRuntime }
+    | { status: 'unsupported_shell'; shell: string }
+    | { status: 'read_failed'; shell: 'bash' }
 
 type TerminalRuntime = TerminalSession & {
     proc: Bun.Subprocess
@@ -25,6 +40,7 @@ type TerminalRuntime = TerminalSession & {
     processKillGraceTimer: ProcessKillTimerHandle | null
     processExited: boolean
     outputBuffer: string
+    history: TerminalHistoryCapability
 }
 
 type TerminalMetadataRecord = {
@@ -259,6 +275,66 @@ export class TerminalManager {
         }))
     }
 
+    getHistory(request: TerminalHistoryRequest): TerminalHistoryResult {
+        const responseBase = {
+            ...this.scopePayload(),
+            terminalId: request.terminalId,
+            requestId: request.requestId
+        }
+        const runtime = this.terminals.get(request.terminalId)
+        if (!runtime || !this.requestMatchesScope(request)) {
+            return {
+                ...responseBase,
+                status: 'not_ready',
+                entries: []
+            }
+        }
+
+        if (runtime.history.status === 'unsupported_shell') {
+            return {
+                ...responseBase,
+                status: 'unsupported_shell',
+                shell: runtime.history.shell,
+                entries: []
+            }
+        }
+        if (runtime.history.status === 'read_failed') {
+            return {
+                ...responseBase,
+                status: 'read_failed',
+                shell: runtime.history.shell,
+                entries: []
+            }
+        }
+
+        const { snapshotPath } = runtime.history.runtime
+        if (!existsSync(snapshotPath)) {
+            return {
+                ...responseBase,
+                status: 'not_ready',
+                shell: runtime.history.shell,
+                entries: []
+            }
+        }
+
+        try {
+            const snapshot = readFileSync(snapshotPath, 'utf8')
+            return {
+                ...responseBase,
+                status: 'ok',
+                shell: runtime.history.shell,
+                entries: parseBashHistorySnapshot(snapshot, request.limit ?? 100)
+            }
+        } catch {
+            return {
+                ...responseBase,
+                status: 'read_failed',
+                shell: runtime.history.shell,
+                entries: []
+            }
+        }
+    }
+
     create(terminalId: string, cols: number, rows: number, cwd?: string, replay = false): void {
         if (process.platform === 'win32') {
             this.emitError(terminalId, 'Remote terminal is not supported on Windows yet.')
@@ -307,14 +383,36 @@ export class TerminalManager {
 
         const sessionPath = cwd?.trim() || this.getSessionPath() || getInvokedCwd()
         const shell = resolveShell()
+        const shellName = basename(shell)
         const decoder = new TextDecoder()
         const now = this.now()
         let runtime: TerminalRuntime | null = null
+        let history: TerminalHistoryCapability = {
+            status: 'unsupported_shell',
+            shell: shellName
+        }
+        let spawnCommand = [shell]
+        let spawnEnv = this.filteredEnv
+
+        if (shellName === 'bash') {
+            try {
+                const historyRuntime = createBashHistoryRuntime({ terminalId })
+                history = { status: 'ready', shell: 'bash', runtime: historyRuntime }
+                spawnCommand = [shell, '--rcfile', historyRuntime.rcPath]
+                spawnEnv = {
+                    ...this.filteredEnv,
+                    HAPI_HISTORY_SNAPSHOT: historyRuntime.snapshotPath,
+                    HAPI_HISTORY_TEMP: historyRuntime.tempPath
+                }
+            } catch {
+                history = { status: 'read_failed', shell: 'bash' }
+            }
+        }
 
         try {
-            const proc = Bun.spawn([shell], {
+            const proc = Bun.spawn(spawnCommand, {
                 cwd: sessionPath,
-                env: this.filteredEnv,
+                env: spawnEnv,
                 terminal: {
                     cols,
                     rows,
@@ -362,6 +460,7 @@ export class TerminalManager {
                     logger.debug('[TERMINAL] Failed to kill process after missing terminal', { error: sanitizeTerminalError(error) })
                 }
                 this.emitError(terminalId, 'Failed to attach terminal.')
+                this.cleanupHistoryCapability(history)
                 return
             }
 
@@ -377,7 +476,8 @@ export class TerminalManager {
                 detachedTimer: null,
                 processKillGraceTimer: null,
                 processExited: false,
-                outputBuffer: ''
+                outputBuffer: '',
+                history
             }
             const record: TerminalMetadataRecord = {
                 terminalId,
@@ -402,6 +502,7 @@ export class TerminalManager {
             else this.scheduleMachineIdleTimer(runtime)
             this.onReady({ ...this.scopePayload(), terminalId })
         } catch (error) {
+            this.cleanupHistoryCapability(history)
             logger.debug('[TERMINAL] Failed to spawn terminal', { error: sanitizeTerminalError(error) })
             this.emitError(terminalId, 'Failed to spawn terminal.')
         }
@@ -738,6 +839,7 @@ export class TerminalManager {
             runtime.lifecycleTimer = null
         }
         this.clearDetachedTimer(runtime)
+        this.cleanupHistoryCapability(runtime.history)
 
         this.terminateProcess(runtime, reason)
 
@@ -849,6 +951,24 @@ export class TerminalManager {
         }
         clearTimeout(runtime.detachedTimer)
         runtime.detachedTimer = null
+    }
+
+    private requestMatchesScope(request: TerminalHistoryRequest): boolean {
+        if ('sessionId' in request) {
+            return request.sessionId === this.sessionId
+        }
+        return request.machineId === this.machineId
+    }
+
+    private cleanupHistoryCapability(capability: TerminalHistoryCapability): void {
+        if (capability.status !== 'ready') {
+            return
+        }
+        try {
+            cleanupBashHistoryRuntime(capability.runtime)
+        } catch {
+            // Runtime history is best-effort and must not block terminal cleanup.
+        }
     }
 
     private scopePayload(): { sessionId: string } | { machineId: string } {

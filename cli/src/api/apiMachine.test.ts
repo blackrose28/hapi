@@ -152,6 +152,7 @@ describe('ApiMachineClient terminal legacy boundary', () => {
         resize: ReturnType<typeof vi.spyOn>
         close: ReturnType<typeof vi.spyOn>
         detach: ReturnType<typeof vi.spyOn>
+        getHistory: ReturnType<typeof vi.spyOn>
         closeAll: ReturnType<typeof vi.spyOn>
     }
 
@@ -167,6 +168,14 @@ describe('ApiMachineClient terminal legacy boundary', () => {
             resize: vi.spyOn(TerminalManager.prototype, 'resize').mockImplementation(() => {}),
             close: vi.spyOn(TerminalManager.prototype, 'close').mockImplementation(() => {}),
             detach: vi.spyOn(TerminalManager.prototype, 'detach').mockImplementation(() => {}),
+            getHistory: vi.spyOn(TerminalManager.prototype, 'getHistory').mockReturnValue({
+                machineId: 'machine-1',
+                terminalId: 'tm',
+                requestId: 'request-1',
+                status: 'ok',
+                shell: 'bash',
+                entries: [{ index: 7, command: 'pwd' }]
+            }),
             closeAll: vi.spyOn(TerminalManager.prototype, 'closeAll').mockImplementation(() => {})
         }
     })
@@ -195,6 +204,56 @@ describe('ApiMachineClient terminal legacy boundary', () => {
         expect(socket.handlers.has('terminal:list')).toBe(false)
         expect(socket.handlers.has('terminal:keepalive')).toBe(false)
         expect(socket.handlers.has('terminal:close-all')).toBe(false)
+
+        client.shutdown()
+    })
+
+    it('advertises terminal history support during the runner socket handshake', () => {
+        const machine = makeMachine('machine-1')
+        const client = new ApiMachineClient({ kind: 'runner', credential: { credentialId: 'cred', secret: 'x'.repeat(32) }, machineId: 'machine' }, machine, workspaceRoot)
+
+        client.connect()
+
+        expect(ioMock).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+                auth: expect.objectContaining({
+                    capabilities: expect.arrayContaining(['terminal-history-v1'])
+                })
+            })
+        )
+        client.shutdown()
+    })
+
+    it('returns live history for a valid machine terminal request', () => {
+        const machine = makeMachine('machine-1')
+        const client = new ApiMachineClient({ kind: 'runner', credential: { credentialId: 'cred', secret: 'x'.repeat(32) }, machineId: 'machine' }, machine, workspaceRoot)
+        client.connect()
+
+        socket.trigger('terminal:history', {
+            machineId: 'machine-1',
+            terminalId: 'tm',
+            requestId: 'request-1',
+            limit: 50
+        })
+
+        expect(terminalSpies.getHistory).toHaveBeenCalledWith({
+            machineId: 'machine-1',
+            terminalId: 'tm',
+            requestId: 'request-1',
+            limit: 50
+        })
+        expect(socket.emitted).toContainEqual({
+            event: 'terminal:history-result',
+            data: {
+                machineId: 'machine-1',
+                terminalId: 'tm',
+                requestId: 'request-1',
+                status: 'ok',
+                shell: 'bash',
+                entries: [{ index: 7, command: 'pwd' }]
+            }
+        })
 
         client.shutdown()
     })

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle
-} from '@/components/ui/dialog'
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/use-translation'
 
@@ -57,31 +58,31 @@ export function RenameSessionDialog(props: RenameSessionDialogProps) {
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>{t('dialog.rename.title')}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={t('dialog.rename.placeholder')}
-                        className="w-full px-3 py-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-fg)] placeholder:text-[var(--app-hint)] focus:outline-none focus:ring-2 focus:ring-[var(--app-button)] focus:border-transparent"
-                        disabled={isPending}
-                        maxLength={255}
-                    />
+        <AppDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <AppDialogContent presentation="alert" className="max-w-sm">
+                <AppDialogHeader title={t('dialog.rename.title')} />
+                <form onSubmit={handleSubmit} className="contents">
+                    <AppDialogBody className="space-y-4 p-4">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={t('dialog.rename.placeholder')}
+                            className="w-full px-3 py-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] text-[var(--app-fg)] placeholder:text-[var(--app-hint)] focus:outline-none focus:ring-2 focus:ring-[var(--app-button)] focus:border-transparent"
+                            disabled={isPending}
+                            maxLength={255}
+                        />
 
-                    {error ? (
-                        <div className="rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                            {error}
-                        </div>
-                    ) : null}
+                        {error ? (
+                            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                                {error}
+                            </div>
+                        ) : null}
+                    </AppDialogBody>
 
-                    <div className="flex gap-2 justify-end">
+                    <AppDialogFooter>
                         <Button
                             type="button"
                             variant="secondary"
@@ -96,9 +97,9 @@ export function RenameSessionDialog(props: RenameSessionDialogProps) {
                         >
                             {isPending ? t('dialog.rename.saving') : t('button.save')}
                         </Button>
-                    </div>
+                    </AppDialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </AppDialogContent>
+        </AppDialog>
     )
 }

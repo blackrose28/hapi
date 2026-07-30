@@ -1,20 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Terminal } from '@xterm/xterm'
 import type { ApiClient } from '@/api/client'
+import {
+    TerminalControlDock,
+    TerminalToolIcon,
+    type TerminalDockTool,
+} from '@/components/Terminal/TerminalControlDock'
 import { TerminalView } from '@/components/Terminal/TerminalView'
 import { SessionTerminalTabs } from '@/components/Terminal/SessionTerminalTabs'
-import { TerminalQuickKeys, useTerminalQuickInput } from '@/components/Terminal/TerminalQuickKeys'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useTerminalQuickInput } from '@/components/Terminal/terminalControls'
+import {
+    EMPTY_TERMINAL_SEARCH_STATE,
+    type TerminalSearchState,
+} from '@/components/Terminal/terminalSearch'
+import { useTerminalHistory } from '@/components/Terminal/useTerminalHistory'
+import {
+    AppDialog,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 import { useAppContext } from '@/lib/app-context'
 import type { EditorTab } from '@/hooks/useEditorState'
 import { useSession } from '@/hooks/queries/useSession'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTerminalSocket } from '@/hooks/useTerminalSocket'
 import { isRemoteTerminalSupported } from '@/utils/terminalSupport'
+import { useTranslation } from '@/lib/use-translation'
 
 
 function EditorSessionTerminalBody(props: {
     api: ApiClient | null
     tab: EditorTab
+    interactionActive: boolean
     compactFontSize?: boolean
 }) {
     const sessionId = props.tab.sessionId ?? null
@@ -46,6 +64,7 @@ function EditorSessionTerminalBody(props: {
             sessionId={sessionId}
             active={Boolean(session.active)}
             terminalSupported={terminalSupported}
+            interactionActive={props.interactionActive}
             cwd={session.metadata?.path}
             compactFontSize={props.compactFontSize}
             className="min-h-0 flex-1"
@@ -56,12 +75,15 @@ function EditorSessionTerminalBody(props: {
 function EditorTerminalBody(props: {
     api: ApiClient | null
     tab: EditorTab
+    isActive: boolean
     onAddToChat?: (text: string) => void
     onRegisterClose?: (tabId: string, close: (() => void) | null) => void
     compactFontSize?: boolean
     mobileMode?: boolean
 }) {
     const { baseUrl } = useAppContext()
+    const { t } = useTranslation()
+    const isDockViewport = useMediaQuery('(max-width: 1023px)')
     const sessionId = props.tab.sessionId ?? null
     const machineId = props.tab.machineId ?? null
     const cwd = props.tab.cwd ?? undefined
@@ -75,6 +97,11 @@ function EditorTerminalBody(props: {
     const [exitInfo, setExitInfo] = useState<{ code: number | null; signal: string | null } | null>(null)
     const [terminalSelection, setTerminalSelection] = useState<string | null>(null)
     const [terminalMousePos, setTerminalMousePos] = useState<{ x: number; y: number } | null>(null)
+    const [activeDockTool, setActiveDockTool] = useState<TerminalDockTool | null>(null)
+    const [searchMounted, setSearchMounted] = useState(false)
+    const [searchState, setSearchState] = useState<TerminalSearchState>(
+        EMPTY_TERMINAL_SEARCH_STATE,
+    )
     const terminalContainerRef = useRef<HTMLDivElement | null>(null)
 
     const {
@@ -86,6 +113,8 @@ function EditorTerminalBody(props: {
         close,
         onOutput,
         onExit,
+        requestHistory,
+        onHistory,
     } = useTerminalSocket({
         baseUrl,
         sessionId: sessionId ?? '',
@@ -99,6 +128,83 @@ function EditorTerminalBody(props: {
         disabled: quickInputDisabled,
         write,
     })
+    const searchStateRef = useRef<TerminalSearchState>(EMPTY_TERMINAL_SEARCH_STATE)
+    const searchGenerationRef = useRef(0)
+    const searchIdentity = props.isActive && !quickInputDisabled
+        ? props.tab.id
+        : null
+    const activeSearchIdentityRef = useRef(searchIdentity)
+    activeSearchIdentityRef.current = searchIdentity
+
+    const clearSearch = useCallback((closeTool = true) => {
+        searchGenerationRef.current += 1
+        searchStateRef.current.controller?.clear()
+        searchStateRef.current = EMPTY_TERMINAL_SEARCH_STATE
+        setSearchState(EMPTY_TERMINAL_SEARCH_STATE)
+        setSearchMounted(false)
+        if (closeTool) {
+            setActiveDockTool(null)
+        }
+    }, [])
+
+    useEffect(() => {
+        clearSearch()
+    }, [clearSearch, searchIdentity])
+
+    const handleActiveDockToolChange = useCallback((tool: TerminalDockTool | null) => {
+        if (tool === 'search') {
+            setSearchMounted(true)
+        }
+        setActiveDockTool(tool)
+    }, [])
+
+    const dismissDockTool = useCallback(() => {
+        if (activeDockTool !== 'search') {
+            setActiveDockTool(null)
+        }
+    }, [activeDockTool])
+
+    const historyTerminalId = props.isActive && !quickInputDisabled
+        ? props.tab.id
+        : null
+    const requestTerminalHistory = useCallback((requestId: string, limit: number) => (
+        historyTerminalId
+            ? requestHistory(requestId, limit)
+            : false
+    ), [historyTerminalId, requestHistory])
+    const history = useTerminalHistory({
+        terminalContextKey: historyTerminalId,
+        terminalId: historyTerminalId,
+        request: requestTerminalHistory,
+        subscribe: onHistory,
+    })
+
+    const searchEnabled = searchMounted && searchIdentity !== null
+    const searchCallbackIdentity = searchIdentity
+    const searchCallbackGeneration = searchGenerationRef.current
+    const handleSearchStateChange = useCallback((nextState: TerminalSearchState) => {
+        if (
+            !searchEnabled
+            || !searchCallbackIdentity
+            || activeSearchIdentityRef.current !== searchCallbackIdentity
+            || searchGenerationRef.current !== searchCallbackGeneration
+        ) {
+            nextState.controller?.clear()
+            return
+        }
+        const previousController = searchStateRef.current.controller
+        if (previousController && previousController !== nextState.controller) {
+            previousController.clear()
+        }
+        searchStateRef.current = nextState
+        setSearchState(nextState)
+    }, [searchCallbackGeneration, searchCallbackIdentity, searchEnabled])
+
+    useEffect(() => () => {
+        searchGenerationRef.current += 1
+        searchStateRef.current.controller?.clear()
+        searchStateRef.current = EMPTY_TERMINAL_SEARCH_STATE
+    }, [])
 
     useEffect(() => {
         props.onRegisterClose?.(props.tab.id, close)
@@ -150,10 +256,10 @@ function EditorTerminalBody(props: {
         }
 
         inputDisposableRef.current = terminal.onData(quickInput.writeTerminalData)
-        if (!props.mobileMode) {
+        if (!isDockViewport) {
             terminal.focus()
         }
-    }, [props.mobileMode, quickInput.writeTerminalData])
+    }, [isDockViewport, quickInput.writeTerminalData])
 
     const handleResize = useCallback((cols: number, rows: number) => {
         lastSizeRef.current = { cols, rows }
@@ -250,6 +356,27 @@ function EditorTerminalBody(props: {
                         {exitInfo.signal ? ` (${exitInfo.signal})` : ''}
                     </span>
                 ) : null}
+                <div className="ml-auto hidden items-stretch lg:flex">
+                    {(['search', 'snippets', 'history'] as const).map((tool) => (
+                        <button
+                            key={tool}
+                            type="button"
+                            aria-label={t(`terminal.controls.${tool}`)}
+                            aria-pressed={activeDockTool === tool}
+                            disabled={quickInputDisabled}
+                            onClick={() => handleActiveDockToolChange(
+                                activeDockTool === tool ? null : tool,
+                            )}
+                            className={`grid min-h-8 min-w-8 place-items-center border-l border-[var(--app-border)] transition-colors motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-40 ${
+                                activeDockTool === tool
+                                    ? 'bg-violet-500/10 text-violet-600 dark:text-violet-300'
+                                    : 'text-[var(--app-hint)] hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]'
+                            }`}
+                        >
+                            <TerminalToolIcon tool={tool} />
+                        </button>
+                    ))}
+                </div>
             </div>
             {errorMessage ? (
                 <div className="border-b border-[var(--app-border)] px-2 py-1 text-xs text-red-500">
@@ -258,7 +385,9 @@ function EditorTerminalBody(props: {
             ) : null}
             <div
                 ref={terminalContainerRef}
-                className="min-h-0 flex-1 overflow-hidden p-2 relative"
+                data-testid="terminal-surface"
+                onPointerDownCapture={dismissDockTool}
+                className="relative min-h-0 flex-1 overflow-hidden p-2"
             >
                 {canUseTerminal ? (
                     <TerminalView
@@ -266,6 +395,14 @@ function EditorTerminalBody(props: {
                         onResize={handleResize}
                         className="h-full w-full"
                         compactFontSize={props.compactFontSize}
+                        mobileInteractionEnabled={
+                            props.isActive && !quickInputDisabled
+                        }
+                        dismissMobileInteraction={
+                            activeDockTool !== null || !props.isActive
+                        }
+                        searchActive={searchEnabled}
+                        onSearchStateChange={handleSearchStateChange}
                     />
                 ) : (
                     <div className="flex h-full items-center justify-center rounded border border-[var(--app-border)] text-xs text-[var(--app-hint)]">
@@ -293,16 +430,24 @@ function EditorTerminalBody(props: {
                     </button>
                 )}
             </div>
-            {props.mobileMode ? (
-                <TerminalQuickKeys
-                    disabled={quickInputDisabled}
-                    ctrlActive={quickInput.ctrlActive}
-                    altActive={quickInput.altActive}
-                    onQuickInput={quickInput.sendQuickInput}
-                    onModifierToggle={quickInput.toggleModifier}
-                    onWritePlainInput={quickInput.writePlainInput}
-                />
-            ) : null}
+            <TerminalControlDock
+                api={props.api}
+                terminalContextKey={
+                    quickInputDisabled || !props.isActive ? null : props.tab.id
+                }
+                disabled={quickInputDisabled}
+                activeTool={activeDockTool}
+                onActiveToolChange={handleActiveDockToolChange}
+                searchMounted={searchMounted}
+                onSearchClose={() => clearSearch()}
+                searchState={searchState}
+                historyState={history.state}
+                onHistoryOpen={history.open}
+                onHistoryRefresh={history.refresh}
+                onHistoryClose={history.close}
+                onQuickInput={quickInput.sendQuickInput}
+                onWritePlainInput={quickInput.writePlainInput}
+            />
         </div>
     )
 }
@@ -325,6 +470,10 @@ export function EditorTerminal(props: {
     const terminalTabs = useMemo(
         () => props.tabs.filter((tab) => tab.type === 'terminal'),
         [props.tabs]
+    )
+    const legacyTerminalTabs = useMemo(
+        () => terminalTabs.filter((tab) => !tab.sessionId),
+        [terminalTabs]
     )
     const activeTerminal = terminalTabs.find((tab) => tab.id === props.activeTabId) ?? terminalTabs[0] ?? null
     const activeSessionTerminal = activeTerminal?.sessionId ? activeTerminal : null
@@ -357,7 +506,24 @@ export function EditorTerminal(props: {
 
     return (
         <div className="flex h-full min-h-0 flex-col border-t border-[var(--app-border)] bg-[var(--app-bg)]">
-            <div className="flex h-8 shrink-0 items-center border-b border-[var(--app-border)] bg-[var(--app-subtle-bg)]">
+            <div
+                className={`flex h-8 shrink-0 items-center border-b border-[var(--app-border)] bg-[var(--app-subtle-bg)] ${
+                    props.mobileMode ? '' : 'cursor-pointer'
+                }`}
+                onClick={(event) => {
+                    const target = event.target
+                    if (
+                        props.mobileMode
+                        || (
+                            target instanceof Element
+                            && target.closest('button, [data-terminal-header-control]')
+                        )
+                    ) {
+                        return
+                    }
+                    props.onToggleCollapsed()
+                }}
+            >
                 {!props.mobileMode ? (
                     <button
                         type="button"
@@ -370,37 +536,44 @@ export function EditorTerminal(props: {
                     </button>
                 ) : null}
                 <div className="px-2 text-xs font-medium text-[var(--app-hint)]">Terminal</div>
-                <div className="flex min-w-0 flex-1 items-center overflow-x-auto">
-                    {terminalTabs.map((tab) => {
-                        const isActive = tab.id === activeTerminal?.id
-                        return (
-                            <div
-                                key={tab.id}
-                                className={`flex items-center gap-1 border-l border-[var(--app-border)] px-2 py-1 text-xs ${
-                                    isActive ? 'bg-[var(--app-bg)] text-[#818cf8]' : 'text-[var(--app-hint)]'
-                                }`}
-                            >
-                                <button
-                                    type="button"
-                                    aria-label={`Select terminal ${tab.label}`}
-                                    className="max-w-[140px] truncate hover:text-[var(--app-fg)]"
-                                    onClick={() => props.onSelectTab(tab.id)}
+                {activeSessionTerminal ? (
+                    <div className="min-w-0 flex-1" />
+                ) : (
+                    <div
+                        data-terminal-header-control
+                        className="flex min-w-0 flex-1 items-center overflow-x-auto"
+                    >
+                        {legacyTerminalTabs.map((tab) => {
+                            const isActive = tab.id === activeTerminal?.id
+                            return (
+                                <div
+                                    key={tab.id}
+                                    className={`flex items-center gap-1 border-l border-[var(--app-border)] px-2 py-1 text-xs ${
+                                        isActive ? 'bg-[var(--app-bg)] text-[#818cf8]' : 'text-[var(--app-hint)]'
+                                    }`}
                                 >
-                                    {tab.label}
-                                </button>
-                                <button
-                                    type="button"
-                                    aria-label={`Close terminal ${tab.label}`}
-                                    className="text-[10px] hover:text-[var(--app-fg)]"
-                                    onClick={() => handleCloseTerminal(tab.id)}
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        )
-                    })}
-                </div>
-                {!props.mobileMode ? (
+                                    <button
+                                        type="button"
+                                        aria-label={`Select terminal ${tab.label}`}
+                                        className="max-w-[140px] truncate hover:text-[var(--app-fg)]"
+                                        onClick={() => props.onSelectTab(tab.id)}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Close terminal ${tab.label}`}
+                                        className="text-[10px] hover:text-[var(--app-fg)]"
+                                        onClick={() => handleCloseTerminal(tab.id)}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+                {!props.mobileMode && !activeSessionTerminal ? (
                     <button
                         type="button"
                         aria-label="Open terminal"
@@ -420,6 +593,10 @@ export function EditorTerminal(props: {
                             <EditorSessionTerminalBody
                                 api={props.api}
                                 tab={activeSessionTerminal}
+                                interactionActive={
+                                    Boolean(props.mobileMode)
+                                    || !props.isCollapsed
+                                }
                                 compactFontSize={props.mobileMode}
                             />
                         </div>
@@ -431,6 +608,10 @@ export function EditorTerminal(props: {
                                 <EditorTerminalBody
                                     api={props.api}
                                     tab={tab}
+                                    isActive={
+                                        isActive
+                                        && (Boolean(props.mobileMode) || !props.isCollapsed)
+                                    }
                                     onAddToChat={props.onAddToChat}
                                     onRegisterClose={handleRegisterClose}
                                     compactFontSize={props.mobileMode}
@@ -446,7 +627,7 @@ export function EditorTerminal(props: {
                 </div>
             ) : null}
 
-            <Dialog
+            <AppDialog
                 open={pendingCloseTerminalId !== null}
                 onOpenChange={(open) => {
                     if (!open) {
@@ -454,15 +635,19 @@ export function EditorTerminal(props: {
                     }
                 }}
             >
-                <DialogContent className="bottom-0 left-0 top-auto w-full max-w-none translate-x-0 translate-y-0 rounded-b-none rounded-t-xl p-4 sm:left-1/2 sm:bottom-auto sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:p-6">
-                    <div className="mx-auto flex max-w-md flex-col gap-3">
-                        <DialogHeader>
-                            <DialogTitle>Close terminal?</DialogTitle>
-                            <DialogDescription>
-                                This will stop the running process and close the terminal tab.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex flex-col gap-2">
+                <AppDialogContent presentation="alert" className="max-w-md">
+                    <AppDialogHeader
+                        title="Close terminal?"
+                        subtitle="This will stop the running process and close the terminal tab."
+                    />
+                    <AppDialogFooter className="mx-auto grid w-full max-w-md grid-cols-2">
+                            <button
+                                type="button"
+                                className="w-full rounded border border-[var(--app-border)] px-3 py-2 text-sm text-[var(--app-fg)] hover:bg-[var(--app-secondary-bg)]"
+                                onClick={() => setPendingCloseTerminalId(null)}
+                            >
+                                Cancel
+                            </button>
                             <button
                                 type="button"
                                 className="w-full rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-500"
@@ -476,17 +661,9 @@ export function EditorTerminal(props: {
                             >
                                 Stop process and close
                             </button>
-                            <button
-                                type="button"
-                                className="w-full rounded border border-[var(--app-border)] px-3 py-2 text-sm text-[var(--app-fg)] hover:bg-[var(--app-secondary-bg)]"
-                                onClick={() => setPendingCloseTerminalId(null)}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    </AppDialogFooter>
+                </AppDialogContent>
+            </AppDialog>
         </div>
     )
 }

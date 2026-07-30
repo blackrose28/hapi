@@ -456,6 +456,9 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
         name: z.string(),
         resourceType: z.string(),
         resourceId: z.string()
+    }),
+    SessionEventBaseSchema.extend({
+        type: z.literal('terminal-snippets-updated')
     })
 ])
 

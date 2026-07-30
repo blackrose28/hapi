@@ -6,6 +6,7 @@ import { TerminalRegistry } from '../../terminalRegistry'
 import { TerminalSessionStateStore } from '../../terminalSessionState'
 import { registerTerminalHandlers as registerTerminalHandlersProduction, type TerminalHandlersDeps } from './terminalHandlers'
 import { broadcastLostTerminalLists as broadcastLostTerminalListsProduction } from './index'
+import { TerminalHistoryRequestRegistry } from '../../terminalHistoryRequests'
 
 type EmittedEvent = {
     event: string
@@ -137,6 +138,106 @@ function runningSessionTerminal(overrides: Partial<SessionTerminalState> = {}): 
 }
 
 describe('cli terminal handlers', () => {
+    it('returns history only to the correlated web socket and restores its request id', () => {
+        const cliSocket = new FakeSocket('cli-socket')
+        const webSocket = new FakeSocket('web-socket')
+        const terminalNamespace = new FakeNamespace()
+        terminalNamespace.sockets.set(webSocket.id, webSocket)
+        const terminalRegistry = new TerminalRegistry({ idleTimeoutMs: 0 })
+        terminalRegistry.register({
+            terminalId: 'terminal-1',
+            sessionId: 'session-1',
+            namespace: 'default',
+            socketId: webSocket.id,
+            cliSocketId: cliSocket.id
+        })
+        const terminalHistoryRequests = new TerminalHistoryRequestRegistry()
+        const correlationId = terminalHistoryRequests.register({
+            webSocketId: webSocket.id,
+            webRequestId: 'web-request-1',
+            cliSocketId: cliSocket.id,
+            terminalId: 'terminal-1',
+            namespace: 'default',
+            scope: { sessionId: 'session-1' }
+        })
+
+        registerTerminalHandlers(cliSocket as unknown as CliSocketWithData, {
+            terminalRegistry,
+            terminalHistoryRequests,
+            terminalNamespace: terminalNamespace as never,
+            resolveSessionAccess: () => ({ ok: true, value: storedSession() }),
+            resolveMachineAccess: () => ({ ok: true, value: storedMachine() }),
+            emitAccessError: () => {
+                throw new Error('Unexpected access error')
+            }
+        })
+
+        cliSocket.trigger('terminal:history-result', {
+            sessionId: 'session-1',
+            terminalId: 'terminal-1',
+            requestId: correlationId,
+            status: 'ok',
+            shell: 'bash',
+            entries: [{ index: 8, command: 'git status' }]
+        })
+
+        expect(lastEmit(webSocket, 'terminal:history-result')?.data).toEqual({
+            sessionId: 'session-1',
+            terminalId: 'terminal-1',
+            requestId: 'web-request-1',
+            status: 'ok',
+            shell: 'bash',
+            entries: [{ index: 8, command: 'git status' }]
+        })
+        expect(terminalNamespace.roomEmits).toEqual([])
+
+        cliSocket.trigger('terminal:history-result', {
+            sessionId: 'session-1',
+            terminalId: 'terminal-1',
+            requestId: correlationId,
+            status: 'ok',
+            entries: []
+        })
+        expect(webSocket.emitted.filter((event) => event.event === 'terminal:history-result')).toHaveLength(1)
+    })
+
+    it('ignores a history result whose terminal scope does not match the correlation', () => {
+        const cliSocket = new FakeSocket('cli-socket')
+        const webSocket = new FakeSocket('web-socket')
+        const terminalNamespace = new FakeNamespace()
+        terminalNamespace.sockets.set(webSocket.id, webSocket)
+        const terminalRegistry = new TerminalRegistry({ idleTimeoutMs: 0 })
+        const terminalHistoryRequests = new TerminalHistoryRequestRegistry()
+        const correlationId = terminalHistoryRequests.register({
+            webSocketId: webSocket.id,
+            webRequestId: 'web-request-1',
+            cliSocketId: cliSocket.id,
+            terminalId: 'terminal-1',
+            namespace: 'default',
+            scope: { sessionId: 'session-1' }
+        })
+
+        registerTerminalHandlers(cliSocket as unknown as CliSocketWithData, {
+            terminalRegistry,
+            terminalHistoryRequests,
+            terminalNamespace: terminalNamespace as never,
+            resolveSessionAccess: () => ({ ok: true, value: storedSession() }),
+            resolveMachineAccess: () => ({ ok: true, value: storedMachine() }),
+            emitAccessError: () => {}
+        })
+
+        cliSocket.trigger('terminal:history-result', {
+            machineId: 'machine-1',
+            terminalId: 'terminal-1',
+            requestId: correlationId,
+            status: 'ok',
+            entries: []
+        })
+
+        expect(lastEmit(webSocket, 'terminal:history-result')).toBeUndefined()
+        expect(terminalHistoryRequests.has(correlationId)).toBe(true)
+    })
+
     it('broadcasts lost terminal lists to exact session rooms', () => {
         const terminalNamespace = new FakeNamespace()
 

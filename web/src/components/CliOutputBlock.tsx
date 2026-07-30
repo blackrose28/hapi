@@ -1,7 +1,13 @@
 import { useMemo } from 'react'
 import { stripAnsiAndControls } from '@/components/assistant-ui/markdown-utils'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogHeader,
+    AppDialogTrigger,
+} from '@/components/ui/app-dialog'
 import { useTranslation } from '@/lib/use-translation'
 
 const CLI_TAG_PATTERN = '(?:local-command-[a-z-]+|command-(?:name|message|args))'
@@ -118,8 +124,8 @@ export function CliOutputBlock(props: { text: string }) {
     return (
         <Card className="min-w-0 max-w-full overflow-hidden shadow-sm">
             <CardHeader className="p-3 space-y-0">
-                <Dialog>
-                    <DialogTrigger asChild>
+                <AppDialog>
+                    <AppDialogTrigger asChild>
                         <button type="button" className="w-full text-left">
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-center justify-between gap-3">
@@ -154,20 +160,18 @@ export function CliOutputBlock(props: { text: string }) {
                                 </div>
                             </div>
                         </button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>{t('terminal.commandName')}</DialogTitle>
-                        </DialogHeader>
-                        <div className="mt-3 max-h-[75vh] overflow-auto">
+                    </AppDialogTrigger>
+                    <AppDialogContent presentation="workspace" className="max-w-2xl">
+                        <AppDialogHeader title={t('terminal.commandName')} />
+                        <AppDialogBody className="max-h-[75vh] overflow-auto p-3">
                             <div className="min-w-0 max-w-full overflow-x-auto overflow-y-hidden">
                                 <pre className="m-0 w-max min-w-full bg-[var(--app-code-bg)] p-2 text-xs font-mono">
                                     {content}
                                 </pre>
                             </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                        </AppDialogBody>
+                    </AppDialogContent>
+                </AppDialog>
             </CardHeader>
         </Card>
     )

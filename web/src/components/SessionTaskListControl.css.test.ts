@@ -27,4 +27,10 @@ describe('SessionTaskListControl theme CSS', () => {
         expect(css).toContain('background: var(--session-task-row-hover);')
         expect(css).toContain('background: var(--session-task-surface);')
     })
+
+    it('does not override the shared AppDialog shell padding on narrow screens', () => {
+        const css = readFileSync(resolve(__dirname, 'SessionTaskListControl.css'), 'utf8')
+
+        expect(css).not.toContain('padding: 18px;')
+    })
 })

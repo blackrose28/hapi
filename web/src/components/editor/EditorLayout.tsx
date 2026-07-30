@@ -17,6 +17,13 @@ import { useSessions } from '@/hooks/queries/useSessions'
 import { useEditorState } from '@/hooks/useEditorState'
 import { useEditorNewSession } from '@/hooks/mutations/useEditorNewSession'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 import { EditorChatPanel } from './EditorChatPanel'
 import { EditorContextMenu } from './EditorContextMenu'
 import { EditorFileTree } from './EditorFileTree'
@@ -138,17 +145,14 @@ function DeleteConfirmModal(props: {
     const hiddenCount = props.items.length - visibleItems.length
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
-            <div
-                role="dialog"
-                aria-modal="true"
-                aria-label={title}
-                className="w-full max-w-md rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] p-4 text-sm text-[var(--app-fg)] shadow-xl"
-            >
-                <h2 className="text-base font-semibold">{title}</h2>
-                <p className="mt-2 text-xs text-[var(--app-hint)]">
-                    This will permanently delete the selected file/folder items.
-                </p>
+        <AppDialog open onOpenChange={(open) => !open && props.onCancel()}>
+            <AppDialogContent presentation="alert" dismissible={false} className="max-w-md text-sm text-[var(--app-fg)]">
+                <AppDialogHeader
+                    title={title}
+                    subtitle="This will permanently delete the selected file/folder items."
+                    closeDisabled={props.isDeleting}
+                />
+                <AppDialogBody className="p-4">
                 <ul className="mt-3 max-h-40 overflow-auto rounded border border-[var(--app-border)] bg-[var(--app-subtle-bg)] p-2 text-xs">
                     {visibleItems.map((item) => (
                         <li key={item.path} className="truncate">
@@ -164,7 +168,8 @@ function DeleteConfirmModal(props: {
                         {props.error}
                     </div>
                 ) : null}
-                <div className="mt-4 flex justify-end gap-2">
+                </AppDialogBody>
+                <AppDialogFooter>
                     <button
                         type="button"
                         className="rounded border border-[var(--app-border)] px-3 py-1.5 text-xs hover:bg-[var(--app-subtle-bg)]"
@@ -181,9 +186,9 @@ function DeleteConfirmModal(props: {
                     >
                         {props.isDeleting ? 'Deleting…' : 'Delete'}
                     </button>
-                </div>
-            </div>
-        </div>
+                </AppDialogFooter>
+            </AppDialogContent>
+        </AppDialog>
     )
 }
 
@@ -240,14 +245,11 @@ export function EditorLayout(props: {
     )
     const activeFilePath = activeFileTab?.path ?? null
 
-    // Auto-open a session terminal tab when activeSessionId changes
-    // so terminals created elsewhere (e.g. modal) are visible in the editor
+    // Keep one session terminal container active when the selected agent changes.
+    // SessionTerminalTabs owns the actual terminal process tabs inside it.
     useEffect(() => {
         if (!editor.activeSessionId) return
-        const hasSessionTab = terminalTabs.some((tab) => tab.sessionId === editor.activeSessionId)
-        if (!hasSessionTab) {
-            editor.openTerminal({ sessionId: editor.activeSessionId })
-        }
+        editor.openTerminal({ sessionId: editor.activeSessionId })
     }, [editor.activeSessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleRegisterTerminalClose = useCallback((tabId: string, close: (() => void) | null) => {

@@ -191,25 +191,6 @@
     pointer-events: none;
 }
 
-.db__pinned-focus-close {
-    position: absolute;
-    right: 14px;
-    top: 10px;
-    z-index: 2;
-    border: 1px solid var(--app-border);
-    border-radius: 8px;
-    background: var(--app-bg);
-    color: var(--app-fg);
-    padding: 4px 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-}
-
-.db__pinned-focus-close:hover {
-    background: var(--app-secondary-bg);
-}
-
 .db__pinned-placeholder {
     flex: 1;
     min-width: 0;
@@ -611,8 +592,7 @@
         display: none;
     }
 
-    .db__pinned-focus-backdrop,
-    .db__pinned-focus-close {
+    .db__pinned-focus-backdrop {
         display: none;
     }
 
@@ -1494,33 +1474,77 @@
 /* Compact header — replaces SessionHeader in 3-4 panel mode */
 .db-pinned__compact-header {
     display: flex;
-    flex-direction: column;
-    padding: 4px 10px;
+    min-width: 0;
+    padding: 6px 8px;
     flex-shrink: 0;
     border-bottom: 1px solid var(--app-border);
-    background: var(--app-bg);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--app-fg) 2.5%, transparent), transparent),
+        var(--app-bg);
     overflow: hidden;
-    gap: 1px;
 }
 
 .db-pinned__compact-row1 {
     display: flex;
+    width: 100%;
+    min-width: 0;
     align-items: center;
-    gap: 6px;
-    height: 26px;
+    gap: 7px;
+    min-height: 30px;
 }
 
-.db-pinned__compact-path {
-    font-size: 0.5625rem;
-    font-family: var(--font-mono, monospace);
+.db-pinned__compact-path-trigger {
+    display: inline-flex;
+    min-width: 0;
+    max-width: min(30%, 220px);
+    height: 24px;
+    align-items: center;
+    gap: 5px;
+    flex: 0 1 auto;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    background: var(--app-subtle-bg);
+    padding: 0 8px;
     color: var(--app-hint);
-    opacity: 0.65;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.db-pinned__compact-path-trigger span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding-left: 24px;
-    /* indent past index badge */
-    padding-bottom: 3px;
+}
+
+.db-pinned__compact-path-trigger:hover {
+    border-color: color-mix(in srgb, var(--app-link) 32%, var(--app-border));
+    background: color-mix(in srgb, var(--app-link) 8%, var(--app-subtle-bg));
+    color: var(--app-fg);
+}
+
+.db-pinned__compact-path-trigger:focus-visible,
+.db-pinned__compact-action:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-link) 70%, #7c6cff);
+    outline-offset: 2px;
+}
+
+.db-pinned__compact-membership {
+    max-width: 140px;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    padding: 2px 8px;
+    color: var(--app-hint);
+    font-size: 0.625rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.db-pinned__compact-membership-overflow {
+    flex-shrink: 0;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -1627,29 +1651,38 @@
 }
 
 .db-pinned__compact-title {
-    flex: 1;
-    font-size: 0.6875rem;
-    font-weight: 600;
+    min-width: 48px;
+    flex: 1 1 140px;
+    font-size: 0.75rem;
+    font-weight: 650;
     color: var(--app-fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.db-pinned__compact-actions {
+    display: flex;
     min-width: 0;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 3px;
+    margin-left: auto;
 }
 
 .db-pinned__compact-action {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: var(--app-subtle-bg);
     color: var(--app-hint);
     cursor: pointer;
     flex-shrink: 0;
-    transition: color 0.15s, background 0.15s;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
 .db-pinned__compact-action--focus {
@@ -1658,27 +1691,73 @@
 
 .db-pinned__compact-action:hover {
     color: var(--app-fg);
+    border-color: var(--app-border);
     background: var(--app-secondary-bg);
+    transform: translateY(-1px);
 }
 
-.db-pinned__unpin-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: var(--app-hint);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: color 0.15s, background 0.15s;
+.db-pinned__compact-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
-.db-pinned__unpin-btn:hover {
+.db-pinned__compact-action--close:hover {
     color: #f87171;
     background: rgba(248, 113, 113, 0.1);
+}
+
+@media (min-width: 769px) {
+    .session-action-menu__mobile-only {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .db-pinned__compact-path-trigger {
+        display: none;
+    }
+
+    .db-pinned__compact-action--focus,
+    .db-pinned__compact-action--team {
+        display: none;
+    }
+
+    .db-pinned__compact-membership {
+        display: none;
+    }
+
+    .db-pinned__compact-membership-overflow {
+        display: none;
+    }
+
+    .db-pinned__compact-header {
+        padding-right: max(8px, env(safe-area-inset-right));
+        padding-left: max(8px, env(safe-area-inset-left));
+    }
+
+    .db-pinned__compact-row1 {
+        gap: 6px;
+    }
+
+    .db-pinned__compact-action {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+@media (max-width: 390px) {
+    .db-pinned__compact-row1 {
+        gap: 4px;
+    }
+
+    .db-pinned__compact-title {
+        font-size: 0.6875rem;
+    }
+
+    .db-pinned__compact-action {
+        width: 28px;
+        height: 28px;
+    }
 }
 
 /* Status accent top bar */

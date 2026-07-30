@@ -11,6 +11,21 @@ export type CodexReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhig
 export type ReasoningEffort = CodexReasoningEffort | string
 export type ClaudeEffort = 'auto' | 'medium' | 'high' | 'max'
 
+export type NewSessionDraft = {
+    machineId: string | null
+    directory: string
+    agent: AgentType
+    model: string
+    effort: ClaudeEffort
+    modelReasoningEffort: ReasoningEffort
+    yoloMode: boolean
+    sessionType: SessionType
+    worktreeName: string
+    resumeCodex: boolean
+    resumeCodexSessionId: string
+    opencodeSelectedModel: string | null
+}
+
 export const MODEL_OPTIONS: Record<AgentType, { value: string; label: string }[]> = {
     claude: [
         { value: 'auto', label: 'Default' },

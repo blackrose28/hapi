@@ -3,7 +3,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useAppContext } from '@/lib/app-context'
 import { useTranslation } from '@/lib/use-translation'
 import { useSessions } from '@/hooks/queries/useSessions'
-import { DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { AppDialogBody, AppDialogContent, AppDialogHeader } from '@/components/ui/app-dialog'
 import type { RootSearch } from '@/router'
 import type { SessionSummary } from '@/types/api'
 
@@ -81,15 +81,15 @@ export function ReplacePinModal(props: { onClose: () => void }) {
         .filter((s): s is SessionSummary => s !== undefined)
 
     return (
-        <DialogContent className="flex flex-col max-h-[85vh] w-[95vw] max-w-lg p-0 gap-0 overflow-hidden">
-            <DialogHeader className="p-4 pb-3 border-b border-[var(--app-border)]">
-                <DialogTitle className="text-xl font-semibold">Maximum Pins Reached</DialogTitle>
-                <DialogDescription className="text-sm text-[var(--app-hint)] mt-1">
-                    You can only pin up to 4 sessions. Select a session below to replace it with your new session, or skip pinning.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="app-scroll-y p-4 flex flex-col gap-2">
+        <AppDialogContent
+            presentation="sheet"
+            className="max-h-[85vh] w-[95vw] max-w-lg"
+        >
+            <AppDialogHeader
+                title="Maximum Pins Reached"
+                subtitle="You can only pin up to 4 sessions. Select a session below to replace it with your new session, or skip pinning."
+            />
+            <AppDialogBody className="app-scroll-y flex flex-col gap-2 p-4">
                 {pinnedSessions.map((s, index) => (
                     <button
                         key={s.id}
@@ -121,7 +121,7 @@ export function ReplacePinModal(props: { onClose: () => void }) {
                 >
                     Skip Pinning
                 </button>
-            </div>
-        </DialogContent>
+            </AppDialogBody>
+        </AppDialogContent>
     )
 }

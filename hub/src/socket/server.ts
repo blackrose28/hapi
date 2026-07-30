@@ -9,6 +9,7 @@ import { RpcRegistry } from './rpcRegistry'
 import type { SyncEvent } from '../sync/syncEngine'
 import { TerminalRegistry, type TerminalRegistryEntry } from './terminalRegistry'
 import { TerminalSessionStateStore } from './terminalSessionState'
+import { TerminalHistoryRequestRegistry } from './terminalHistoryRequests'
 import type { CliSocketWithData, SocketData, SocketServer } from './socketTypes'
 import type { RunnerAuthenticator } from '../auth/runnerAuthenticator'
 import { RunnerSocketAuthSchema } from '@hapi/protocol/runner-enrollment'
@@ -131,6 +132,7 @@ export function createSocketServer(deps: SocketServerDeps): {
         onIdle: (entry) => handleTerminalRegistryIdle(entry, terminalNs, cliNs)
     })
     const terminalSessionState = new TerminalSessionStateStore()
+    const terminalHistoryRequests = new TerminalHistoryRequestRegistry()
 
     cliNs.use((socket, next) => {
         const auth = socket.handshake.auth as Record<string, unknown> | undefined
@@ -157,6 +159,7 @@ export function createSocketServer(deps: SocketServerDeps): {
         store: deps.store,
         rpcRegistry,
         terminalRegistry,
+        terminalHistoryRequests,
         terminalSessionState,
         onSessionAlive: deps.onSessionAlive,
         onSessionEnd: deps.onSessionEnd,
@@ -188,6 +191,7 @@ export function createSocketServer(deps: SocketServerDeps): {
             return deps.store.machines.getMachine(machineId)
         },
         terminalRegistry,
+        terminalHistoryRequests,
         terminalSessionState,
         maxTerminalsPerSocket,
         maxTerminalsPerSession,

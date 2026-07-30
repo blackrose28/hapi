@@ -54,6 +54,39 @@ describe('useEditorState', () => {
         expect(result.current.activeTabId).toBe(result.current.tabs[1].id)
     })
 
+    it('keeps one session terminal container and reactivates it on duplicate opens', () => {
+        const { result } = renderHook(() => useEditorState())
+
+        act(() => {
+            result.current.openTerminal({ sessionId: 'session-1' })
+        })
+        const sessionTerminalId = result.current.tabs[0].id
+
+        act(() => {
+            result.current.openTerminal({ machineId: 'machine-1', cwd: '/repo' })
+            result.current.openTerminal({ shell: 'zsh', sessionId: 'session-1' })
+        })
+
+        expect(result.current.tabs).toHaveLength(2)
+        expect(result.current.tabs.filter((tab) => tab.sessionId === 'session-1')).toHaveLength(1)
+        expect(result.current.activeTabId).toBe(sessionTerminalId)
+    })
+
+    it('collapses duplicate persisted session terminal containers on initialization', () => {
+        const { result } = renderHook(() => useEditorState(undefined, undefined, {
+            tabs: [
+                { id: 'term-session-1', type: 'terminal', label: 'Terminal: bash', sessionId: 'session-1' },
+                { id: 'term-session-2', type: 'terminal', label: 'Terminal: bash (2)', sessionId: 'session-1' }
+            ],
+            activeTabId: 'term-session-2'
+        }))
+
+        expect(result.current.tabs).toEqual([
+            expect.objectContaining({ id: 'term-session-1', sessionId: 'session-1' })
+        ])
+        expect(result.current.activeTabId).toBe('term-session-1')
+    })
+
     it('does not use accidental click event objects as terminal labels', () => {
         const { result } = renderHook(() => useEditorState())
 

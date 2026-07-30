@@ -4,6 +4,13 @@ import { useAppContext } from '@/lib/app-context'
 import { useTeamChats } from '@/hooks/queries/useTeamChats'
 import { useTeamChatActions } from '@/hooks/mutations/useTeamChatActions'
 import type { TeamChat } from '@/types/api'
+import {
+    AppDialog,
+    AppDialogBody,
+    AppDialogContent,
+    AppDialogFooter,
+    AppDialogHeader,
+} from '@/components/ui/app-dialog'
 
 function getProjectName(project?: string): string {
     if (!project) return 'Team Chat'
@@ -174,11 +181,14 @@ export default function TeamChatsPage() {
                 )}
             </div>
             {createOpen ? (
-                <div role="dialog" aria-modal="true" aria-label="New Team Chat" className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 text-[var(--app-fg)] shadow-2xl">
-                        <div className="text-base font-semibold">New Team Chat</div>
-                        <div className="mt-1 text-sm text-[var(--app-hint)]">Start with an empty room. You can add sessions after it opens.</div>
-                        <div className="mt-4 space-y-3">
+                <AppDialog open onOpenChange={(open) => !open && setCreateOpen(false)}>
+                    <AppDialogContent presentation="alert" dismissible={false} className="max-w-md text-[var(--app-fg)]">
+                        <AppDialogHeader
+                            title="New Team Chat"
+                            subtitle="Start with an empty room. You can add sessions after it opens."
+                            closeDisabled={isPending}
+                        />
+                        <AppDialogBody className="space-y-3 p-4">
                             <div>
                                 <label htmlFor="team-chat-name" className="mb-1 block text-xs font-medium text-[var(--app-hint)]">Team Chat name</label>
                                 <input
@@ -201,9 +211,9 @@ export default function TeamChatsPage() {
                                     placeholder="Optional"
                                 />
                             </div>
-                        </div>
                         {createError ? <div className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{createError}</div> : null}
-                        <div className="mt-4 flex justify-end gap-2">
+                        </AppDialogBody>
+                        <AppDialogFooter>
                             <button
                                 type="button"
                                 disabled={isPending}
@@ -220,20 +230,27 @@ export default function TeamChatsPage() {
                             >
                                 Create Team Chat
                             </button>
-                        </div>
-                    </div>
-                </div>
+                        </AppDialogFooter>
+                    </AppDialogContent>
+                </AppDialog>
             ) : null}
             {deleteCandidate ? (
-                <div role="dialog" aria-modal="true" aria-label={`Delete ${deleteCandidate.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-bg)] p-4 text-[var(--app-fg)] shadow-2xl">
-                        <div className="text-base font-semibold">Delete Team Chat?</div>
-                        <div className="mt-2 text-sm text-[var(--app-hint)]">
-                            This archives <span className="font-medium text-[var(--app-fg)]">{deleteCandidate.name}</span>.
-                        </div>
-                        <div className="mt-1 text-sm text-[var(--app-hint)]">Sessions in this Team Chat will not be deleted.</div>
+                <AppDialog open onOpenChange={(open) => !open && setDeleteCandidate(null)}>
+                    <AppDialogContent presentation="alert" dismissible={false} className="max-w-md text-[var(--app-fg)]">
+                        <AppDialogHeader
+                            title="Delete Team Chat?"
+                            closeDisabled={isPending}
+                            subtitle={(
+                                <span>
+                                    This archives <span className="font-medium text-[var(--app-fg)]">{deleteCandidate.name}</span>.
+                                </span>
+                            )}
+                        />
+                        <AppDialogBody className="p-4 text-sm text-[var(--app-hint)]">
+                            <div>Sessions in this Team Chat will not be deleted.</div>
                         {deleteError ? <div className="mt-3 rounded-md bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-400">{deleteError}</div> : null}
-                        <div className="mt-4 flex justify-end gap-2">
+                        </AppDialogBody>
+                        <AppDialogFooter>
                             <button
                                 type="button"
                                 disabled={isPending}
@@ -250,9 +267,9 @@ export default function TeamChatsPage() {
                             >
                                 Delete Team Chat
                             </button>
-                        </div>
-                    </div>
-                </div>
+                        </AppDialogFooter>
+                    </AppDialogContent>
+                </AppDialog>
             ) : null}
         </div>
     )

@@ -77,6 +77,16 @@ describe('SessionTaskListControl', () => {
         expect(trigger).toHaveClass('session-task-badge', 'session-task-badge--active')
     })
 
+    it('uses the shared mobile sheet presentation', () => {
+        render(<SessionTaskListControl todos={todos} />)
+
+        fireEvent.click(screen.getByRole('button'))
+
+        expect(screen.getByRole('dialog'))
+            .toHaveAttribute('data-app-dialog-presentation', 'sheet')
+        expect(document.querySelector('[data-app-dialog-sheet-handle]')).toBeInTheDocument()
+    })
+
     it('stops compact trigger double-clicks from bubbling', () => {
         const onDoubleClick = vi.fn()
         render(<div onDoubleClick={onDoubleClick}><SessionTaskListControl todos={todos} compact /></div>)

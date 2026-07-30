@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Dialog } from '@/components/ui/dialog'
 import { TerminalModal } from './TerminalModal'
@@ -27,10 +27,10 @@ vi.mock('@/components/Terminal/SessionTerminalTabs', () => ({
     }
 }))
 
-function renderModal() {
+function renderModal(onClose = vi.fn()) {
     return render(
         <Dialog open>
-            <TerminalModal sessionId="session-1" onClose={vi.fn()} />
+            <TerminalModal sessionId="session-1" onClose={onClose} />
         </Dialog>
     )
 }
@@ -50,9 +50,31 @@ describe('TerminalModal', () => {
             terminalSupported: true
         }))
         expect(sharedTabsMock).toHaveBeenCalledWith(expect.not.objectContaining({
-            title: expect.anything(),
-            subtitle: expect.anything()
+            header: expect.anything()
         }))
+        expect(screen.getByRole('heading', { name: 'Terminal' })).toBeInTheDocument()
+        expect(screen.getByText('/tmp/project')).toBeInTheDocument()
+        expect(document.querySelector('[data-app-dialog-content]')).toBeInTheDocument()
+    })
+
+    it('uses the shared slim close control in the dialog header', () => {
+        renderModal()
+
+        const close = screen.getByRole('button', { name: 'Close' })
+        expect(close).toHaveClass('h-11', 'w-11')
+        expect(close.firstElementChild).toHaveClass('h-[28px]', 'w-[28px]', 'border')
+    })
+
+    it('uses the mobile workspace presentation and returns to the session', () => {
+        const onClose = vi.fn()
+        renderModal(onClose)
+
+        expect(screen.getByRole('dialog'))
+            .toHaveAttribute('data-app-dialog-presentation', 'workspace')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Back to session' }))
+
+        expect(onClose).toHaveBeenCalledOnce()
     })
 
     it('unmounts through shared tabs without legacy close', () => {

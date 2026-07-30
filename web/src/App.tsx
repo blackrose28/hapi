@@ -299,6 +299,7 @@ function AppInner() {
     const { subscriptionId } = useSSE({
         enabled: Boolean(api && session),
         baseUrl,
+        cacheScopeId: session ? `${session.organizationId}:${session.membershipId}` : undefined,
         subscription: eventSubscription,
         onConnect: handleSseConnect,
         onDisconnect: handleSseDisconnect,

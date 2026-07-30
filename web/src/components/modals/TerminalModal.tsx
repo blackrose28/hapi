@@ -3,7 +3,7 @@ import { useSession } from '@/hooks/queries/useSession'
 import { SessionTerminalTabs } from '@/components/Terminal/SessionTerminalTabs'
 import { LoadingState } from '@/components/LoadingState'
 import { isRemoteTerminalSupported } from '@/utils/terminalSupport'
-import { DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { AppDialogBody, AppDialogContent, AppDialogHeader } from '@/components/ui/app-dialog'
 
 export function TerminalModal(props: { sessionId: string; onClose: () => void }) {
     const sessionId = props.sessionId
@@ -20,16 +20,26 @@ export function TerminalModal(props: { sessionId: string; onClose: () => void })
     }
 
     return (
-        <DialogContent className="flex h-[85vh] max-h-[800px] w-[95vw] max-w-3xl flex-col gap-0 overflow-hidden border-[var(--app-border)] bg-[var(--app-bg)] p-0">
-            <DialogTitle className="sr-only">Terminal</DialogTitle>
-            <DialogDescription className="sr-only">Session terminal</DialogDescription>
-            <SessionTerminalTabs
-                sessionId={sessionId}
-                active={Boolean(session.active)}
-                terminalSupported={terminalSupported}
-                cwd={session.metadata?.path}
-                className="min-h-0 flex-1"
+        <AppDialogContent
+            presentation="workspace"
+            className="h-[85vh] max-h-[800px] w-[95vw] max-w-3xl"
+        >
+            <AppDialogHeader
+                title="Terminal"
+                subtitle={session.metadata?.name ?? session.metadata?.path}
+                mobileNavigation="back"
+                mobileBackLabel="Back to session"
+                onMobileBack={props.onClose}
             />
-        </DialogContent>
+            <AppDialogBody className="overflow-hidden p-0">
+                <SessionTerminalTabs
+                    sessionId={sessionId}
+                    active={Boolean(session.active)}
+                    terminalSupported={terminalSupported}
+                    cwd={session.metadata?.path}
+                    className="min-h-0 flex-1"
+                />
+            </AppDialogBody>
+        </AppDialogContent>
     )
 }

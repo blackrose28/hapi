@@ -136,6 +136,12 @@ describe('TeamSessionChatModal', () => {
         )
 
         expect(screen.getByRole('dialog', { name: /Direct chat with @UI/i })).toBeInTheDocument()
+        expect(screen.getByRole('dialog', { name: /Direct chat with @UI/i }))
+            .toHaveAttribute('data-app-dialog-presentation', 'workspace')
+        expect(screen.getByRole('heading', { name: 'Direct chat with @UI' })).toBeInTheDocument()
+        expect(document.querySelector('[data-app-dialog-content]')).toBeInTheDocument()
+        expect(screen.getAllByRole('button', { name: 'Close direct chat' })).toHaveLength(1)
+        expect(screen.getByRole('button', { name: 'Back to Team Chat' })).toBeInTheDocument()
         expect(screen.getByText('Messages here go only to this session, not the Team Chat.')).toBeInTheDocument()
         expect(screen.getByText('Frontend polish')).toBeInTheDocument()
         expect(screen.getByTestId('session-chat')).toHaveTextContent('Session Chat s2')
@@ -154,5 +160,47 @@ describe('TeamSessionChatModal', () => {
         expect(sendMessage).toHaveBeenCalledWith('private question', undefined)
         expect(onOpenFullSession).toHaveBeenCalledWith('s2')
         expect(onClose).toHaveBeenCalled()
+    })
+
+    it('returns to Team Chat through the mobile workspace Back control', () => {
+        const onClose = vi.fn()
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <TeamSessionChatModal
+                    api={{} as ApiClient}
+                    sessionId="s2"
+                    alias="UI"
+                    onClose={onClose}
+                    onOpenFullSession={vi.fn()}
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Back to Team Chat' }))
+
+        expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    it('closes through the shared dialog Escape behavior', () => {
+        const onClose = vi.fn()
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <TeamSessionChatModal
+                    api={{} as ApiClient}
+                    sessionId="s2"
+                    alias="UI"
+                    onClose={onClose}
+                    onOpenFullSession={vi.fn()}
+                />
+            </QueryClientProvider>
+        )
+
+        fireEvent.keyDown(document, { key: 'Escape' })
+
+        expect(onClose).toHaveBeenCalledTimes(1)
     })
 })

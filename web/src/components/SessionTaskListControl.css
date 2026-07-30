@@ -13,10 +13,10 @@
     height: 20px;
     gap: 5px;
     padding: 0 7px;
-    border: 1px solid #3c4655;
+    border: 1px solid var(--app-border);
     border-radius: 6px;
-    background: #20252d;
-    color: #c6d0df;
+    background: var(--app-subtle-bg);
+    color: var(--app-hint);
     font-size: 10px;
     font-weight: 700;
     line-height: 1;
@@ -25,9 +25,9 @@
 }
 
 .session-task-badge:hover {
-    border-color: #566275;
-    background: #272d36;
-    color: #eef3fb;
+    border-color: color-mix(in srgb, var(--app-link) 32%, var(--app-border));
+    background: var(--app-secondary-bg);
+    color: var(--app-fg);
     transform: translateY(-1px);
 }
 
@@ -47,7 +47,7 @@
 .session-task-badge--active {
     border-color: rgb(140 125 255 / 42%);
     background: rgb(140 125 255 / 10%);
-    color: #c7c0ff;
+    color: #6552c7;
 }
 
 .session-task-badge--active .session-task-badge__dot {
@@ -59,7 +59,7 @@
 .session-task-badge--pending {
     border-color: rgb(215 163 74 / 38%);
     background: rgb(215 163 74 / 9%);
-    color: #e6bd73;
+    color: #94600d;
 }
 
 .session-task-badge--pending .session-task-badge__dot {
@@ -69,11 +69,23 @@
 .session-task-badge--completed {
     border-color: rgb(70 211 154 / 34%);
     background: rgb(70 211 154 / 8%);
-    color: #79dfb6;
+    color: #147557;
 }
 
 .session-task-badge--completed .session-task-badge__dot {
     background: #46d39a;
+}
+
+[data-theme="dark"] .session-task-badge--active {
+    color: #c7c0ff;
+}
+
+[data-theme="dark"] .session-task-badge--pending {
+    color: #e6bd73;
+}
+
+[data-theme="dark"] .session-task-badge--completed {
+    color: #79dfb6;
 }
 
 .session-task-dialog {
@@ -91,13 +103,18 @@
     --session-task-active: #6552c7;
     --session-task-pending: #94600d;
     --session-task-completed: #147557;
-    width: calc(100vw - 24px);
-    max-width: 440px;
     border-color: var(--session-task-border);
-    border-radius: 14px;
     background: var(--session-task-surface);
     color: var(--session-task-text);
     box-shadow: 0 24px 64px var(--session-task-shadow), 0 0 0 1px var(--session-task-outline);
+}
+
+@media (min-width: 640px) {
+    .session-task-dialog {
+        width: calc(100vw - 24px);
+        max-width: 440px;
+        border-radius: 14px;
+    }
 }
 
 [data-theme="dark"] .session-task-dialog {
@@ -251,11 +268,5 @@
 
     .session-task-badge--active .session-task-badge__dot {
         animation: none;
-    }
-}
-
-@media (max-width: 375px) {
-    .session-task-dialog {
-        padding: 18px;
     }
 }

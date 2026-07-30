@@ -210,7 +210,7 @@ function FileListSkeleton(props: { label: string; rows?: number }) {
     )
 }
 
-import { DialogContent, DialogTitle, DialogHeader, DialogDescription } from '@/components/ui/dialog'
+import { AppDialogContent, AppDialogHeader } from '@/components/ui/app-dialog'
 import type { RootSearch } from '@/router'
 
 export function FilesModal(props: { sessionId: string; path?: string; onClose: () => void }) {
@@ -285,21 +285,28 @@ export function FilesModal(props: { sessionId: string; path?: string; onClose: (
     }, [])
 
     return (
-        <DialogContent className="flex flex-col h-[85vh] max-h-[800px] w-[95vw] max-w-3xl p-0 gap-0 overflow-hidden bg-[var(--app-bg)] border-[var(--app-border)]">
-            <DialogHeader className="p-4 pb-2 border-b border-[var(--app-border)] flex-row items-center gap-4">
-                <div className="flex-1">
-                    <DialogTitle className="text-xl font-semibold">Files</DialogTitle>
-                    <DialogDescription className="text-xs text-[var(--app-hint)] mt-1">{subtitle}</DialogDescription>
-                </div>
-                <button
-                    type="button"
-                    onClick={handleRefresh}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
-                    title="Refresh"
-                >
-                    <RefreshIcon />
-                </button>
-            </DialogHeader>
+        <AppDialogContent
+            presentation="workspace"
+            className="h-[85vh] max-h-[800px] w-[95vw] max-w-3xl"
+        >
+            <AppDialogHeader
+                title="Files"
+                subtitle={subtitle}
+                mobileNavigation="back"
+                mobileBackLabel="Back to session"
+                onMobileBack={props.onClose}
+                actions={(
+                    <button
+                        type="button"
+                        onClick={handleRefresh}
+                        aria-label="Refresh files"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border)] text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
+                        title="Refresh"
+                    >
+                        <RefreshIcon />
+                    </button>
+                )}
+            />
 
             <div className="bg-[var(--app-bg)]">
                 <div className="mx-auto w-full max-w-content p-3 border-b border-[var(--app-border)]">
@@ -446,6 +453,6 @@ export function FilesModal(props: { sessionId: string; path?: string; onClose: (
                     )}
                 </div>
             </div>
-        </DialogContent>
+        </AppDialogContent>
     )
 }

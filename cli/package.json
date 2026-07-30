@@ -43,7 +43,7 @@
     "prepack": "bun run prepare-npm-packages",
     "tools:unpack": "bun run scripts/unpack-tools.ts",
     "update-homebrew-formula": "bun run scripts/update-homebrew-formula.ts",
-    "test": "bun run tools:unpack && vitest run && bun test src/terminal/TerminalManager.test.ts",
+    "test": "bun run tools:unpack && vitest run && bun test src/terminal/TerminalManager.test.ts src/terminal/bashHistory.test.ts",
     "test:win": "vitest run",
     "dev": "bun src/index.ts",
     "dev:local-server": "bun --env-file .env.dev-local-server src/index.ts",
