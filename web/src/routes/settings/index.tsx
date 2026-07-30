@@ -556,7 +556,10 @@ export default function SettingsPage() {
                                 aria-expanded={isSessionListStatusOpen}
                                 aria-haspopup="listbox"
                             >
-                                <span className="text-[var(--app-fg)]">{t('settings.display.sessionListStatus')}</span>
+                                <div>
+                                    <div className="text-[var(--app-fg)]">{t('settings.display.sessionListStatus')}</div>
+                                    <div className="mt-0.5 text-xs leading-snug text-[var(--app-hint)]">{t('settings.display.sessionListStatus.detailedDescription')}</div>
+                                </div>
                                 <span className="flex items-center gap-1 text-[var(--app-hint)]">
                                     <span>{t(currentSessionListStatusModeLabel)}</span>
                                     <ChevronDownIcon className={`transition-transform ${isSessionListStatusOpen ? 'rotate-180' : ''}`} />
@@ -596,11 +599,6 @@ export default function SettingsPage() {
                                 </div>
                             )}
                         </div>
-                        {sessionListStatusMode === 'detailed' ? (
-                            <div className="px-3 pb-3 text-xs text-[var(--app-hint)]">
-                                {t('settings.display.sessionListStatus.detailedDescription')}
-                            </div>
-                        ) : null}
                     </div>
 
                     {/* Voice Assistant section */}

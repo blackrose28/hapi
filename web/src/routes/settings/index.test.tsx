@@ -145,6 +145,11 @@ describe('SettingsPage', () => {
         expect(screen.getAllByText('Follow System').length).toBeGreaterThanOrEqual(1)
     })
 
+    it('keeps the session status description visible', () => {
+        renderWithProviders(<SettingsPage />)
+        expect(screen.getByText('Shows why a session stopped: permission, input, background work, new activity, or a scheduled message (clock icon).')).toBeInTheDocument()
+    })
+
     it('uses correct i18n keys for Appearance setting', () => {
         const spyT = renderWithSpyT(<SettingsPage />)
         const calledKeys = spyT.mock.calls.map((call) => call[0])

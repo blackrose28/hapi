@@ -37,6 +37,7 @@ export type SessionSummaryMetadata = {
     summary?: { text: string }
     flavor?: string | null
     worktree?: WorktreeMetadata
+    agentSessionId?: string
     lastUserRequest?: string
     lifecycleState?: string
 }
