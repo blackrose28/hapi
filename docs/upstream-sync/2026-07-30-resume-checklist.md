@@ -102,7 +102,7 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `codex-subagent-goal` (8 commits)
 - [x] `codex-session-import-resume` (8 commits) — `apiTypes→schemas.ts` fold
 - [x] `codex-transcript-sync` (6 commits) — `apiTypes→schemas.ts` fold
-- [ ] `codex-fast-tier-ui` (6 commits) — `apiTypes→schemas.ts` fold
+- [x] codex-fast-tier-ui (6 commits) — `apiTypes→schemas.ts` fold
 - [ ] `codex-mcp-safety-approval` (6 commits)
 - [ ] `codex-new-capabilities` (5 commits)
 - [ ] `codex-reasoning-effort-modeswitch` (5 commits)
