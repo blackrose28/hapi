@@ -77,16 +77,16 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `export-session-conversation` (4 commits)
 - [x] `session-list-hover-tooltips` (2 commits)
 
-### Batch 3: CLI core
-- [ ] `cli-misc` (7 commits)
-- [ ] `cli-runner-session-lifecycle` (4 commits)
-- [ ] `resume-command-picker` (10 commits) — creates `cli/src/commands/resume.ts`; add kimi/pi/grok branches
-- [ ] `runner-resilience` (2 commits)
-- [ ] `stale-runner-pid-detection` (1 commit)
-- [ ] `stop-hub-cleanly` (1 commit)
-- [ ] `cli-mcp-transport` (3 commits)
-- [ ] `integration-test-isolation` (1 commit)
-- [ ] `title-update-prompts` (1 commit)
+### Batch 3: CLI core — ✅ DONE
+- [x] `cli-misc` (7 commits)
+- [x] `cli-runner-session-lifecycle` (4 commits)
+- [x] `resume-command-picker` (10 commits) — creates `cli/src/commands/resume.ts`; add kimi/pi/grok branches
+- [x] `runner-resilience` (2 commits)
+- [x] `stale-runner-pid-detection` (1 commit)
+- [x] `stop-hub-cleanly` (1 commit)
+- [x] `cli-mcp-transport` (3 commits)
+- [x] `integration-test-isolation` (1 commit)
+- [x] `title-update-prompts` (1 commit)
 
 ### Batch 4: Agent backends
 - [ ] `claude-backend-fixes` (7 commits)
