@@ -137,14 +137,11 @@ export class Store {
             6: () => this.migrateFromV6ToV7(),
             7: () => this.migrateFromV7ToV8(),
             8: () => this.migrateFromV8ToV9(),
-<<<<<<< HEAD
             9: () => this.migrateFromV9ToV10(),
             10: () => this.migrateFromV10ToV11(),
             11: () => this.migrateFromV11ToV12(),
             12: () => this.migrateFromV12ToV13(),
             13: () => this.migrateFromV13ToV14(),
-=======
->>>>>>> b2a30c2e (feat(hub,web): support scheduling messages for future delivery (#590))
         })
 
         if (currentVersion === 0) {

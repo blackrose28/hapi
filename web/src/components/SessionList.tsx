@@ -14,15 +14,11 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CopyIcon, CheckIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
-import { DEFAULT_SESSION_PREVIEW_LIMIT, useSessionPreviewLimit } from '@/hooks/useSessionPreviewLimit'
-import { useSessionListStatusMode } from '@/hooks/useSessionListStatusMode'
 import { classifySessionAttention } from '@/lib/sessionAttention'
-import { getSessionLastSeenAt } from '@/lib/sessionLastSeen'
 import { getAttentionLabel, SessionAttentionIndicator } from '@/components/SessionAttentionIndicator'
 import { HoverTooltip, SESSION_ROW_TOOLTIP_FOCUS_CLASS, useSessionRowTooltipIds } from '@/components/HoverTooltip'
 import { formatRelativeTime } from '@/lib/relativeTime'
 import { formatScheduledTooltipDetail } from '@/lib/scheduledTime'
-import { getCodexImportedAt, subscribeCodexImportedSessions } from '@/lib/codexImportedSessions'
 import { formatReopenError } from '@/lib/reopenError'
 import { compareSessionGroupOrder } from '@/lib/session-group-order'
 import { getArchiveAllDescription, getArchiveSessionDescription, getTotalKnownTerminalLiveCount } from '@/lib/archiveConfirmation'
@@ -614,7 +610,7 @@ function SessionItem(props: {
     selected?: boolean
 }) {
     const { t } = useTranslation()
-    const { showDetailedStatus } = useSessionListStatusMode()
+    const showDetailedStatus = true
     const { session: s, onSelect, showPath = true, api, selected = false } = props
     const { haptic } = usePlatform()
     const [menuOpen, setMenuOpen] = useState(false)
@@ -664,16 +660,17 @@ function SessionItem(props: {
         () => showDetailedStatus
             ? classifySessionAttention(s, {
                 selected,
-                lastSeenAt: getSessionLastSeenAt(s.id)
+                lastSeenAt: undefined
             })
             : null,
         [s, selected, showDetailedStatus]
     )
     const attentionLabel = attention ? getAttentionLabel(attention, t) : null
-    const scheduledLabel = s.futureScheduledMessageCount > 1
-        ? t('session.item.scheduledMessages', { count: s.futureScheduledMessageCount })
+    const scheduledCount = s.futureScheduledMessageCount ?? 0
+    const scheduledLabel = scheduledCount > 1
+        ? t('session.item.scheduledMessages', { count: scheduledCount })
         : t('session.item.scheduledMessage')
-    const hasScheduleTooltip = showDetailedStatus && s.futureScheduledMessageCount > 0
+    const hasScheduleTooltip = showDetailedStatus && scheduledCount > 0
     const { attentionId, scheduleId, describedBy } = useSessionRowTooltipIds(
         Boolean(attention),
         hasScheduleTooltip
@@ -832,8 +829,9 @@ function SessionItem(props: {
 function ProjectGroupActions(props: {
     group: SessionGroup
     api: ApiClient | null
+    onNewSessionInDirectory?: (input: { machineId: string | null; directory: string }) => void
 }) {
-    const { group, api } = props
+    const { group, api, onNewSessionInDirectory } = props
     const { t } = useTranslation()
     const navigate = useNavigate()
     const queryClient = useQueryClient()
@@ -885,6 +883,23 @@ function ProjectGroupActions(props: {
     return (
         <>
             <div className="flex items-center gap-0 opacity-0 group-hover/project:opacity-100 transition-opacity duration-150 shrink-0">
+                {onNewSessionInDirectory && group.directory && group.directory !== 'Other' ? (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onNewSessionInDirectory({
+                                machineId: group.machineId,
+                                directory: group.directory!
+                            })
+                        }}
+                        className="p-1 rounded text-[var(--app-hint)] hover:text-[var(--app-fg)] hover:bg-[var(--app-subtle-bg)] transition-colors"
+                        title="New session in this directory"
+                        aria-label="New session in this directory"
+                    >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                    </button>
+                ) : null}
                 {canOpenInEditor ? (
                     <button
                         type="button"
@@ -955,6 +970,7 @@ export function SessionList(props: {
     sessions: SessionSummary[]
     onSelect: (sessionId: string) => void
     onNewSession: () => void
+    onNewSessionInDirectory?: (input: { machineId: string | null; directory: string }) => void
     onBrowse?: () => void
     onRefresh: () => void
     isLoading: boolean
@@ -1076,9 +1092,11 @@ export function SessionList(props: {
         })
     }
 
-    // Auto-expand group (and machine) containing selected session
+    const prevSelectedSessionIdRef = useRef(selectedSessionId)
     useEffect(() => {
         if (!selectedSessionId) return
+        if (prevSelectedSessionIdRef.current === selectedSessionId) return
+        prevSelectedSessionIdRef.current = selectedSessionId
         setCollapseOverrides(prev => {
             const group = allGroups.find(g =>
                 g.sessions.some(s => s.id === selectedSessionId)
@@ -1204,6 +1222,7 @@ export function SessionList(props: {
                                                     <ProjectGroupActions
                                                         group={group}
                                                         api={api}
+                                                        onNewSessionInDirectory={props.onNewSessionInDirectory}
                                                     />
                                                 </div>
 

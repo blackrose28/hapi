@@ -102,14 +102,16 @@ describe('SessionList directory action', () => {
 })
 
 describe('SessionList collapse behavior', () => {
+    const testQueryClient = new QueryClient({
+        defaultOptions: {
+            queries: { retry: false },
+            mutations: { retry: false },
+        }
+    })
+
     function renderSessionList(sessions: SessionSummary[], selectedSessionId = 'session-running') {
         return (
-            <QueryClientProvider client={new QueryClient({
-                defaultOptions: {
-                    queries: { retry: false },
-                    mutations: { retry: false },
-                }
-            })}>
+            <QueryClientProvider client={testQueryClient}>
                 <I18nProvider>
                     <SessionList
                         sessions={sessions}

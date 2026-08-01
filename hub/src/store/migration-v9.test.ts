@@ -166,14 +166,14 @@ describe('Store V9: scheduled_at store operations', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
         const futureMs = Date.now() + 60_000
-        const msg = store.messages.addMessage(session.id, 'hello', 'local-1', futureMs)
+        const msg = store.messages.addMessage(session.id, 'hello', 'local-1', futureMs).message
         expect(msg.scheduledAt).toBe(futureMs)
     })
 
     it('addMessage without scheduledAt has scheduledAt = null', () => {
         const store = new Store(':memory:')
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
-        const msg = store.messages.addMessage(session.id, 'hello', 'local-1')
+        const msg = store.messages.addMessage(session.id, 'hello', 'local-1').message
         expect(msg.scheduledAt).toBeNull()
     })
 
@@ -185,7 +185,7 @@ describe('Store V9: scheduled_at store operations', () => {
         const future = now + 60_000
 
         // Mature: scheduled_at in the past
-        const mature = store.messages.addMessage(session.id, 'mature', 'local-mature', past)
+        const mature = store.messages.addMessage(session.id, 'mature', 'local-mature', past).message
         // Future: not yet mature
         store.messages.addMessage(session.id, 'future', 'local-future', future)
         // No scheduledAt: not scheduled
@@ -202,7 +202,7 @@ describe('Store V9: scheduled_at store operations', () => {
         const now = Date.now()
         const past = now - 1000
 
-        const msg = store.messages.addMessage(session.id, 'mature', 'local-m', past)
+        const msg = store.messages.addMessage(session.id, 'mature', 'local-m', past).message
         // Simulate CLI ack
         store.messages.markMessagesInvoked(session.id, ['local-m'], now)
 
@@ -215,8 +215,8 @@ describe('Store V9: scheduled_at store operations', () => {
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
         const now = Date.now()
 
-        const msg2 = store.messages.addMessage(session.id, 'second', 'local-2', now - 500)
-        const msg1 = store.messages.addMessage(session.id, 'first', 'local-1', now - 1000)
+        const msg2 = store.messages.addMessage(session.id, 'second', 'local-2', now - 500).message
+        const msg1 = store.messages.addMessage(session.id, 'first', 'local-1', now - 1000).message
 
         const results = store.messages.getMatureScheduledMessages(now)
         expect(results.map(m => m.id)).toEqual([msg1.id, msg2.id])
@@ -228,7 +228,7 @@ describe('Store V9: scheduled_at store operations', () => {
         const now = Date.now()
 
         // Immediate queued (no scheduledAt) — included
-        const immediate = store.messages.addMessage(session.id, 'immediate', 'local-imm')
+        const immediate = store.messages.addMessage(session.id, 'immediate', 'local-imm').message
         // Mature scheduled — must be excluded so the mature-scan path can deliver it
         // with the no-stamp + re-emit-until-ack contract.
         store.messages.addMessage(session.id, 'mature', 'local-mature', now - 1000)
@@ -245,7 +245,7 @@ describe('Store V9: scheduled_at store operations', () => {
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
         const now = Date.now()
 
-        const msg = store.messages.addMessage(session.id, 'q', 'local-q')
+        const msg = store.messages.addMessage(session.id, 'q', 'local-q').message
         store.messages.markMessagesInvoked(session.id, ['local-q'], now)
 
         const results = store.messages.getImmediateQueuedLocalMessages(session.id)
@@ -257,7 +257,7 @@ describe('Store V9: scheduled_at store operations', () => {
         const session = store.sessions.getOrCreateSession('test', { path: '/tmp' }, null, 'default')
         const future = Date.now() + 60_000
 
-        const scheduled = store.messages.addMessage(session.id, 'future', 'local-f', future)
+        const scheduled = store.messages.addMessage(session.id, 'future', 'local-f', future).message
 
         const results = store.messages.getUninvokedLocalMessages(session.id)
         expect(results.map(m => m.id)).toContain(scheduled.id)

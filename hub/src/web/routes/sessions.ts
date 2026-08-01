@@ -103,7 +103,7 @@ export function createSessionsRoutes(
         const getPendingCount = (s: Session) => s.agentState?.requests ? Object.keys(s.agentState.requests).length : 0
 
         const organizationId = c.get('organizationId')
-        const sessions = engine.getSessionsByNamespace(organizationId)
+        const sessionRecords = engine.getSessionsByNamespace(organizationId)
             .filter((session) => !(requireCapability(
                 c, options.capabilityResolver, 'session', session.id, 'view'
             ) instanceof Response))
@@ -121,23 +121,19 @@ export function createSessionsRoutes(
                 // Then by updatedAt
                 return b.updatedAt - a.updatedAt
             })
-<<<<<<< HEAD
-            .map((session) => withKnownTerminalCount(
-                toSessionSummary(session),
-                options.getTerminalLiveCount?.(session.id, organizationId)
-            ))
-=======
         const scheduledCounts = engine.getFutureScheduledMessageCounts(sessionRecords.map((session) => session.id))
         const nextScheduledAt = engine.getNextScheduledAtBySessionIds(sessionRecords.map((session) => session.id))
         const sessions = sessionRecords.map((session) => {
-            const summary = toSessionSummary(session)
+            const summary = withKnownTerminalCount(
+                toSessionSummary(session),
+                options.getTerminalLiveCount?.(session.id, organizationId)
+            )
             return {
                 ...summary,
                 futureScheduledMessageCount: scheduledCounts.get(session.id) ?? 0,
                 nextScheduledAt: nextScheduledAt.get(session.id) ?? null
             }
         })
->>>>>>> ce67823f (feat(web,hub): rich hover tooltips on session-list attention indicators (#941))
 
         return c.json({ sessions })
     })
@@ -225,7 +221,6 @@ export function createSessionsRoutes(
         }
 
         return c.json(result.payload)
-    })
     })
 
     app.get('/sessions/:id', (c) => {

@@ -44,7 +44,7 @@ function createApp(opts: {
         c.set('namespace', 'default')
         await next()
     })
-    app.route('/api', createMessagesRoutes(() => engine as SyncEngine))
+    app.route('/api', createMessagesRoutes(() => engine as SyncEngine, () => 'manage'))
 
     return { app, sentMessages }
 }

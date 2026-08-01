@@ -11,6 +11,7 @@ function msg(overrides: Partial<StoredMessage> = {}): StoredMessage {
         seq: 1,
         localId: null,
         invokedAt: null,
+        scheduledAt: null,
         ...overrides
     }
 }

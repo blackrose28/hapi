@@ -274,7 +274,6 @@ export function ScheduleTimePicker({ onSchedule, onClose, anchorRef, pendingSche
     return (
         <div
             ref={panelRef}
-            role="dialog"
             aria-label={t('composer.scheduleSend')}
             style={
                 isMobilePanel

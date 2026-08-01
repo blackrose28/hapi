@@ -171,6 +171,24 @@ export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlers
         return
     }
 
+    if (socket.data.runnerClientType === 'session-scoped') {
+        registerSessionHandlers(socket, {
+            store,
+            resolveSessionAccess,
+            emitAccessError,
+            onSessionAlive,
+            onSessionReady,
+            onSessionEnd,
+            onWebappEvent,
+            onBackgroundTaskDelta,
+            onSessionActivity,
+            onSessionCrashed,
+            onAgentTextMessage,
+            onSweepImmediateQueued
+        })
+        return
+    }
+
     registerSessionHandlers(socket, {
         store,
         resolveSessionAccess,

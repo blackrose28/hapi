@@ -70,7 +70,7 @@ const haptic: PlatformHaptic = {
 export function usePlatform(): Platform {
     const isTelegram = useMemo(() => isTelegramApp(), [])
     const isTouch = useMemo(
-        () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+        () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
         []
     )
 

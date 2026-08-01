@@ -579,8 +579,6 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
 
 export type SyncEvent = z.infer<typeof SyncEventSchema>
 
-<<<<<<< HEAD
-
 export const ScratchlistAttachmentMetadataSchema = z.object({
     id: z.string(),
     filename: z.string(),

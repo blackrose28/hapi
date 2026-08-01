@@ -112,7 +112,7 @@ describe('MessageService goal status filtering', () => {
         store.messages.addMessage(session.id, redundantGoalStatusContent('No goal to clear'))
 
         const service = new MessageService(store, makeIo(() => {}), makePublisher() as any)
-        const page = service.getMessagesPage(session.id, { limit: 10, before: null })
+        const page = service.getMessagesPage(session.id, { limit: 10, beforeSeq: null })
 
         expect(page.messages.map(message => message.content)).toEqual([
             { role: 'user', content: { type: 'text', text: '/goal ship it' } },
@@ -124,17 +124,23 @@ describe('MessageService goal status filtering', () => {
         const store = makeStore()
         const session = makeSession(store, 'session-export-visible')
 
-        const first = store.messages.addMessage(session.id, { role: 'user', content: 'Hello' })
-        const queued = store.messages.addMessage(session.id, { role: 'user', content: 'Queued' }, 'local-queued')
+        const first = store.messages.addMessage(session.id, { role: 'user', content: 'Hello' }).message
+        const queued = store.messages.addMessage(session.id, { role: 'user', content: 'Queued' }, 'local-queued').message
         store.messages.addMessage(session.id, redundantGoalStatusContent('Goal active'))
         const hiddenSystem = store.messages.addMessage(session.id, {
             role: 'agent',
             content: {
-                type: 'output',
+                type: 'claude',
                 data: { type: 'system', subtype: 'init', uuid: 'sys-init' }
             }
-        })
-        const second = store.messages.addMessage(session.id, { role: 'agent', content: 'Hi' })
+        }).message
+        const second = store.messages.addMessage(session.id, {
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: { type: 'message', text: 'Hi' }
+            }
+        }).message
 
         const service = new MessageService(store, makeIo(() => {}), makePublisher() as any)
         const result = service.getSessionExport(session.id, toProtocolSession(session))
@@ -155,12 +161,12 @@ describe('MessageService goal status filtering', () => {
             { role: 'user', content: { type: 'text', text: 'Scheduled' } },
             'local-scheduled',
             Date.now() + 60_000
-        )
+        ).message
         const normal = store.messages.addMessage(
             session.id,
             { role: 'user', content: { type: 'text', text: 'Normal' } },
             'local-normal'
-        )
+        ).message
         store.messages.markMessagesInvoked(session.id, ['local-normal'], 2_000)
         store.messages.markMessagesInvoked(session.id, ['local-scheduled'], 3_000)
 
@@ -176,8 +182,8 @@ describe('MessageService goal status filtering', () => {
         const store = makeStore()
         const session = makeSession(store, 'session-export-cap')
 
-        store.messages.addMessage(session.id, { role: 'user', content: 'One' })
-        store.messages.addMessage(session.id, { role: 'agent', content: 'Two' })
+        store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'One' } })
+        store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'Two' } })
 
         const service = new MessageService(store, makeIo(() => {}), makePublisher() as any)
         const result = service.getSessionExport(session.id, toProtocolSession(session), 1)
@@ -193,11 +199,11 @@ describe('MessageService goal status filtering', () => {
         const store = makeStore()
         const session = makeSession(store, 'goal-status-pagination')
 
-        const user = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: '/goal ship it' } })
+        const user = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: '/goal ship it' } }).message
         store.messages.addMessage(session.id, redundantGoalStatusContent('Goal active'))
 
         const service = new MessageService(store, makeIo(() => {}), makePublisher() as any)
-        const latest = service.getMessagesPage(session.id, { limit: 1, before: null })
+        const latest = service.getMessagesPage(session.id, { limit: 1, beforeSeq: null })
 
         expect(latest.messages).toHaveLength(1)
         expect(latest.messages[0]?.id).toBe(user.id)
@@ -209,11 +215,11 @@ describe('MessageService goal status filtering', () => {
         const store = makeStore()
         const session = makeSession(store, 'goal-status-position-pagination')
 
-        const user = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: '/goal ship it' } })
+        const user = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: '/goal ship it' } }).message
         store.messages.addMessage(session.id, redundantGoalStatusContent('Goal active · 8016 tokens'))
 
         const service = new MessageService(store, makeIo(() => {}), makePublisher() as any)
-        const latest = service.getMessagesPage(session.id, { limit: 1, before: null })
+        const latest = service.getMessagesPageByPosition(session.id, { limit: 1, before: null })
 
         expect(latest.messages).toHaveLength(1)
         expect(latest.messages[0]?.id).toBe(user.id)
@@ -230,14 +236,14 @@ describe('MessageService message pagination', () => {
     it('returns the latest page with a composite cursor', () => {
         const store = makeStore()
         const session = makeSession(store, 'page-first')
-        const first = store.messages.addMessage(session.id, 'first', 'local-first')
-        const second = store.messages.addMessage(session.id, 'second', 'local-second')
-        const third = store.messages.addMessage(session.id, 'third', 'local-third')
+        const first = store.messages.addMessage(session.id, 'first', 'local-first').message
+        const second = store.messages.addMessage(session.id, 'second', 'local-second').message
+        const third = store.messages.addMessage(session.id, 'third', 'local-third').message
         store.messages.markMessagesInvoked(session.id, ['local-first'], 1_000)
         store.messages.markMessagesInvoked(session.id, ['local-second'], 2_000)
         store.messages.markMessagesInvoked(session.id, ['local-third'], 3_000)
 
-        const page = makeService(store).getMessagesPage(session.id, { limit: 2, before: null })
+        const page = makeService(store).getMessagesPageByPosition(session.id, { limit: 2, before: null })
 
         expect(page.messages.map((message) => message.id)).toEqual([second.id, third.id])
         expect(page.page.nextBeforeAt).toBe(2_000)
@@ -249,15 +255,15 @@ describe('MessageService message pagination', () => {
     it('uses the composite cursor for older pages', () => {
         const store = makeStore()
         const session = makeSession(store, 'page-older')
-        const first = store.messages.addMessage(session.id, 'first', 'local-first')
-        const second = store.messages.addMessage(session.id, 'second', 'local-second')
-        const third = store.messages.addMessage(session.id, 'third', 'local-third')
+        const first = store.messages.addMessage(session.id, 'first', 'local-first').message
+        const second = store.messages.addMessage(session.id, 'second', 'local-second').message
+        const third = store.messages.addMessage(session.id, 'third', 'local-third').message
         store.messages.markMessagesInvoked(session.id, ['local-first'], 1_000)
         store.messages.markMessagesInvoked(session.id, ['local-second'], 2_000)
         store.messages.markMessagesInvoked(session.id, ['local-third'], 3_000)
 
-        const latest = makeService(store).getMessagesPage(session.id, { limit: 2, before: null })
-        const older = makeService(store).getMessagesPage(session.id, {
+        const latest = makeService(store).getMessagesPageByPosition(session.id, { limit: 2, before: null })
+        const older = makeService(store).getMessagesPageByPosition(session.id, {
             limit: 2,
             before: { at: latest.page.nextBeforeAt!, seq: latest.page.nextBeforeSeq! }
         })
@@ -273,13 +279,13 @@ describe('MessageService message pagination', () => {
     it('breaks equal timestamp ties by seq', () => {
         const store = makeStore()
         const session = makeSession(store, 'page-tie')
-        const first = store.messages.addMessage(session.id, 'first', 'local-first')
-        const second = store.messages.addMessage(session.id, 'second', 'local-second')
-        const third = store.messages.addMessage(session.id, 'third', 'local-third')
+        const first = store.messages.addMessage(session.id, 'first', 'local-first').message
+        const second = store.messages.addMessage(session.id, 'second', 'local-second').message
+        const third = store.messages.addMessage(session.id, 'third', 'local-third').message
         store.messages.markMessagesInvoked(session.id, ['local-first', 'local-second', 'local-third'], 1_000)
 
-        const latest = makeService(store).getMessagesPage(session.id, { limit: 2, before: null })
-        const older = makeService(store).getMessagesPage(session.id, {
+        const latest = makeService(store).getMessagesPageByPosition(session.id, { limit: 2, before: null })
+        const older = makeService(store).getMessagesPageByPosition(session.id, {
             limit: 2,
             before: { at: latest.page.nextBeforeAt!, seq: latest.page.nextBeforeSeq! }
         })
@@ -293,11 +299,11 @@ describe('MessageService message pagination', () => {
     it('orders scheduled queued messages by their display position without changing the cursor', () => {
         const store = makeStore()
         const session = makeSession(store, 'page-scheduled')
-        const scheduled = store.messages.addMessage(session.id, 'scheduled', 'local-scheduled', Date.now() + 60_000)
-        const invoked = store.messages.addMessage(session.id, 'invoked', 'local-invoked')
+        const scheduled = store.messages.addMessage(session.id, 'scheduled', 'local-scheduled', Date.now() + 60_000).message
+        const invoked = store.messages.addMessage(session.id, 'invoked', 'local-invoked').message
         store.messages.markMessagesInvoked(session.id, ['local-invoked'], scheduled.createdAt + 1_000)
 
-        const page = makeService(store).getMessagesPage(session.id, { limit: 1, before: null })
+        const page = makeService(store).getMessagesPageByPosition(session.id, { limit: 1, before: null })
 
         expect(page.messages.map((message) => message.id)).toEqual([scheduled.id, invoked.id])
         expect(page.page.nextBeforeAt).toBe(scheduled.createdAt + 1_000)
@@ -306,7 +312,6 @@ describe('MessageService message pagination', () => {
     })
 })
 
->>>>>>> f086949a (feat(web,hub): export session conversation (#808))
 describe('MessageService.cancelQueuedMessage race scenarios', () => {
     describe('Race-A: CLI ack removed:true → DELETE + status=cancelled', () => {
         it('returns cancelled and emits message-cancelled SSE after CLI confirms removal', async () => {
@@ -316,7 +321,7 @@ describe('MessageService.cancelQueuedMessage race scenarios', () => {
                 session.id,
                 { role: 'user', content: { type: 'text', text: 'hello' } },
                 'local-a'
-            )
+            ).message
 
             const publisher = makePublisher()
             const io = makeIo((callback) => {
@@ -351,7 +356,7 @@ describe('MessageService.cancelQueuedMessage race scenarios', () => {
                 session.id,
                 { role: 'user', content: { type: 'text', text: 'hello' } },
                 'local-b'
-            )
+            ).message
 
             const publisher = makePublisher()
             const io = makeIo((callback) => {
@@ -402,7 +407,7 @@ describe('MessageService.cancelQueuedMessage race scenarios', () => {
                 session.id,
                 { role: 'user', content: { type: 'text', text: 'hello' } },
                 'local-c'
-            )
+            ).message
 
             const publisher = makePublisher()
             const io = makeIo((callback) => {
@@ -452,7 +457,7 @@ describe('MessageService.cancelQueuedMessage race scenarios', () => {
                 session.id,
                 { role: 'user', content: { type: 'text', text: 'hello' } },
                 'local-offline'
-            )
+            ).message
 
             let ackCalled = false
             // socketCount=0 → adapter.rooms.get() returns undefined → cliCount = 0
@@ -497,7 +502,7 @@ describe('MessageService.cancelQueuedMessage race scenarios', () => {
                 session.id,
                 { role: 'user', content: { type: 'text', text: 'hello' } },
                 'local-d'
-            )
+            ).message
 
             // DB row was already marked invoked (e.g. by a concurrent messages-consumed)
             const invokedAt = Date.now()
@@ -533,7 +538,7 @@ describe('MessageService.cancelQueuedMessage race scenarios', () => {
                 session.id,
                 { role: 'user', content: { type: 'text', text: 'hello' } },
                 'local-e'
-            )
+            ).message
 
             const publisher = makePublisher()
             // Reconnect-overlap scenario: one socket timed out (err set by Socket.IO),
@@ -587,7 +592,7 @@ describe('MessageService — cancel × mature race (scheduled messages)', () => 
             { role: 'user', content: { type: 'text', text: 'sched' } },
             'local-sched-race',
             past
-        )
+        ).message
 
         // Simulate: mature tick already emitted to CLI, CLI shifted the item.
         // Cancel arrives and CLI returns not-found (item already shift()-ed).
@@ -636,7 +641,7 @@ describe('MessageService.cancelQueuedMessage — future-scheduled message', () =
             { role: 'user', content: { type: 'text', text: 'scheduled future' } },
             'local-future-cancel',
             futureMs
-        )
+        ).message
 
         // CLI responds not-found: the message was never emitted there
         let ackCalled = false
@@ -685,7 +690,7 @@ describe('MessageService.cancelQueuedMessage — future-scheduled message', () =
             { role: 'user', content: { type: 'text', text: 'future offline' } },
             'local-future-offline',
             futureMs
-        )
+        ).message
 
         let ackCalled = false
         const io = makeIo(() => { ackCalled = true }, 0) // CLI offline

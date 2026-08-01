@@ -121,8 +121,6 @@ describe('isExternalUserMessage', () => {
     })
 })
 
-<<<<<<< HEAD
-
 describe('ApiSessionClient.updateMetadata', () => {
     const now = 1_710_000_000_000
 

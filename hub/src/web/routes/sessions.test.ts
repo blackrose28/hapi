@@ -54,6 +54,8 @@ function createApp(session: Session, opts?: {
     resumeSession?: (sessionId: string, namespace: string, resumeOpts?: { permissionMode?: string }) => Promise<{ type: string; sessionId?: string; message?: string; code?: string }>
     getTerminalLiveCount?: (sessionId: string, namespace: string) => number | undefined
     getUserCapability?: () => 'view' | 'interact' | 'spawn' | 'operate' | 'manage' | null
+    getFutureScheduledMessageCounts?: (sessionIds: string[]) => Map<string, number>
+    getNextScheduledAtBySessionIds?: (sessionIds: string[]) => Map<string, number>
     listAgentModelsForSession?: () => Promise<{
         status: 'dynamic' | 'fallback' | 'unsupported' | 'failed'
         models: Array<{ id: string; displayName: string }>
@@ -146,6 +148,8 @@ function createApp(session: Session, opts?: {
         cacheGrokModelsForSession,
         cacheAgentModelsForSession,
         resumeSession,
+        getFutureScheduledMessageCounts: opts?.getFutureScheduledMessageCounts ?? (() => new Map()),
+        getNextScheduledAtBySessionIds: opts?.getNextScheduledAtBySessionIds ?? (() => new Map()),
         getSessionExport: opts?.getSessionExport ?? (() => ({
             type: 'success',
             payload: {
@@ -187,7 +191,6 @@ function createApp(session: Session, opts?: {
 }
 
 describe('sessions routes', () => {
-<<<<<<< HEAD
     it('filters ungranted collections and rejects read-only bulk control', async () => {
         const session = createSession()
         const denied = createApp(session, { getUserCapability: () => null })

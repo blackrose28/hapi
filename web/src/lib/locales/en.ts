@@ -94,7 +94,6 @@ const en = {
   // Session inactive
   'session.inactive.autoResume': 'This session is inactive. Send a message to resume.',
   'session.inactive.cannotResume': 'This session is inactive and cannot be resumed.',
->>>>>>> ce67823f (feat(web,hub): rich hover tooltips on session-list attention indicators (#941))
 
   // Session header
   'session.title': 'Files',

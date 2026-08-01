@@ -52,16 +52,17 @@ export function formatScheduledFireLabel(
 
 /** Session-list clock tooltip body from summary fields. */
 export function formatScheduledTooltipDetail(
-    summary: { futureScheduledMessageCount: number; nextScheduledAt: number | null },
+    summary: { futureScheduledMessageCount?: number; nextScheduledAt?: number | null },
     t: (key: string, params?: Record<string, string | number>) => string
 ): string {
     if (summary.nextScheduledAt != null) {
         const when = formatScheduledFireLabel(summary.nextScheduledAt, t)
         if (when) {
-            if (summary.futureScheduledMessageCount > 1) {
+            const count = summary.futureScheduledMessageCount ?? 0
+            if (count > 1) {
                 return t('session.tooltip.scheduled.next', {
                     when,
-                    more: summary.futureScheduledMessageCount - 1
+                    more: count - 1
                 })
             }
             return t('session.tooltip.scheduled.fires', { when })

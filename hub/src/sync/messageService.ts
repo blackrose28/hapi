@@ -63,7 +63,8 @@ function isExportVisibleStoredMessage(message: StoredMessageForDelivery): boolea
     }
 
     const data = (inner as { data?: unknown }).data
-    return isClaudeChatVisibleMessage(data)
+    if (!isObject(data)) return false
+    return isClaudeChatVisibleMessage(data as { type: unknown; subtype?: unknown })
 }
 
 export class MessageService {
@@ -75,7 +76,10 @@ export class MessageService {
     ) {
     }
 
-    getMessagesPage(sessionId: string, options: { limit: number; beforeSeq: number | null }): {
+    getMessagesPage(
+        sessionId: string,
+        options: { limit: number; beforeSeq: number | null }
+    ): {
         messages: DecryptedMessage[]
         page: {
             limit: number
@@ -84,31 +88,35 @@ export class MessageService {
             hasMore: boolean
         }
     } {
-        const stored = this.store.messages.getMessages(sessionId, options.limit, options.beforeSeq ?? undefined)
-        const messages: DecryptedMessage[] = stored.map((message) => ({
-            id: message.id,
-            seq: message.seq,
-            localId: message.localId,
-            content: message.content,
-            createdAt: message.createdAt,
-            invokedAt: message.invokedAt,
-            scheduledAt: message.scheduledAt
-        }))
+        let cursor: number | undefined = options.beforeSeq ?? undefined
+        const messages: DecryptedMessage[] = []
+        let lastBatchLength = 0
+        let oldestSeqInScan: number | null = null
 
-        let oldestSeq: number | null = null
-        for (const message of messages) {
-            if (typeof message.seq !== 'number') continue
-            if (oldestSeq === null || message.seq < oldestSeq) {
-                oldestSeq = message.seq
+        do {
+            const batch = this.store.messages.getMessages(sessionId, options.limit, cursor)
+            lastBatchLength = batch.length
+            if (batch.length === 0) break
+
+            const batchOldest = batch[0]?.seq ?? null
+            if (batchOldest !== null) {
+                cursor = batchOldest
+                if (oldestSeqInScan === null || batchOldest < oldestSeqInScan) {
+                    oldestSeqInScan = batchOldest
+                }
             }
-        }
 
+            const visible = toVisibleDecryptedMessages(batch)
+            messages.unshift(...visible)
+        } while (messages.length < options.limit && lastBatchLength === options.limit)
+
+        const oldestSeq = messages[0]?.seq ?? oldestSeqInScan
         const nextBeforeSeq = oldestSeq
         const hasMore = nextBeforeSeq !== null
             && this.store.messages.getMessages(sessionId, 1, nextBeforeSeq).length > 0
 
         return {
-            messages,
+            messages: messages.slice(-options.limit),
             page: {
                 limit: options.limit,
                 beforeSeq: options.beforeSeq,
@@ -163,45 +171,44 @@ export class MessageService {
             hasMore: boolean
         }
     } {
-        const before = options.before ?? undefined
-        const pageRows = this.store.messages.getMessagesByPosition(sessionId, options.limit, before)
+        let cursor = options.before ?? undefined
+        const messages: DecryptedMessage[] = []
+        let lastBatchLength = 0
+        let oldestSeqInScan: number | null = null
+        let oldestPositionAtInScan: number | null = null
 
-        // Latest-page request (no cursor): also include uninvoked local user messages
-        // out-of-band, so refresh / secondary clients can still see queued rows even
-        // when their position key (createdAt) places them outside the latest page.
-        // The cursor stays anchored to pageRows so out-of-band rows don't affect
-        // pagination of older pages.
-        const queuedRows = before === undefined
-            ? this.store.messages.getUninvokedLocalMessages(sessionId)
-            : []
+        do {
+            const pageRows = this.store.messages.getMessagesByPosition(sessionId, options.limit, cursor)
+            lastBatchLength = pageRows.length
+            if (pageRows.length === 0) break
 
-        const byId = new Map<string, typeof pageRows[number]>()
-        for (const row of pageRows) byId.set(row.id, row)
-        for (const row of queuedRows) byId.set(row.id, row)
+            const oldestRow = pageRows[0] ?? null
+            if (oldestRow) {
+                const at = oldestRow.invokedAt ?? oldestRow.createdAt
+                cursor = { at, seq: oldestRow.seq }
+                oldestSeqInScan = oldestRow.seq
+                oldestPositionAtInScan = at
+            }
 
-        const stored = [...byId.values()].sort((a, b) => {
-            const at = (a.invokedAt ?? a.createdAt) - (b.invokedAt ?? b.createdAt)
-            return at !== 0 ? at : a.seq - b.seq
-        })
+            const queuedRows = options.before == null
+                ? this.store.messages.getUninvokedLocalMessages(sessionId)
+                : []
 
-        const messages: DecryptedMessage[] = stored.map((message) => ({
-            id: message.id,
-            seq: message.seq,
-            localId: message.localId,
-            content: message.content,
-            createdAt: message.createdAt,
-            invokedAt: message.invokedAt,
-            scheduledAt: message.scheduledAt
-        }))
+            const byId = new Map<string, typeof pageRows[number]>()
+            for (const row of pageRows) byId.set(row.id, row)
+            for (const row of queuedRows) byId.set(row.id, row)
 
-        // The cursor is the oldest row in the actual position-ordered page (pageRows[0]).
-        // Out-of-band queued rows are not part of the cursor — they are pinned to
-        // every latest-page response.
-        const oldest = pageRows[0] ?? null
-        const oldestSeq: number | null = oldest?.seq ?? null
-        const oldestPositionAt: number | null = oldest
-            ? oldest.invokedAt ?? oldest.createdAt
-            : null
+            const stored = [...byId.values()].sort((a, b) => {
+                const at = (a.invokedAt ?? a.createdAt) - (b.invokedAt ?? b.createdAt)
+                return at !== 0 ? at : a.seq - b.seq
+            })
+
+            const visible = toVisibleDecryptedMessages(stored)
+            messages.unshift(...visible)
+        } while (messages.length < options.limit && lastBatchLength === options.limit)
+
+        const oldestSeq = oldestSeqInScan
+        const oldestPositionAt = oldestPositionAtInScan
 
         const hasMore = oldestSeq !== null && oldestPositionAt !== null
             && this.store.messages.getMessagesByPosition(

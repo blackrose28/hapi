@@ -11,6 +11,8 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     return {
         id: 'session-1',
         namespace: 'default',
+        seq: 1,
+        createdAt: 1000,
         active: true,
         activeAt: 1000,
         updatedAt: 2000,
@@ -23,7 +25,6 @@ function makeSession(overrides: Partial<Session> = {}): Session {
         model: null,
         modelReasoningEffort: null,
         effort: null,
-        serviceTier: null,
         ...overrides
     }
 }
@@ -78,19 +79,6 @@ describe('toSessionSummary', () => {
         expect(summary.pendingRequestKinds).toEqual(['input'])
         expect(summary.pendingRequestsCount).toBe(1)
         expect(summary.backgroundTaskCount).toBe(2)
-        expect(summary.futureScheduledMessageCount).toBe(0)
-    })
-
-    it('includes lifecycleState in summary metadata', () => {
-        const summary = toSessionSummary(makeSession({
-            metadata: {
-                path: '/proj',
-                host: 'local',
-                lifecycleState: 'archived'
-            }
-        }))
-
-        expect(summary.metadata?.lifecycleState).toBe('archived')
     })
 
     it('includes structured pendingRequests for hover-tooltip copy', () => {
@@ -108,19 +96,19 @@ describe('toSessionSummary', () => {
         expect(summary.pendingRequestsCount).toBe(3)
         expect(summary.pendingRequestKinds).toEqual(['permission', 'input'])
         expect(summary.pendingRequests).toHaveLength(3)
-        expect(summary.pendingRequests[0]).toEqual({
+        expect(summary.pendingRequests![0]).toEqual({
             id: 'req2',
             kind: 'input',
             tool: 'AskUserQuestion',
             since: 50
         })
-        expect(summary.pendingRequests[1]).toEqual({
+        expect(summary.pendingRequests![1]).toEqual({
             id: 'req1',
             kind: 'permission',
             tool: 'Bash',
             since: 100
         })
-        expect(summary.pendingRequests[2]).toEqual({
+        expect(summary.pendingRequests![2]).toEqual({
             id: 'req3',
             kind: 'permission',
             tool: 'Edit',

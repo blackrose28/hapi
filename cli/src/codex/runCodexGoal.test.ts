@@ -33,6 +33,7 @@ vi.mock('@/agent/sessionFactory', () => ({
                 getHarness().sentAgentMessages.push(message);
             },
             emitMessagesConsumed() {},
+            onCancelQueuedMessage() {},
             rpcHandlerManager: {
                 registerHandler() {}
             }

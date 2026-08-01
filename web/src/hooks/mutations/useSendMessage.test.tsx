@@ -205,7 +205,7 @@ describe('useSendMessage', () => {
     })
 
     it('preserves scheduledAt when retrying a failed scheduled message', async () => {
-        const sendMock = vi.fn(async () => {})
+        const sendMock = vi.fn(async () => ({ status: 'sent', sessionId: 'session-1' }))
         const api = createMockApi(sendMock)
         const scheduledAt = Date.now() + 5 * 60_000
 

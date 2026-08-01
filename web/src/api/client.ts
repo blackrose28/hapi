@@ -305,7 +305,6 @@ export class ApiClient {
         return await this.request<SessionResponse>(`/api/sessions/${encodeURIComponent(sessionId)}`)
     }
 
-<<<<<<< HEAD
     async getTeamMessages(teamChatId: string, opts?: { limit?: number; beforeSeq?: number | null }): Promise<TeamMessagesResponse> {
         const params = new URLSearchParams()
         if (opts?.limit) params.set('limit', String(opts.limit))

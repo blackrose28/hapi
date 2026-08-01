@@ -56,6 +56,7 @@ it('classifies application-level mobile dialog presentations', () => {
         '/src/components/modals/ReplacePinModal.tsx': 'sheet',
         '/src/components/TeamChat/TeamSessionChatModal.tsx': 'workspace',
         '/src/components/SessionGoalControl.tsx': 'sheet',
+        '/src/components/SessionExportDialog.tsx': 'sheet',
     } as const
 
     for (const [file, presentation] of Object.entries(expectedPresentations)) {

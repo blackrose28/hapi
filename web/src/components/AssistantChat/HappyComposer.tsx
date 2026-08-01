@@ -32,7 +32,6 @@ import { FloatingOverlay } from '@/components/ChatInput/FloatingOverlay'
 import { Autocomplete } from '@/components/ChatInput/Autocomplete'
 import { StatusBar } from '@/components/AssistantChat/StatusBar'
 import { ComposerButtons } from '@/components/AssistantChat/ComposerButtons'
-<<<<<<< HEAD
 import {
     CompactComposerActionButton,
     CompactComposerAttachmentButton,
@@ -40,9 +39,7 @@ import {
 } from '@/components/AssistantChat/CompactComposerControls'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import { SessionComposerSettingsPanel } from '@/components/AssistantChat/SessionComposerSettingsPanel'
-=======
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
->>>>>>> b2a30c2e (feat(hub,web): support scheduling messages for future delivery (#590))
 import { AttachmentItem } from '@/components/AssistantChat/AttachmentItem'
 import { useTranslation } from '@/lib/use-translation'
 import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
@@ -829,7 +826,6 @@ export function HappyComposer(props: {
         if (!canSend) return
         beginCompactSend()
         api.composer().send()
-<<<<<<< HEAD
     }, [api, beginCompactSend, canSend])
 
     // Pi: selected model info for UI labels and thinking level filtering
@@ -870,14 +866,6 @@ export function HappyComposer(props: {
         setShowPiModelPanel(false)
         haptic('light')
     }, [controlsDisabled, haptic])
-=======
-        // SessionChat owns clearing the schedule — it clears only after awaiting
-        // the send hook's accepted result, which covers both pre-mutation guards
-        // and async inactive-session resume failure. Clearing here unconditionally
-        // would race ahead of that check and drop the user's schedule on every
-        // rejected send path.
-    }, [api])
->>>>>>> b2a30c2e (feat(hub,web): support scheduling messages for future delivery (#590))
 
     const overlays = useMemo(() => {
         // Pi flavor: separate floating panels for model and thinking level.

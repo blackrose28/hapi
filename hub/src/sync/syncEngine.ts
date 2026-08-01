@@ -199,17 +199,13 @@ export class SyncEngine {
         return this.sessionCache.getSessionsByNamespace(namespace)
     }
 
-<<<<<<< HEAD
-=======
     getFutureScheduledMessageCounts(sessionIds: string[], now: number = Date.now()): Map<string, number> {
-        return this.store.messages.countFutureScheduledBySessionIds(sessionIds, now)
+        return this.db.messages.countFutureScheduledBySessionIds(sessionIds, now)
     }
 
     getNextScheduledAtBySessionIds(sessionIds: string[], now: number = Date.now()): Map<string, number> {
-        return this.store.messages.minFutureScheduledAtBySessionIds(sessionIds, now)
+        return this.db.messages.minFutureScheduledAtBySessionIds(sessionIds, now)
     }
-
->>>>>>> ce67823f (feat(web,hub): rich hover tooltips on session-list attention indicators (#941))
     getSession(sessionId: string): Session | undefined {
         return this.sessionCache.getSession(sessionId) ?? this.sessionCache.refreshSession(sessionId) ?? undefined
     }

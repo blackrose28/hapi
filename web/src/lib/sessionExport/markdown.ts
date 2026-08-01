@@ -74,10 +74,6 @@ function formatAgentContentBlock(block: NormalizedAgentContent): string | null {
             const content = safeStringify(block.content).trim()
             return content ? `- ${label}: ${truncate(content.replace(/\s+/g, ' '), 240)}` : `- ${label}`
         }
-        case 'generated-image':
-            return `- Generated image: ${block.fileName}`
-        case 'codex-review':
-            return `- Codex review: ${block.review.overallCorrectness ?? 'review'} (${block.review.findings.length} findings)`
         case 'summary':
             return `> Summary: ${block.summary}`
         case 'sidechain':

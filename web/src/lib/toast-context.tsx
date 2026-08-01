@@ -15,7 +15,7 @@ export type ToastContextValue = {
     removeToast: (id: string) => void
 }
 
-const ToastContext = createContext<ToastContextValue | null>(null)
+export const ToastContext = createContext<ToastContextValue | null>(null)
 const TOAST_DURATION_MS = 6000
 
 function createToastId(): string {

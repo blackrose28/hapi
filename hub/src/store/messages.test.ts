@@ -13,7 +13,7 @@ describe('cancelQueuedMessage', () => {
     it('happy path: deletes queued message, returns status=cancelled with localId', () => {
         const store = makeStore()
         const session = makeSession(store, 'cancel-happy')
-        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-1')
+        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-1').message
 
         const result = store.messages.cancelQueuedMessage(session.id, msg.id)
         expect(result.status).toBe('cancelled')
@@ -30,7 +30,7 @@ describe('cancelQueuedMessage', () => {
         const store = makeStore()
         const session = makeSession(store, 'cancel-already-invoked')
         const content = { role: 'user', content: { type: 'text', text: 'hello' } }
-        const msg = store.messages.addMessage(session.id, content, 'lid-2')
+        const msg = store.messages.addMessage(session.id, content, 'lid-2').message
 
         const invokedAt = Date.now()
         // Simulate CLI invoke ack
@@ -54,7 +54,7 @@ describe('cancelQueuedMessage', () => {
     it('cancel × 2 idempotent: second call returns status=cancelled with localId=null (row gone)', () => {
         const store = makeStore()
         const session = makeSession(store, 'cancel-idempotent')
-        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-3')
+        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-3').message
 
         const first = store.messages.cancelQueuedMessage(session.id, msg.id)
         expect(first.status).toBe('cancelled')
@@ -84,7 +84,7 @@ describe('cancelQueuedMessage', () => {
         const store = makeStore()
         const sessionA = makeSession(store, 'cancel-session-a')
         const sessionB = makeSession(store, 'cancel-session-b')
-        const msg = store.messages.addMessage(sessionA.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-A')
+        const msg = store.messages.addMessage(sessionA.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-A').message
 
         const result = store.messages.cancelQueuedMessage(sessionB.id, msg.id)
         expect(result.status).toBe('cancelled')
@@ -100,7 +100,7 @@ describe('cancelQueuedMessage', () => {
     it('cancelled localId is propagated from the deleted row', () => {
         const store = makeStore()
         const session = makeSession(store, 'cancel-localid-propagate')
-        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-propagate')
+        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, 'lid-propagate').message
 
         const result = store.messages.cancelQueuedMessage(session.id, msg.id)
         expect(result.status).toBe('cancelled')
@@ -153,7 +153,7 @@ describe('cancelQueuedMessage', () => {
         const store = makeStore()
         const session = makeSession(store, 'cancel-by-localid-invoked')
         const localId = 'local:invoked-id'
-        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, localId)
+        const msg = store.messages.addMessage(session.id, { role: 'user', content: { type: 'text', text: 'hello' } }, localId).message
 
         const invokedAt = Date.now()
         store.messages.markMessagesInvoked(session.id, [localId], invokedAt)
@@ -199,7 +199,7 @@ describe('addMessage: scheduledAt invariants', () => {
             { role: 'user', content: { type: 'text', text: 'queued for later' } },
             'lid-sched',
             future
-        )
+        ).message
 
         expect(msg.scheduledAt).toBe(future)
         expect(msg.invokedAt).toBeNull()
@@ -218,7 +218,7 @@ describe('getDeliverableMessagesAfter: CLI backfill excludes future-scheduled ro
             session.id,
             { role: 'user', content: { type: 'text', text: 'immediate' } },
             'lid-immediate'
-        )
+        ).message
         store.messages.addMessage(
             session.id,
             { role: 'user', content: { type: 'text', text: 'future-scheduled' } },
@@ -230,7 +230,7 @@ describe('getDeliverableMessagesAfter: CLI backfill excludes future-scheduled ro
             { role: 'user', content: { type: 'text', text: 'mature-scheduled' } },
             'lid-mature',
             past
-        )
+        ).message
 
         const delivered = store.messages.getDeliverableMessagesAfter(session.id, 0, now)
         const ids = delivered.map((m) => m.id)
@@ -271,12 +271,12 @@ describe('getDeliverableMessagesAfter: CLI backfill excludes future-scheduled ro
             session.id,
             { role: 'user', content: { type: 'text', text: 'first' } },
             'lid-1'
-        )
+        ).message
         const m2 = store.messages.addMessage(
             session.id,
             { role: 'user', content: { type: 'text', text: 'second' } },
             'lid-2'
-        )
+        ).message
 
         // afterSeq = m1.seq → only m2 should be returned.
         const onlyM2 = store.messages.getDeliverableMessagesAfter(session.id, m1.seq, now)

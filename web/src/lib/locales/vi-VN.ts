@@ -61,10 +61,41 @@ export default {
   'session.item.worktree': 'worktree',
   'session.item.pending': 'đang chờ',
   'session.item.thinking': 'đang suy nghĩ',
+  'session.item.permission': 'Cần cấp quyền',
+  'session.item.needsInput': 'Cần nhập liệu',
+  'session.item.background': 'Tác vụ nền đang chạy',
+  'session.item.newActivity': 'Hoạt động mới',
+  'session.item.scheduledMessage': 'Tin nhắn hẹn giờ đang chờ',
+  'session.item.scheduledMessages': '{count} tin nhắn hẹn giờ đang chờ',
+  'session.tooltip.permission.body': 'Chấp nhận:',
+  'session.tooltip.input.body': 'Phản hồi:',
+  'session.tooltip.background.count.one': '1 tác vụ đang chạy',
+  'session.tooltip.background.count.other': '{count} tác vụ đang chạy',
+  'session.tooltip.scheduled.body': 'Sẽ gửi khi đến giờ.',
+  'session.tooltip.scheduled.fires': 'Gửi lúc {when}',
+  'session.tooltip.scheduled.next': 'Tiếp theo {when} · và {more} tin nhắn khác',
+  'session.tooltip.moreCount': 'và {count} tin nhắn khác',
   'session.time.justNow': 'vừa xong',
   'session.time.minutesAgo': '{n} phút trước',
   'session.time.hoursAgo': '{n} giờ trước',
   'session.time.daysAgo': '{n} ngày trước',
+  'session.time.inLessThanMinute': 'trong <1 phút',
+  'session.time.inMinutes': 'trong {n} phút',
+  'session.time.inHours': 'trong {n} giờ',
+  'session.time.inDays': 'trong {n} ngày',
+  'session.time.soon': 'sắp tới',
+  'session.time.importedFromCodex.justNow': 'vừa nhập từ Codex',
+  'session.time.importedFromCodex.minutesAgo': 'đã nhập từ Codex {n} phút trước',
+  'session.time.importedFromCodex.hoursAgo': 'đã nhập từ Codex {n} giờ trước',
+  'session.time.importedFromCodex.daysAgo': 'đã nhập từ Codex {n} ngày trước',
+  'session.cursorMigration.banner.title': 'Đang nâng cấp phiên Cursor',
+  'session.cursorMigration.banner.body': 'Chuyển đổi đoạn chat cũ sang giao thức ACP an toàn hơn. Thao tác này mất 15-20 giây đối với lịch sử dài; cuộc trò chuyện sẽ tự động tiếp tục.',
+  'session.cursorMigration.bannerAmbiguous.title': 'Nâng cấp phiên Cursor cần kiểm tra thủ công',
+  'session.cursorMigration.bannerAmbiguous.body': 'Đoạn chat này tồn tại trên đĩa ở nhiều thư mục làm việc hoặc kích thước không khớp, HAPI không thể tự động chuyển đổi. Hãy kiểm tra nhật ký hub.',
+
+  // Session inactive
+  'session.inactive.autoResume': 'Phiên này không hoạt động. Gửi tin nhắn để tiếp tục.',
+  'session.inactive.cannotResume': 'Phiên này không hoạt động và không thể tiếp tục.',
 
   // Session header
   'session.title': 'Tệp',
@@ -87,10 +118,38 @@ export default {
 
   // Session actions
   'session.action.rename': 'Đổi tên',
+  'session.action.export': 'Xuất cuộc trò chuyện',
   'session.action.archive': 'Lưu trữ',
   'session.action.delete': 'Xoá',
   'session.action.copy': 'Sao chép',
   'session.action.reopen': 'Mở lại',
+
+  // Session export
+  'session.export.title': 'Xuất cuộc trò chuyện',
+  'session.export.description': 'Chọn định dạng, sau đó tải xuống toàn bộ cuộc trò chuyện hiển thị.',
+  'session.export.format.json': 'JSON',
+  'session.export.format.json.description': 'Dữ liệu không mất mát kèm thông tin mô tả và tin nhắn.',
+  'session.export.format.markdown': 'Markdown',
+  'session.export.format.markdown.description': 'Định dạng văn bản dễ đọc tạo từ cùng dữ liệu xuất.',
+  'session.export.download': 'Tải xuống',
+  'session.export.downloading': 'Đang xuất…',
+  'session.export.error.noApi': 'Không thể kết nối đến máy chủ',
+  'session.export.error.default': 'Xuất cuộc trò chuyện thất bại',
+  'session.export.toast.success.title': 'Đã xuất cuộc trò chuyện',
+  'session.export.toast.success.body': 'Đã tải xuống {filename}',
+  'session.export.toast.error.title': 'Xuất thất bại',
+
+  // Composer schedule
+  'composer.scheduleSend': 'Hẹn giờ gửi',
+  'composer.scheduleRelativeTab': 'Thời gian trễ',
+  'composer.scheduleSpecificTab': 'Thời gian cụ thể',
+  'composer.scheduleSpecificHint': 'Tối đa 7 ngày. Yêu cầu hub đang chạy; CLI sẽ cập nhật vào lần kết nối tiếp theo.',
+  'composer.scheduleErrorPast': 'Thời gian hẹn giờ phải ở tương lai.',
+  'composer.scheduleErrorTooFar': 'Thời gian hẹn giờ tối đa là 7 ngày.',
+
+  // Queued messages
+  'queuedMessages.scheduledFor': 'Đã hẹn giờ lúc {time}',
+  'queuedMessages.editAlreadyInvoked': 'Tin nhắn đã gửi — không thể chỉnh sửa',
 
   // Dialogs
   'dialog.rename.title': 'Đổi tên phiên',

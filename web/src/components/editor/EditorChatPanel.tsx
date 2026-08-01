@@ -91,9 +91,9 @@ export function EditorChatPanel(props: {
                 onBack={() => {}}
                 onRefresh={refreshSession}
                 onLoadMore={messagesState.loadMore}
-                onSend={(text: string, attachments?: AttachmentMetadata[]) => {
+                onSend={async (text: string, attachments?: AttachmentMetadata[], scheduledAt?: number | null) => {
                     const expandedText = props.onExpandDraft ? props.onExpandDraft(text) : text
-                    sendMessage(expandedText, attachments)
+                    return sendMessage(expandedText, attachments, scheduledAt)
                 }}
                 onFlushPending={messagesState.flushPending}
                 onAtBottomChange={messagesState.setAtBottom}

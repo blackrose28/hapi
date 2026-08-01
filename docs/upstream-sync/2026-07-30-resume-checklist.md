@@ -69,11 +69,13 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `cross-package-build-coupling` (1 commit)
 - [x] `chore-cleanup` (2 commits)
 
-### Batch 2: Hub core
-- [ ] `hub-session-lifecycle` (7 commits) — `apiTypes→schemas.ts` fold
-- [ ] `hub-sqlite-storage` (4 commits) — `apiTypes→schemas.ts` fold; V14→V15 migration
-- [ ] `hub-messaging-scheduling` (4 commits) — creates `ScheduleTimePicker.tsx`
-- [ ] `telegram-notifications` (1 commit)
+### Batch 2: Hub core — ✅ DONE
+- [x] `hub-session-lifecycle` (7 commits)
+- [x] `hub-sqlite-storage` (4 commits) — V14→V15 migration
+- [x] `hub-messaging-scheduling` (4 commits) + `windows-schedule-picker` (1 commit)
+- [x] `telegram-notifications` (1 commit)
+- [x] `export-session-conversation` (4 commits)
+- [x] `session-list-hover-tooltips` (2 commits)
 
 ### Batch 3: CLI core
 - [ ] `cli-misc` (7 commits)

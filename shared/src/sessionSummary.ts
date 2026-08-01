@@ -50,15 +50,15 @@ export type SessionSummary = {
     metadata: SessionSummaryMetadata | null
     todoProgress: { completed: number; total: number } | null
     pendingRequestsCount: number
-    pendingRequestKinds: PendingRequestKind[]
+    pendingRequestKinds?: PendingRequestKind[]
     /** Capped, oldest-first slice of pending tool requests. Use this for tooltip
      *  / per-row UX. The full count (which may exceed the cap) is in
      *  `pendingRequestsCount`. */
-    pendingRequests: PendingRequest[]
-    backgroundTaskCount: number
-    futureScheduledMessageCount: number
+    pendingRequests?: PendingRequest[]
+    backgroundTaskCount?: number
+    futureScheduledMessageCount?: number
     /** Epoch ms of the soonest uninvoked future scheduled message, or null. */
-    nextScheduledAt: number | null
+    nextScheduledAt?: number | null
     model: string | null
     effort: string | null
     terminalLiveCount?: number
