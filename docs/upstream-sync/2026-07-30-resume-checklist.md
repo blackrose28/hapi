@@ -1,6 +1,6 @@
 # Upstream sync round 2026-07-30 — resume checklist
 
-Last updated: 2026-08-01 15:16 ICT. Batch 1 (foundation) complete, typecheck clean.
+Last updated: 2026-08-01 17:56 ICT. Batch 4 (agent backends) complete, typecheck clean.
 82 pending carts triaged: **72 adopt**, **5 defer**, **5 skip**.
 Read `docs/upstream-sync/2026-07-30-round.md` for full per-cart detail.
 
@@ -88,15 +88,15 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `integration-test-isolation` (1 commit)
 - [x] `title-update-prompts` (1 commit)
 
-### Batch 4: Agent backends
-- [ ] `claude-backend-fixes` (7 commits)
-- [ ] `cursor-acp-stability` (11 commits)
-- [ ] `cursor-acp-migration` (4 commits) — `apiTypes→schemas.ts` fold
-- [ ] `cursor-new-capabilities` (3 commits) — `apiTypes→schemas.ts` fold
-- [ ] `cursor-remote-resume-wiring` (1 commit)
-- [ ] `opencode-acp-fixes` (7 commits) — `apiTypes→schemas.ts` fold
-- [ ] `opencode-features` (3 commits)
-- [ ] `pi-agent-integration` (5 commits)
+### Batch 4: Agent backends — ✅ DONE
+- [x] `claude-backend-fixes` (7 commits)
+- [x] `cursor-acp-stability` (11 commits)
+- [x] `cursor-acp-migration` (4 commits) — `apiTypes→schemas.ts` fold
+- [x] `cursor-new-capabilities` (3 commits) — `apiTypes→schemas.ts` fold
+- [x] `cursor-remote-resume-wiring` (1 commit)
+- [x] `opencode-acp-fixes` (7 commits) — `apiTypes→schemas.ts` fold
+- [x] `opencode-features` (3 commits)
+- [x] `pi-agent-integration` (5 commits)
 
 ### Batch 5: Codex
 - [ ] `codex-subagent-goal` (8 commits)
@@ -174,20 +174,25 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 
 ## Next session: what to do first
 
-1. **Commit batch 1** — all changes are in working tree, typecheck clean:
+1. **Start Batch 5: Codex** (10 carts, 54 commits total):
+   - `codex-subagent-goal` (8 commits)
+   - `codex-session-import-resume` (8 commits)
+   - `codex-transcript-sync` (6 commits)
+   - `codex-fast-tier-ui` (6 commits)
+   - `codex-mcp-safety-approval` (6 commits)
+   - `codex-new-capabilities` (5 commits)
+   - `codex-reasoning-effort-modeswitch` (5 commits)
+   - `codex-review-messages-render` (1 commit)
+   - `codex-title-mcp-autoapprove` (1 commit)
+   - `multiagent-timeline-codex` (1 commit)
+2. **Run full verification**:
    ```bash
-   cd /data/Work/AI/hapi
-   git add -A
-   git commit -m "upstream-sync: batch 1 — foundation (shared-schema-refactors, cross-package-build-coupling, chore-cleanup)"
-   ```
-2. **Run full test suite** to confirm no regressions:
-   ```bash
+   bun typecheck
    cd shared && bun test
    cd ../hub && bun test
    cd ../cli && bunx vitest run
    cd ../web && bunx vitest run
    ```
-3. **Start batch 2** (hub core) — 4 carts, 16 commits total
 
 ## Recurring gotchas (from this round)
 
