@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Schema validates fields used in the codebase and keeps explicit
  * log fields required by the CLI and UI.

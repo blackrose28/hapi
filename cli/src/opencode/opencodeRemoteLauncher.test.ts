@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MessageQueue2 } from '@/utils/MessageQueue2';
 import type { OpencodeMode, PermissionMode } from './types';
@@ -407,7 +408,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         ]);
         await opencodeRemoteLauncher(session as never);
 
-        const handler = rpcHandlers.get('listOpencodeModels');
+        const handler = rpcHandlers.get(RPC_METHODS.ListOpencodeModels);
         expect(handler).toBeDefined();
         const result = await handler!(undefined) as Record<string, unknown>;
         expect(result).toEqual({
@@ -425,7 +426,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         ]);
         await opencodeRemoteLauncher(session as never);
 
-        const handler = rpcHandlers.get('listOpencodeModels');
+        const handler = rpcHandlers.get(RPC_METHODS.ListOpencodeModels);
         expect(handler).toBeDefined();
         const result = await handler!(undefined) as Record<string, unknown>;
         expect(result).toEqual({

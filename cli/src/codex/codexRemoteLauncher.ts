@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React from 'react';
 import { randomUUID } from 'node:crypto';
 

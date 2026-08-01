@@ -1,10 +1,11 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { listSlashCommands } from './slashCommands'
 
-describe('listSlashCommands', () => {
+describe(RPC_METHODS.ListSlashCommands, () => {
     const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
     const originalCodexHome = process.env.CODEX_HOME
     let sandboxDir: string

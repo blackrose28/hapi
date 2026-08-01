@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { InvalidateSync } from "@/utils/sync";
 import { startFileWatcher } from "@/modules/watcher/startFileWatcher";
 

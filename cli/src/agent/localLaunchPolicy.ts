@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type StartedBy = 'runner' | 'terminal';
 
 export type LocalLaunchExitReason = 'switch' | 'exit';

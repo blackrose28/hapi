@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { TerminalHistoryEntry } from '@hapi/protocol'
 import {
     chmodSync,

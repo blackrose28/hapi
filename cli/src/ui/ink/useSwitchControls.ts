@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInput, type Key } from 'ink';
 
@@ -106,7 +107,7 @@ export function useSwitchControls(opts: {
                 await new Promise(resolve => setTimeout(resolve, 100));
                 onSwitch?.();
             } else {
-                setConfirmationWithTimeout('switch');
+                setConfirmationWithTimeout(RPC_METHODS.Switch);
             }
             return;
         }

@@ -1,5 +1,6 @@
 import { AgentStateSchema, MetadataSchema, TeamStateSchema } from '@hapi/protocol/schemas'
 import type { CodexCollaborationMode, PermissionMode, Session } from '@hapi/protocol/types'
+import type { SessionPatch } from '@hapi/protocol/schemas'
 import type { Store } from '../store'
 import { clampAliveTime } from './aliveTime'
 import { EventPublisher } from './eventPublisher'
@@ -256,7 +257,7 @@ export class SessionCache {
                     modelReasoningEffort: session.modelReasoningEffort,
                     effort: session.effort,
                     collaborationMode: session.collaborationMode
-                }
+                } satisfies SessionPatch
             })
         }
     }
@@ -283,7 +284,7 @@ export class SessionCache {
                 data: {
                     thinking: true,
                     updatedAt: session.updatedAt
-                }
+                } satisfies SessionPatch
             })
         }
     }
@@ -300,7 +301,7 @@ export class SessionCache {
         this.publisher.emit({
             type: 'session-updated',
             sessionId,
-            data: { backgroundTaskCount: next }
+            data: { backgroundTaskCount: next } satisfies SessionPatch
         })
     }
 
@@ -334,7 +335,7 @@ export class SessionCache {
             type: 'session-updated',
             sessionId,
             namespace: session.namespace,
-            data: { updatedAt: session.updatedAt }
+            data: { updatedAt: session.updatedAt } satisfies SessionPatch
         })
     }
 
@@ -354,7 +355,11 @@ export class SessionCache {
         session.backgroundTaskCount = 0
         this.pendingThinkingUntilBySessionId.delete(session.id)
 
-        this.publisher.emit({ type: 'session-updated', sessionId: session.id, data: { active: false, thinking: false, backgroundTaskCount: 0 } })
+        this.publisher.emit({
+            type: 'session-updated',
+            sessionId: session.id,
+            data: { active: false, thinking: false, backgroundTaskCount: 0 } satisfies SessionPatch
+        })
     }
 
     /**
@@ -391,7 +396,11 @@ export class SessionCache {
             session.thinking = false
             this.pendingThinkingUntilBySessionId.delete(session.id)
             expired.push(session.id)
-            this.publisher.emit({ type: 'session-updated', sessionId: session.id, data: { active: false } })
+            this.publisher.emit({
+                type: 'session-updated',
+                sessionId: session.id,
+                data: { active: false } satisfies SessionPatch
+            })
         }
 
         return expired

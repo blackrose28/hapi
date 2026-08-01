@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * JSONL line parser — shared by all stdio-based agent transports.
  *

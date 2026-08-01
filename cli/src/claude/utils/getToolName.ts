@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Converts tool names to human-readable format for UI display
  * 

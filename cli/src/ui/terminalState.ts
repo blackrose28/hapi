@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export function restoreTerminalState(): void {
     if (process.stdout.isTTY) {
         // Disable kitty keyboard protocol / CSI u key release reporting if enabled.

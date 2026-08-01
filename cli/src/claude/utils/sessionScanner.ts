@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { RawJSONLines, RawJSONLinesSchema } from "../types";
 import { basename, join } from "node:path";
 import { readFile } from "node:fs/promises";

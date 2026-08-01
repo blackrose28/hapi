@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { RunnerEnrollmentExchangeSchema, RunnerEnrollmentResultSchema, type RunnerEnrollmentExchange, type RunnerEnrollmentResult } from '@hapi/protocol/runner-enrollment'
 
 export function canonicalHubUrl(value:string):string{const url=new URL(value);if(url.protocol!=='https:'&&url.hostname!=='localhost'&&url.hostname!=='127.0.0.1')throw new Error('invalid_hub_url');url.hash='';url.search='';url.pathname=url.pathname.replace(/\/+$/,'');return url.toString().replace(/\/$/,'')}

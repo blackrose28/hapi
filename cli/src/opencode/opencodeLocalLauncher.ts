@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger';
 import { opencodeLocal } from './opencodeLocal';
 import { OpencodeSession } from './session';

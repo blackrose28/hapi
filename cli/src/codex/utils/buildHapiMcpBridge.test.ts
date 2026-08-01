@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiSessionClient } from '@/api/apiSession'
 import { HAPI_SESSION_ID_ENV } from '@/agent/hapiSessionEnv'

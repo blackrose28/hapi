@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Low-level difftastic wrapper - just arguments in, string out
  */

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { randomUUID } from 'node:crypto';
 import type { AgentMessage, PlanItem } from './types';
 

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it, vi } from 'vitest';
 import { registerAcpSessionTitleSync } from './acpSessionTitle';
 import type { AcpSessionInfoUpdate } from './backends/acp/AcpSdkBackend';

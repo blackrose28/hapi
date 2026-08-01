@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it } from 'vitest';
 import type { ApiSessionClient } from '@/api/apiSession';
 import { CodexPermissionHandler } from './permissionHandler';
@@ -130,7 +131,7 @@ describe('CodexPermissionHandler', () => {
             }
         });
 
-        const permissionRpc = rpcHandlers.get('permission');
+        const permissionRpc = rpcHandlers.get(RPC_METHODS.Permission);
         expect(permissionRpc).toBeTypeOf('function');
 
         await permissionRpc?.({ id: 'perm-1', approved: true, decision: 'approved' });
@@ -180,7 +181,7 @@ describe('CodexPermissionHandler', () => {
             }
         });
 
-        const permissionRpc = rpcHandlers.get('permission');
+        const permissionRpc = rpcHandlers.get(RPC_METHODS.Permission);
         expect(permissionRpc).toBeTypeOf('function');
 
         const answers = {

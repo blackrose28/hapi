@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentMessage } from '@/agent/types'
 import type { PiAgentEvent, PiAssistantMessageEvent } from './types'
 import { PiAssistantMessageEventSchema } from './schemas'

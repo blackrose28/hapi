@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { registerAgentModelHandlers } from './handlers/agentModels'
 import { registerBashHandlers } from './handlers/bash'

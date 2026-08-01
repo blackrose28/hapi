@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export function normalizeCapabilityName(value: unknown): string | null {
     if (typeof value !== 'string') {
         return null

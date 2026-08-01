@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type ReadyEventOptions = {
     pending: unknown;
     queueSize: () => number;

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect } from 'vitest';
 import { MessageQueue2 } from './MessageQueue2';
 import { hashObject } from './deterministicJson';

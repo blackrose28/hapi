@@ -7,7 +7,7 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
-import type { AgentFlavor, AgentModelCatalogResult } from '@hapi/protocol'
+import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult } from '@hapi/protocol'
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant } from '../store'
@@ -661,7 +661,7 @@ export class SyncEngine {
     async spawnSession(
         machineId: string,
         directory: string,
-        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi' = 'claude',
+        agent: AgentFlavor = 'claude',
         model?: string,
         modelReasoningEffort?: string,
         yolo?: boolean,
@@ -708,9 +708,7 @@ export class SyncEngine {
             return { type: 'error', message: 'Session metadata missing path', code: 'resume_unavailable' }
         }
 
-        const flavor = metadata.flavor === 'codex' || metadata.flavor === 'gemini' || metadata.flavor === 'kimi' || metadata.flavor === 'grok' || metadata.flavor === 'opencode' || metadata.flavor === 'cursor' || metadata.flavor === 'pi'
-            ? metadata.flavor
-            : 'claude'
+        const flavor = isKnownFlavor(metadata.flavor) ? metadata.flavor : 'claude'
         const resumeToken = flavor === 'codex'
             ? metadata.codexSessionId
             : flavor === 'gemini'

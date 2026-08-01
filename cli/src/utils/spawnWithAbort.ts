@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { SpawnOptions, StdioOptions } from 'node:child_process';
 import spawn from 'cross-spawn';
 import { logger } from '@/ui/logger';
@@ -84,7 +85,7 @@ export async function spawnWithAbort(options: SpawnWithAbortOptions): Promise<vo
         if (options.signal.aborted) {
             abortHandler();
         } else {
-            options.signal.addEventListener('abort', abortHandler);
+            options.signal.addEventListener(RPC_METHODS.Abort, abortHandler);
         }
 
         const cleanupAbortHandler = () => {
@@ -92,7 +93,7 @@ export async function spawnWithAbort(options: SpawnWithAbortOptions): Promise<vo
                 clearTimeout(abortKillTimeout);
                 abortKillTimeout = null;
             }
-            options.signal.removeEventListener('abort', abortHandler);
+            options.signal.removeEventListener(RPC_METHODS.Abort, abortHandler);
         };
 
         child.on('error', (error) => {

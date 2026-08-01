@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export class AsyncLock {
     private permits: number = 1;
     private promiseResolverQueue: Array<(v: boolean) => void> = [];

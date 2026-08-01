@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger';
 import { spawnWithTerminalGuard } from '@/utils/spawnWithTerminalGuard';
 import type { PermissionMode } from './types';

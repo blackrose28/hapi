@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type RpcErrorResponse = { success: false; error: string }
 
 export type RpcSuccessResponse<T extends object> = { success: true } & T

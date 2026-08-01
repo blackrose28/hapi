@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { join } from 'node:path';
 import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import { configuration } from '@/configuration';

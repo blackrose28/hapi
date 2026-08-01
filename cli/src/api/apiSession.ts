@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { io, type Socket } from 'socket.io-client'

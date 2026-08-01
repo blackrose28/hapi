@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentModelCatalogResult } from '@hapi/protocol'
 import { filterModelsByAvailableModels } from './claudePolicy'
 

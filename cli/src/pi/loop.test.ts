@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { parsePiModels, parsePiCommands, sendPiRpcAndWait, wireTransportEvents } from './loop';
 import { PiSession } from './session';

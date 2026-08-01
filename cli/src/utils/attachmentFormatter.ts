@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AttachmentMetadata } from '@/api/types'
 
 /**

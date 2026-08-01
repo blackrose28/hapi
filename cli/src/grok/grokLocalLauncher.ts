@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { BaseLocalLauncher } from '@/modules/common/launcher/BaseLocalLauncher';
 import { grokLocal } from './grokLocal';
 import type { GrokSession } from './session';

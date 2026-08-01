@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export class Future<T> {
     private _resolve!: (value: T) => void;
     private _reject!: (reason?: any) => void;

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React from 'react';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
@@ -181,10 +182,10 @@ class CursorRemoteLauncher extends RemoteLauncherBase {
                 killProcessByChildProcess(child, false).catch(() => {});
                 resolve(null);
             };
-            this.abortController.signal.addEventListener('abort', abortHandler);
+            this.abortController.signal.addEventListener(RPC_METHODS.Abort, abortHandler);
 
             const cleanup = () => {
-                this.abortController.signal.removeEventListener('abort', abortHandler);
+                this.abortController.signal.removeEventListener(RPC_METHODS.Abort, abortHandler);
             };
 
             child.on('error', (err) => {
@@ -239,11 +240,11 @@ class CursorRemoteLauncher extends RemoteLauncherBase {
     }
 
     private async handleSwitchFromUi(): Promise<void> {
-        await this.requestExit('switch', () => this.handleAbort());
+        await this.requestExit(RPC_METHODS.Switch, () => this.handleAbort());
     }
 
     private async handleSwitchRequest(): Promise<void> {
-        await this.requestExit('switch', () => this.handleAbort());
+        await this.requestExit(RPC_METHODS.Switch, () => this.handleAbort());
     }
 }
 

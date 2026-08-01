@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type CodexCliOverrides = {
     sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
     approvalPolicy?: 'untrusted' | 'on-failure' | 'on-request' | 'never';

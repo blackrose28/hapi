@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 

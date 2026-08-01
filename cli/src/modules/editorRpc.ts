@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { execFile, type ExecFileOptions } from 'node:child_process'
 import type { Dirent } from 'node:fs'

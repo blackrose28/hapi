@@ -164,15 +164,6 @@ export default {
   'newSession.create': 'Tạo',
   'newSession.creating': 'Đang tạo…',
 
-  // Spawn session (old component)
-  'spawn.title': 'Tạo phiên',
-  'spawn.sessionType': 'Loại phiên',
-  'spawn.useAsIs': 'Dùng thư mục đã chọn trực tiếp',
-  'spawn.createWorktree': 'Tạo worktree mới cạnh repo',
-  'spawn.worktreePlaceholder': 'feature-x (mặc định 1228-xxxx)',
-  'spawn.cancel': 'Huỷ',
-  'spawn.create': 'Tạo phiên',
-  'spawn.creating': 'Đang tạo…',
   'session.directoryMissingSimple': 'Thư mục không tồn tại, sẽ được tự động tạo khi tạo phiên.',
   'session.directoryMissingSimpleConfirm': 'Thư mục không tồn tại. Nhấn lại để tự động tạo.',
   'session.directoryMissingWorktree': 'Phiên worktree yêu cầu thư mục repo đã tồn tại.',

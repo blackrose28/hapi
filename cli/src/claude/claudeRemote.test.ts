@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect, vi } from 'vitest';
 import * as claudeSdk from '@/claude/sdk';
 import type { SDKMessage } from '@/claude/sdk/types';

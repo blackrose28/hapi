@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger';
 import { startHookServer } from '@/claude/utils/startHookServer';
 import { codexLocal } from './codexLocal';

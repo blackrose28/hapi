@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger'
 import { Future } from '@/utils/future'
 import { getLocalLaunchExitReason } from '@/agent/localLaunchPolicy'
@@ -77,19 +78,19 @@ export class BaseLocalLauncher {
 
             const doAbort = async () => {
                 logger.debug(`[${label}]: ${abortLogMessage}`)
-                this.setExitReason('switch')
+                this.setExitReason(RPC_METHODS.Switch)
                 queue.reset()
                 await abortProcess()
             }
 
             const doSwitch = async () => {
                 logger.debug(`[${label}]: ${switchLogMessage}`)
-                this.setExitReason('switch')
+                this.setExitReason(RPC_METHODS.Switch)
                 await abortProcess()
             }
 
-            rpcHandlerManager.registerHandler('abort', doAbort)
-            rpcHandlerManager.registerHandler('switch', doSwitch)
+            rpcHandlerManager.registerHandler(RPC_METHODS.Abort, doAbort)
+            rpcHandlerManager.registerHandler(RPC_METHODS.Switch, doSwitch)
             queue.setOnMessage(() => {
                 void doSwitch()
             })
@@ -139,8 +140,8 @@ export class BaseLocalLauncher {
             }
         } finally {
             this.exitFuture.resolve(undefined)
-            rpcHandlerManager.registerHandler('abort', async () => {})
-            rpcHandlerManager.registerHandler('switch', async () => {})
+            rpcHandlerManager.registerHandler(RPC_METHODS.Abort, async () => {})
+            rpcHandlerManager.registerHandler(RPC_METHODS.Switch, async () => {})
             queue.setOnMessage(null)
         }
 
@@ -155,7 +156,7 @@ export class BaseLocalLauncher {
     }
 
     private requestSwitch = (): void => {
-        this.setExitReason('switch')
+        this.setExitReason(RPC_METHODS.Switch)
         if (!this.abortController.signal.aborted) {
             this.abortController.abort()
         }

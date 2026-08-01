@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Converter from SDK message types to log format (RawJSONLines)
  * Transforms Claude SDK messages into the format expected by session logs

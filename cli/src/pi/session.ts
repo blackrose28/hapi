@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { ApiClient, ApiSessionClient } from '@/lib';
 import type { Metadata } from '@/api/types';
 import type { PiCommandSummary, PiModelSummary, PiThinkingLevel } from './types';

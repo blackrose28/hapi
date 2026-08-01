@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export async function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }

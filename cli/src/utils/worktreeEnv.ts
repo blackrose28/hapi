@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { execFileSync } from 'node:child_process';
 import { realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';

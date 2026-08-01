@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import os from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
@@ -49,7 +50,7 @@ export function buildMachineMetadata(options?: { workspaceRoot?: string }): Mach
         homeDir: os.homedir(),
         happyHomeDir: configuration.happyHomeDir,
         happyLibDir: runtimePath(),
-        workspaceRoot: options?.workspaceRoot
+        workspaceRoots: options?.workspaceRoot ? [options.workspaceRoot] : undefined
     }
 }
 

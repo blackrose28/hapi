@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * WebSocket client for machine/runner communication with hapi-hub
  */
@@ -9,7 +10,7 @@ import { realpathSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { logger } from '@/ui/logger'
 import { configuration } from '@/configuration'
-import type { Update, UpdateMachineBody } from '@hapi/protocol'
+import type { ClientToServerEvents, ServerToClientEvents, Update, UpdateMachineBody } from '@hapi/protocol'
 import {
     CLI_CAPABILITIES,
     TerminalClosePayloadSchema,
@@ -40,51 +41,6 @@ import {
 import type { SpawnSessionOptions, SpawnSessionResult } from '../modules/common/rpcTypes'
 import { applyVersionedAck } from './versionedUpdate'
 import { buildSocketIoExtraHeaderOptions } from './hubExtraHeaders'
-
-interface ServerToRunnerEvents {
-    update: (data: Update) => void
-    'rpc-request': (data: { method: string; params: string }, callback: (response: string) => void) => void
-    'terminal:open': (data: unknown) => void
-    'terminal:write': (data: unknown) => void
-    'terminal:resize': (data: unknown) => void
-    'terminal:close': (data: unknown) => void
-    'terminal:detach': (data: unknown) => void
-    'terminal:history': (data: unknown) => void
-    error: (data: { message: string }) => void
-}
-
-interface RunnerToServerEvents {
-    'machine-alive': (data: { machineId: string; time: number }) => void
-    'machine-update-metadata': (data: { machineId: string; metadata: unknown; expectedVersion: number }, cb: (answer: {
-        result: 'error'
-    } | {
-        result: 'version-mismatch'
-        version: number
-        metadata: unknown | null
-    } | {
-        result: 'success'
-        version: number
-        metadata: unknown | null
-    }) => void) => void
-    'machine-update-state': (data: { machineId: string; runnerState: unknown | null; expectedVersion: number }, cb: (answer: {
-        result: 'error'
-    } | {
-        result: 'version-mismatch'
-        version: number
-        runnerState: unknown | null
-    } | {
-        result: 'success'
-        version: number
-        runnerState: unknown | null
-    }) => void) => void
-    'rpc-register': (data: { method: string }) => void
-    'rpc-unregister': (data: { method: string }) => void
-    'terminal:ready': (data: unknown) => void
-    'terminal:output': (data: unknown) => void
-    'terminal:exit': (data: unknown) => void
-    'terminal:error': (data: unknown) => void
-    'terminal:history-result': (data: unknown) => void
-}
 
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>
@@ -119,7 +75,7 @@ interface ListMachineDirectoryResponse {
 }
 
 export class ApiMachineClient {
-    private socket!: Socket<ServerToRunnerEvents, RunnerToServerEvents>
+    private socket!: Socket<ServerToClientEvents, ClientToServerEvents>
     private keepAliveInterval: NodeJS.Timeout | null = null
     private rpcHandlerManager: RpcHandlerManager
     private readonly terminalManager: TerminalManager
@@ -161,7 +117,7 @@ export class ApiMachineClient {
             onError: (payload) => this.socket.emit('terminal:error', payload)
         })
 
-        this.rpcHandlerManager.registerHandler<PathExistsRequest, PathExistsResponse>('path-exists', async (params) => {
+        this.rpcHandlerManager.registerHandler<PathExistsRequest, PathExistsResponse>(RPC_METHODS.PathExists, async (params) => {
             const rawPaths = Array.isArray(params?.paths) ? params.paths : []
             const uniquePaths = Array.from(new Set(rawPaths.filter((path): path is string => typeof path === 'string')))
             const exists: Record<string, boolean> = {}
@@ -180,7 +136,7 @@ export class ApiMachineClient {
             return { exists }
         })
 
-        this.rpcHandlerManager.registerHandler<ListMachineDirectoryRequest, ListMachineDirectoryResponse>('list-directory', async (params) => {
+        this.rpcHandlerManager.registerHandler<ListMachineDirectoryRequest, ListMachineDirectoryResponse>(RPC_METHODS.ListMachineDirectory, async (params) => {
             if (!this.normalizedWorkspaceRoot) {
                 return { success: false, error: 'Workspace browsing is not enabled for this machine' }
             }
@@ -333,7 +289,7 @@ export class ApiMachineClient {
     }
 
     setRPCHandlers({ spawnSession, stopSession, requestShutdown }: MachineRpcHandlers): void {
-        this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
+        this.rpcHandlerManager.registerHandler(RPC_METHODS.SpawnHappySession, async (params: any) => {
             const { directory, sessionId, resumeSessionId, machineId, approvedNewDirectoryCreation, agent, model, effort, modelReasoningEffort, yolo, permissionMode, token, sessionType, worktreeName, recoveryContext } = params || {}
 
             if (!directory) {
@@ -373,7 +329,7 @@ export class ApiMachineClient {
             }
         })
 
-        this.rpcHandlerManager.registerHandler('stop-session', (params: any) => {
+        this.rpcHandlerManager.registerHandler(RPC_METHODS.StopSession, (params: any) => {
             const { sessionId } = params || {}
             if (!sessionId) {
                 throw new Error('Session ID is required')
@@ -387,7 +343,7 @@ export class ApiMachineClient {
             return { message: 'Session stopped' }
         })
 
-        this.rpcHandlerManager.registerHandler('stop-runner', () => {
+        this.rpcHandlerManager.registerHandler(RPC_METHODS.StopRunner, () => {
             setTimeout(() => requestShutdown(), 100)
             return { message: 'Runner stop request acknowledged' }
         })
@@ -489,7 +445,7 @@ export class ApiMachineClient {
                 logger.debug('[API MACHINE] Failed to update runner state on connect', error)
             })
 
-            const hubWorkspaceRoot = this.machine.metadata?.workspaceRoot
+            const hubWorkspaceRoot = this.machine.metadata?.workspaceRoots?.[0]
             const desiredWorkspaceRoot = this.workspaceRoot
             if (desiredWorkspaceRoot !== hubWorkspaceRoot) {
                 if (desiredWorkspaceRoot) {
@@ -500,15 +456,15 @@ export class ApiMachineClient {
                 this.updateMachineMetadata((current) => {
                     const base = current ?? this.machine.metadata
                     if (!base) {
-                        return { workspaceRoot: desiredWorkspaceRoot } as MachineMetadata
+                        return { workspaceRoots: desiredWorkspaceRoot ? [desiredWorkspaceRoot] : undefined } as unknown as MachineMetadata
                     }
                     if (desiredWorkspaceRoot) {
-                        return { ...base, workspaceRoot: desiredWorkspaceRoot }
+                        return { ...base, workspaceRoots: desiredWorkspaceRoot ? [desiredWorkspaceRoot] : undefined }
                     }
-                    const { workspaceRoot: _omit, ...rest } = base
+                    const { workspaceRoots: _omit, ...rest } = base
                     return rest as MachineMetadata
                 }).then(() => {
-                    console.log(`[HAPI] Workspace root synced: ${this.machine.metadata?.workspaceRoot ?? '(none)'}`)
+                    console.log(`[HAPI] Workspace root synced: ${this.machine.metadata?.workspaceRoots?.[0] ?? '(none)'}`)
                 }).catch((error) => {
                     console.error('[HAPI] Failed to sync workspace root:', error instanceof Error ? error.message : error)
                 })

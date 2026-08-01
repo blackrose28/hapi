@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it } from 'vitest';
 import { buildThreadStartParams, buildTurnStartParams } from './appServerConfig';
 import { codexSystemPrompt } from './systemPrompt';

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Detect internal session-metadata JSON that leaks into agent text output.
  *

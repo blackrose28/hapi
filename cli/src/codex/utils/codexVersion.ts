@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import spawn from 'cross-spawn'
 import { withBunRuntimeEnv } from '@/utils/bunRuntime'
 

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Type definitions for Claude Code SDK integration
  * Provides type-safe interfaces for all SDK communication

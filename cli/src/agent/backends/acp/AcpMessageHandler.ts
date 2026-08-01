@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentMessage, PlanItem } from '@/agent/types';
 import { asString, isObject } from '@hapi/protocol';
 import { deriveToolNameWithSource, isPlaceholderToolName } from '@/agent/utils';

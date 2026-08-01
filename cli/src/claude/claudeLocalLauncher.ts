@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { claudeLocal } from "./claudeLocal";
 import { Session } from "./session";
 import { createSessionScanner } from "./utils/sessionScanner";

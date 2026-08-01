@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { RawJSONLines } from '@/claude/types'
 import { isClaudeChatVisibleMessage as isSharedClaudeChatVisibleMessage } from '@hapi/protocol/messages'
 

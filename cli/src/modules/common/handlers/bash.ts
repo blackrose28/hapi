@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { exec, type ExecOptions } from 'child_process'
 import { promisify } from 'util'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
@@ -21,7 +22,7 @@ interface BashResponse {
 }
 
 export function registerBashHandlers(rpcHandlerManager: RpcHandlerManager, workingDirectory: string): void {
-    rpcHandlerManager.registerHandler<BashRequest, BashResponse>('bash', async (data) => {
+    rpcHandlerManager.registerHandler<BashRequest, BashResponse>(RPC_METHODS.Bash, async (data) => {
         if (data.cwd) {
             const validation = validatePath(data.cwd, workingDirectory)
             if (!validation.valid) {

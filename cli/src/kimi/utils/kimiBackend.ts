@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { AcpSdkBackend } from '@/agent/backends/acp';
 
 function filterEnv(env: NodeJS.ProcessEnv): Record<string, string> {

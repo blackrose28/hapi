@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AgentMessage } from '@/agent/types';
 import { AcpSdkBackend } from './AcpSdkBackend';

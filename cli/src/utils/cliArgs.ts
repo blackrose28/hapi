@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { basename } from 'node:path';
 
 function resolveRawArgv(): string[] {

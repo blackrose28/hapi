@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -16,7 +17,7 @@ async function writeSkill(skillDir: string, name: string, description: string): 
     ].join('\n'))
 }
 
-describe('listSkills', () => {
+describe(RPC_METHODS.ListSkills, () => {
     const originalHome = process.env.HOME
     let sandboxDir: string
     let homeDir: string

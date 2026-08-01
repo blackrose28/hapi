@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { createInterface } from 'node:readline/promises'
 
 function isInteractive(): boolean {

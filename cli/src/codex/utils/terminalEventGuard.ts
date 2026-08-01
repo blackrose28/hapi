@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type TerminalEventGuardInput = {
     eventTurnId: string | null;
     currentTurnId: string | null;

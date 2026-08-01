@@ -1,3 +1,27 @@
+export type {
+    CodexModelsResponse,
+    CodexModelSummary,
+    CommandResponse,
+    DeleteUploadResponse,
+    DirectoryEntry,
+    FileReadResponse,
+    GitCommandResponse,
+    ListDirectoryResponse,
+    MachineDirectoryEntry,
+    MachineListDirectoryResponse,
+    MachinePathsExistsResponse,
+    OpencodeModelsResponse,
+    OpencodeModelSummary,
+    OpencodeEffortSummary,
+    PathExistsResponse,
+    SessionPatch,
+    SlashCommand,
+    SlashCommandsResponse,
+    UploadFileResponse
+} from '@hapi/protocol/schemas'
+
+import type { RunnerState } from '@hapi/protocol/schemas'
+
 import type {
     DecryptedMessage as ProtocolDecryptedMessage,
     Session,
@@ -44,21 +68,7 @@ export type DecryptedMessage = ProtocolDecryptedMessage & {
     invokedAt?: number | null
 }
 
-export type RunnerState = {
-    status?: string
-    pid?: number
-    httpPort?: number
-    startedAt?: number
-    shutdownRequestedAt?: number
-    shutdownSource?: string
-    lastSpawnError?: {
-        message: string
-        pid?: number
-        exitCode?: number | null
-        signal?: string | null
-        at: number
-    } | null
-}
+
 
 export type Machine = {
     id: string
@@ -83,8 +93,8 @@ export type AuthResponse = {
     }
 }
 
-export type SessionsResponse = { sessions: SessionSummary[] }
 export type SessionResponse = { session: Session; userCapability?: 'view' | 'interact' | 'operate' | 'manage' }
+export type SessionsResponse = { sessions: SessionSummary[] }
 export type MessagesResponse = {
     messages: DecryptedMessage[]
     page: {
@@ -162,36 +172,17 @@ export type TeamMessagesResponse = {
     }
 }
 
-export type MachinesResponse = { machines: Machine[] }
+
 export type { AgentModelCatalogResult } from '@hapi/protocol'
 export type AgentModelsResponse = AgentModelCatalogResult
-export type MachinePathsExistsResponse = { exists: Record<string, boolean> }
 
-export type MachineDirectoryEntry = {
-    name: string
-    type: 'file' | 'directory' | 'other'
-    size?: number
-    modified?: number
-    isGitRepo?: boolean
-}
-
-export type MachineListDirectoryResponse = {
-    success: boolean
-    entries?: MachineDirectoryEntry[]
-    error?: string
-}
+export type MachinesResponse = { machines: Machine[] }
 
 export type SpawnResponse =
     | { type: 'success'; sessionId: string }
     | { type: 'error'; message: string }
 
-export type GitCommandResponse = {
-    success: boolean
-    stdout?: string
-    stderr?: string
-    exitCode?: number
-    error?: string
-}
+
 
 export type FileSearchItem = {
     fileName: string
@@ -206,35 +197,10 @@ export type FileSearchResponse = {
     error?: string
 }
 
-export type DirectoryEntry = {
-    name: string
-    type: 'file' | 'directory' | 'other'
-    size?: number
-    modified?: number
-}
 
-export type ListDirectoryResponse = {
-    success: boolean
-    entries?: DirectoryEntry[]
-    error?: string
-}
 
-export type FileReadResponse = {
-    success: boolean
-    content?: string
-    error?: string
-}
 
-export type UploadFileResponse = {
-    success: boolean
-    path?: string
-    error?: string
-}
 
-export type DeleteUploadResponse = {
-    success: boolean
-    error?: string
-}
 
 export type GitFileStatus = {
     fileName: string
@@ -255,19 +221,7 @@ export type GitStatusFiles = {
     totalUnstaged: number
 }
 
-export type SlashCommand = {
-    name: string
-    description?: string
-    source: 'builtin' | 'user' | 'plugin' | 'project'
-    content?: string  // Expanded content for Codex user prompts
-    pluginName?: string
-}
 
-export type SlashCommandsResponse = {
-    success: boolean
-    commands?: SlashCommand[]
-    error?: string
-}
 
 export type SkillSummary = {
     name: string
@@ -280,38 +234,10 @@ export type SkillsResponse = {
     error?: string
 }
 
-export type CodexModelSummary = {
-    id: string
-    displayName: string
-    isDefault: boolean
-    defaultReasoningEffort?: string | null
-    supportedReasoningEfforts?: string[]
-}
 
-export type CodexModelsResponse = {
-    success: boolean
-    models?: CodexModelSummary[]
-    error?: string
-}
 
-export type OpencodeModelSummary = {
-    modelId: string
-    name?: string
-}
 
-export type OpencodeEffortSummary = {
-    effortId: string
-    name?: string
-}
 
-export type OpencodeModelsResponse = {
-    success: boolean
-    availableModels?: OpencodeModelSummary[]
-    currentModelId?: string | null
-    availableEfforts?: OpencodeEffortSummary[]
-    currentEffortId?: string | null
-    error?: string
-}
 
 /** Maps thinking levels to provider-specific values. null = unsupported. */
 export type PiThinkingLevelMap = Partial<Record<string, string | null>>

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { constants, existsSync, readdirSync } from 'node:fs'
 import { lstat, mkdir, open, readFile, realpath, rename, rm } from 'node:fs/promises'
 import { dirname, join, resolve, sep } from 'node:path'

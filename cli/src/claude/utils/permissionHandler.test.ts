@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it, vi } from 'vitest';
 import { PermissionHandler } from './permissionHandler';
 import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from '../sdk/prompts';

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 const WINDOWS_SHELL_ARG_PATTERN = /[&|<>^()%!"\r\n]/u;
 
 /** Reject dynamic values before passing them to a Windows `shell: true` spawn. */

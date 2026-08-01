@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import chalk from 'chalk'
 import { execFileSync } from 'node:child_process'
 import { z } from 'zod'

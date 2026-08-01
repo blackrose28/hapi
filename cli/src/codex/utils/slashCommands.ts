@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { CODEX_PERMISSION_MODES } from '@hapi/protocol/modes';
 import type { CodexPermissionMode } from '@hapi/protocol/types';
 import type { ReasoningEffort } from '../appServerTypes';

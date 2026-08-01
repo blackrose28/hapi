@@ -1,27 +1,30 @@
 import {
     AgentModelCatalogResultSchema,
     type AgentFlavor,
-    type AgentModelCatalogResult
+    type AgentModelCatalogResult,
+    RPC_METHODS
 } from '@hapi/protocol'
 import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/types'
+import type {
+    CodexModelSummary,
+    CodexModelsResponse,
+    CommandResponse,
+    DeleteUploadResponse,
+    DirectoryEntry,
+    FileReadResponse,
+    GeneratedImageResponse,
+    ListDirectoryResponse,
+    OpencodeModelsResponse,
+    OpencodeModelSummary,
+    PathExistsResponse,
+    UploadFileResponse
+} from '@hapi/protocol/schemas'
 import type { Server } from 'socket.io'
 import type { RpcRegistry } from '../socket/rpcRegistry'
 
-export type RpcCommandResponse = {
-    success: boolean
-    stdout?: string
-    stderr?: string
-    exitCode?: number
-    error?: string
-}
-
-export type RpcReadFileResponse = {
-    success: boolean
-    content?: string
-    size?: number
-    error?: string
-}
-
+export type RpcCommandResponse = CommandResponse
+export type RpcReadFileResponse = FileReadResponse
+export type RpcGeneratedImageResponse = GeneratedImageResponse
 export type RpcReadFileRawResponse = {
     success: boolean
     data?: string
@@ -29,56 +32,21 @@ export type RpcReadFileRawResponse = {
     size?: number
     error?: string
 }
-
-export type RpcUploadFileResponse = {
-    success: boolean
-    path?: string
-    error?: string
-}
-
+export type RpcUploadFileResponse = UploadFileResponse
 export type RpcEditorFileMutationResponse = {
     success: boolean
     path?: string
     size?: number
     error?: string
 }
-
-export type RpcDeleteUploadResponse = {
-    success: boolean
-    error?: string
-}
-
-export type RpcDirectoryEntry = {
-    name: string
-    type: 'file' | 'directory' | 'other'
-    size?: number
-    modified?: number
-    gitStatus?: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked'
-}
-
-export type RpcListDirectoryResponse = {
-    success: boolean
-    entries?: RpcDirectoryEntry[]
-    error?: string
-}
-
-export type RpcPathExistsResponse = {
-    exists: Record<string, boolean>
-}
-
-export type RpcCodexModel = {
-    id: string
-    displayName: string
-    isDefault: boolean
-    defaultReasoningEffort?: string | null
-    supportedReasoningEfforts?: string[]
-}
-
-export type RpcListCodexModelsResponse = {
-    success: boolean
-    models?: RpcCodexModel[]
-    error?: string
-}
+export type RpcDeleteUploadResponse = DeleteUploadResponse
+export type RpcDirectoryEntry = DirectoryEntry
+export type RpcListDirectoryResponse = ListDirectoryResponse
+export type RpcPathExistsResponse = PathExistsResponse
+export type RpcCodexModel = CodexModelSummary
+export type RpcListCodexModelsResponse = CodexModelsResponse
+export type RpcOpencodeModel = OpencodeModelSummary
+export type RpcListOpencodeModelsResponse = OpencodeModelsResponse
 
 export type RpcEditorProject = {
     path: string
@@ -149,25 +117,6 @@ export type RpcEditorGitStashListResponse = {
     error?: string
 }
 
-
-export type RpcOpencodeModel = {
-    modelId: string
-    name?: string
-}
-
-export type RpcOpencodeEffort = {
-    effortId: string
-    name?: string
-}
-
-export type RpcListOpencodeModelsResponse = {
-    success: boolean
-    availableModels?: RpcOpencodeModel[]
-    currentModelId?: string | null
-    availableEfforts?: RpcOpencodeEffort[]
-    currentEffortId?: string | null
-    error?: string
-}
 
 // Note: this fork has no shared `apiTypes.ts` module (deliberately not adopted
 // — see docs/upstream-sync), so RpcPiModel/RpcListPiModelsResponse are kept
@@ -287,7 +236,7 @@ export class RpcGateway {
     async spawnSession(
         machineId: string,
         directory: string,
-        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi' = 'claude',
+        agent: AgentFlavor = 'claude',
         model?: string,
         modelReasoningEffort?: string,
         yolo?: boolean,

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Reasoning Processor - Handles streaming reasoning deltas and identifies reasoning tools
  * 

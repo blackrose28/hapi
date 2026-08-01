@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { isKnownFlavor } from '@hapi/protocol'
+import { AgentFlavorSchema, isKnownFlavor } from '@hapi/protocol'
 import { PermissionModeSchema } from '@hapi/protocol/schemas'
 import type { SyncEngine } from '../../sync/syncEngine'
 import type { WebAppEnv } from '../middleware/auth'
@@ -8,7 +8,7 @@ import { requireMachine, requireCapability, type RestCapabilityResolver } from '
 
 const spawnBodySchema = z.object({
     directory: z.string().min(1),
-    agent: z.enum(['claude', 'codex', 'cursor', 'gemini', 'grok', 'opencode']).optional(),
+    agent: AgentFlavorSchema.optional(),
     model: z.string().optional(),
     effort: z.string().optional(),
     modelReasoningEffort: z.string().optional(),

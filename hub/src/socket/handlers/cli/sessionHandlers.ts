@@ -181,7 +181,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
                 const updatedAt = Math.max(msg.createdAt, (latest?.todosUpdatedAt ?? msg.createdAt - 1) + 1)
                 const result = store.sessions.setSessionTodos(sid, reduction.todos, updatedAt, session.namespace)
                 if (result === 'applied') {
-                    onWebappEvent?.({ type: 'session-updated', sessionId: sid, data: { sid } })
+                    onWebappEvent?.({ type: 'session-updated', sessionId: sid })
                 } else if (result === 'error') {
                     console.warn(`Failed to persist session todos for ${sid}`)
                 }
@@ -195,7 +195,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
             const newTeamState = applyTeamStateDelta(existingTeamState ?? null, teamDelta)
             const updated = store.sessions.setSessionTeamState(sid, newTeamState, msg.createdAt, session.namespace)
             if (updated) {
-                onWebappEvent?.({ type: 'session-updated', sessionId: sid, data: { sid } })
+                onWebappEvent?.({ type: 'session-updated', sessionId: sid })
             }
         }
 
@@ -317,7 +317,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
                 }
             }
             socket.to(`session:${sid}`).emit('update', update)
-            onWebappEvent?.({ type: 'session-updated', sessionId: sid, data: { sid } })
+            onWebappEvent?.({ type: 'session-updated', sessionId: sid })
         }
     }
 
@@ -364,7 +364,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
                 }
             }
             socket.to(`session:${sid}`).emit('update', update)
-            onWebappEvent?.({ type: 'session-updated', sessionId: sid, data: { sid } })
+            onWebappEvent?.({ type: 'session-updated', sessionId: sid })
         }
     }
 

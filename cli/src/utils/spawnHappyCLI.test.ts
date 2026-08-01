@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpawnOptions } from 'child_process';
 

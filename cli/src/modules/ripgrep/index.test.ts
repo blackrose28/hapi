@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Tests for low-level ripgrep wrapper
  */
@@ -9,7 +10,7 @@ describe('ripgrep low-level wrapper', () => {
     it('should get version', async () => {
         const result = await run(['--version'])
         expect(result.exitCode).toBe(0)
-        expect(result.stdout).toContain('ripgrep')
+        expect(result.stdout).toContain(RPC_METHODS.Ripgrep)
     })
     
     it('should search for pattern', async () => {

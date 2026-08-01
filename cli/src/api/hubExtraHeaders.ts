@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { configuration } from '@/configuration'
 
 export function buildHubRequestHeaders(baseHeaders: Record<string, string>): Record<string, string> {

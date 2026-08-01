@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { resolve, sep } from 'path';
 
 export interface PathValidationResult {

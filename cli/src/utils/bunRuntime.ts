@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { isBunCompiled } from '@/projectPath';
 
 export type BunRuntimeEnvOptions = {

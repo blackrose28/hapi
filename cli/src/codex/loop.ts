@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { MessageQueue2 } from '@/utils/MessageQueue2';
 import { logger } from '@/ui/logger';
 import { runLocalRemoteSession } from '@/agent/loopBase';

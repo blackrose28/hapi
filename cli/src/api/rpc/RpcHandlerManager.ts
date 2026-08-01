@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Generic RPC handler manager for session and machine clients
  * Manages RPC method registration and handler execution (no encryption).

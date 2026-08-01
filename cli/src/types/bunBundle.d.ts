@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 declare module 'bun:bundle' {
     interface Registry {
         features:

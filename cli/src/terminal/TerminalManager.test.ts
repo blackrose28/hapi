@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { TerminalStateSchema, TerminalWarningPayloadSchema, type TerminalWarningPayload } from '@hapi/protocol'
 import { logger } from '@/ui/logger'

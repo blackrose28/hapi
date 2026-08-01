@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type CodexGoalCommand =
     | { action: 'get' }
     | { action: 'clear' }

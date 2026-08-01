@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { mkdirSync } from "node:fs";
 import { logger } from "@/ui/logger";
 import { claudeCheckSession } from "./utils/claudeCheckSession";

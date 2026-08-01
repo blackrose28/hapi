@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentFlavor } from '@hapi/protocol';
 
 export type McpEnvVar = {

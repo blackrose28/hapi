@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { SessionEffort } from '@/api/types'
 
 export function normalizeClaudeSessionEffort(effort?: string | null): SessionEffort {

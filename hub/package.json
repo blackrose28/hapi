@@ -6,6 +6,12 @@
   "author": "weishu",
   "license": "AGPL-3.0-only",
   "type": "module",
+  "exports": {
+    "./startHub": {
+      "types": "./src/startHub.d.ts",
+      "default": "./src/startHub.ts"
+    }
+  },
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch run src/index.ts",

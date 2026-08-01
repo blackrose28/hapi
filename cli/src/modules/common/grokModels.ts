@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { asString, isObject } from '@hapi/protocol';
 import { AcpStdioTransport } from '@/agent/backends/acp/AcpStdioTransport';
 import packageJson from '../../../package.json';

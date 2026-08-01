@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { join } from 'path'
 import { tmpdir } from 'os'
 

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { access, readdir, readFile } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { homedir } from 'os';

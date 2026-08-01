@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import axios from 'axios';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';

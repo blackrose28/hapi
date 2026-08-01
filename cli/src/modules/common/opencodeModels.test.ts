@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sendRequestMock = vi.fn()
@@ -16,7 +17,7 @@ vi.mock('@/agent/backends/acp/AcpStdioTransport', () => ({
 
 import { listOpencodeModelsForCwd, _resetOpencodeModelsCacheForTests } from './opencodeModels'
 
-describe('listOpencodeModelsForCwd', () => {
+describe(RPC_METHODS.ListOpencodeModelsForCwd, () => {
     beforeEach(() => {
         _resetOpencodeModelsCacheForTests()
         sendRequestMock.mockReset()

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Deterministic JSON utilities for consistent object serialization and hashing
  * 

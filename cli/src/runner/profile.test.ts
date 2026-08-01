@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach,describe,expect,it } from 'vitest'
 import { mkdtemp,readFile,stat,symlink,writeFile } from 'node:fs/promises'
 import { rm } from 'node:fs/promises'

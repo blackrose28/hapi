@@ -1,26 +1,12 @@
+import { PROTOCOL_VERSION } from "@hapi/protocol";
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { PROTOCOL_VERSION } from '@hapi/protocol'
+import { CreateOrLoadMachineRequestSchema, CreateOrLoadSessionRequestSchema } from '@hapi/protocol/schemas'
 import { MarkTeamMentionNoActionInputSchema, ReportToTeamInputSchema } from '@hapi/protocol/schemas'
 import type { Machine, Session, SyncEngine } from '../../sync/syncEngine'
 import type { RunnerAuthenticator } from '../../auth/runnerAuthenticator'
 
 const runnerAuthorizationSchema = z.string().regex(/^Runner\s+[^.\s]+\.[^\s]+$/i)
-
-const createOrLoadSessionSchema = z.object({
-    tag: z.string().min(1),
-    metadata: z.unknown(),
-    agentState: z.unknown().nullable().optional(),
-    model: z.string().optional(),
-    modelReasoningEffort: z.string().optional(),
-    effort: z.string().optional()
-})
-
-const createOrLoadMachineSchema = z.object({
-    id: z.string().min(1),
-    metadata: z.unknown(),
-    runnerState: z.unknown().nullable().optional()
-})
 
 const getMessagesQuerySchema = z.object({
     afterSeq: z.coerce.number().int().min(0),
@@ -106,7 +92,7 @@ export function createCliRoutes(
             return c.json({ error: 'Not ready' }, 503)
         }
         const json = await c.req.json().catch(() => null)
-        const parsed = createOrLoadSessionSchema.safeParse(json)
+        const parsed = CreateOrLoadSessionRequestSchema.safeParse(json)
         if (!parsed.success) {
             return c.json({ error: 'Invalid body' }, 400)
         }
@@ -237,7 +223,7 @@ export function createCliRoutes(
             return c.json({ error: 'Not ready' }, 503)
         }
         const json = await c.req.json().catch(() => null)
-        const parsed = createOrLoadMachineSchema.safeParse(json)
+        const parsed = CreateOrLoadMachineRequestSchema.safeParse(json)
         if (!parsed.success) {
             return c.json({ error: 'Invalid body' }, 400)
         }

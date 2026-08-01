@@ -1,3 +1,4 @@
+import type { SessionSummary } from './sessionSummary';
 import { z } from 'zod'
 import { CachedAgentModelCatalogSchema } from './agentModels'
 import { CODEX_COLLABORATION_MODES, PERMISSION_MODES } from './modes'
@@ -380,6 +381,84 @@ export const SessionSchema = z.object({
 
 export type Session = z.infer<typeof SessionSchema>
 
+export const SessionPatchSchema = z.object({
+    active: z.boolean().optional(),
+    thinking: z.boolean().optional(),
+    activeAt: z.number().optional(),
+    updatedAt: z.number().optional(),
+    model: z.string().nullable().optional(),
+    modelReasoningEffort: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
+    permissionMode: PermissionModeSchema.optional(),
+    collaborationMode: CodexCollaborationModeSchema.optional(),
+    backgroundTaskCount: z.number().optional(),
+    scratchlistUpdatedAt: z.number().optional()
+}).strict()
+
+export type SessionPatch = z.infer<typeof SessionPatchSchema>
+
+export const MachineMetadataSchema = z.object({
+    host: z.string(),
+    platform: z.string(),
+    happyCliVersion: z.string(),
+    displayName: z.string().optional(),
+    homeDir: z.string().optional(),
+    happyHomeDir: z.string().optional(),
+    happyLibDir: z.string().optional(),
+    workspaceRoots: z.array(z.string()).optional()
+})
+
+export type MachineMetadata = z.infer<typeof MachineMetadataSchema>
+
+export const RunnerStateSchema = z.object({
+    status: z.union([z.enum(["running", "shutting-down"]), z.string()]),
+    pid: z.number().optional(),
+    httpPort: z.number().optional(),
+    startedAt: z.number().optional(),
+    shutdownRequestedAt: z.number().optional(),
+    shutdownSource: z.union([z.enum(["mobile-app", "cli", "os-signal", "unknown"]), z.string()]).optional(),
+    lastSpawnError: z.object({
+        message: z.string(),
+        pid: z.number().optional(),
+        exitCode: z.number().nullable().optional(),
+        signal: z.string().nullable().optional(),
+        at: z.number()
+    }).nullable().optional()
+})
+
+export type RunnerState = z.infer<typeof RunnerStateSchema>
+
+export const MachineSchema = z.object({
+    id: z.string(),
+    namespace: z.string(),
+    seq: z.number(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    active: z.boolean(),
+    activeAt: z.number(),
+    metadata: MachineMetadataSchema.nullable(),
+    metadataVersion: z.number(),
+    runnerState: RunnerStateSchema.nullable(),
+    runnerStateVersion: z.number()
+})
+
+export type Machine = z.infer<typeof MachineSchema>
+
+export const MachinePatchSchema = z.object({
+    active: z.boolean().optional(),
+    activeAt: z.number().optional(),
+    updatedAt: z.number().optional()
+}).strict()
+
+export type MachinePatch = z.infer<typeof MachinePatchSchema>
+
+export const SessionUpdatedDataSchema = z.union([SessionSchema, SessionPatchSchema])
+export type SessionUpdatedData = z.infer<typeof SessionUpdatedDataSchema>
+
+export const MachineUpdatedDataSchema = z.union([MachineSchema, MachinePatchSchema, z.null()])
+export type MachineUpdatedData = z.infer<typeof MachineUpdatedDataSchema>
+
+
 const SessionEventBaseSchema = z.object({
     namespace: z.string().optional()
 })
@@ -395,11 +474,11 @@ const MachineChangedSchema = SessionEventBaseSchema.extend({
 export const SyncEventSchema = z.discriminatedUnion('type', [
     SessionChangedSchema.extend({
         type: z.literal('session-added'),
-        data: z.unknown().optional()
+        data: SessionUpdatedDataSchema.optional()
     }),
     SessionChangedSchema.extend({
         type: z.literal('session-updated'),
-        data: z.unknown().optional()
+        data: SessionUpdatedDataSchema.optional()
     }),
     SessionEventBaseSchema.extend({
         type: z.literal('session-removed'),
@@ -428,7 +507,7 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
     }),
     MachineChangedSchema.extend({
         type: z.literal('machine-updated'),
-        data: z.unknown().optional()
+        data: MachineUpdatedDataSchema.optional()
     }),
     SessionEventBaseSchema.extend({
         type: z.literal('toast'),
@@ -528,3 +607,194 @@ export const UploadScratchlistAttachmentResponseSchema = z.object({
     code: z.string().optional()
 });
 export type UploadScratchlistAttachmentResponse = z.infer<typeof UploadScratchlistAttachmentResponseSchema>;
+
+export type CommandResponse = {
+    success: boolean
+    stdout?: string
+    stderr?: string
+    exitCode?: number
+    error?: string
+}
+
+export type GitCommandResponse = CommandResponse
+
+export type FileReadResponse = {
+    success: boolean
+    content?: string
+    size?: number
+    error?: string
+}
+
+export type GeneratedImageResponse = {
+    success: boolean
+    content?: string
+    size?: number
+    mimeType?: string
+    fileName?: string
+    error?: string
+}
+
+export type UploadFileResponse = {
+    success: boolean
+    path?: string
+    error?: string
+}
+
+export type DeleteUploadResponse = {
+    success: boolean
+    error?: string
+}
+
+export type DirectoryEntry = {
+    name: string
+    type: 'file' | 'directory' | 'other'
+    size?: number
+    modified?: number
+    gitStatus?: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked'
+}
+
+export type ListDirectoryResponse = {
+    success: boolean
+    entries?: DirectoryEntry[]
+    error?: string
+}
+
+export type RpcListDirectoryResponse = ListDirectoryResponse
+
+export type MachineDirectoryEntry = DirectoryEntry & {
+    isGitRepo?: boolean
+}
+
+export type MachineListDirectoryResponse = {
+    success: boolean
+    entries?: MachineDirectoryEntry[]
+    error?: string
+}
+
+export type PathExistsResponse = {
+    exists: Record<string, boolean>
+}
+
+export type MachinePathsExistsResponse = PathExistsResponse
+
+export type CodexModelSummary = {
+    id: string
+    displayName: string
+    isDefault: boolean
+    defaultReasoningEffort?: string | null
+    supportedReasoningEfforts?: string[]
+}
+
+export type CodexModelsResponse = {
+    success: boolean
+    models?: CodexModelSummary[]
+    error?: string
+}
+
+export type ListCodexModelsResponse = CodexModelsResponse
+
+export type OpencodeModelSummary = {
+    modelId: string
+    name?: string
+}
+
+export type OpencodeEffortSummary = { effortId: string; name?: string }
+
+export type OpencodeModelsResponse = {
+    success: boolean
+    availableModels?: OpencodeModelSummary[]
+    currentModelId?: string | null
+    availableEfforts?: OpencodeEffortSummary[]
+    currentEffortId?: string | null
+    error?: string
+}
+
+export type ListOpencodeModelsResponse = OpencodeModelsResponse
+
+export type SlashCommand = {
+    name: string
+    description?: string
+    source: 'builtin' | 'user' | 'plugin' | 'project'
+    content?: string  // Expanded content for Codex user prompts
+    pluginName?: string
+}
+
+export type SlashCommandsResponse = {
+    success: boolean
+    commands?: SlashCommand[]
+    error?: string
+}
+
+export const CreateOrLoadSessionRequestSchema = z.object({
+    tag: z.string().min(1),
+    metadata: z.unknown(),
+    agentState: z.unknown().nullable().optional(),
+    model: z.string().optional(),
+    modelReasoningEffort: z.string().optional(),
+    effort: z.string().optional()
+})
+
+export type CreateOrLoadSessionRequest = z.infer<typeof CreateOrLoadSessionRequestSchema>
+
+export const CreateOrLoadMachineRequestSchema = z.object({
+    id: z.string().min(1),
+    metadata: z.unknown(),
+    runnerState: z.unknown().nullable().optional()
+})
+
+export type CreateOrLoadMachineRequest = z.infer<typeof CreateOrLoadMachineRequestSchema>
+
+export const CliMessagesResponseSchema = z.object({
+    messages: z.array(z.object({
+        id: z.string(),
+        seq: z.number(),
+        createdAt: z.number(),
+        localId: z.string().nullable().optional(),
+        content: z.unknown()
+    }))
+})
+
+export type CliMessagesResponse = z.infer<typeof CliMessagesResponseSchema>
+
+export const CreateSessionResponseSchema = z.object({
+    session: SessionSchema
+})
+
+export type CreateSessionResponse = z.infer<typeof CreateSessionResponseSchema>
+
+export const CreateMachineResponseSchema = z.object({
+    machine: MachineSchema
+})
+
+export type CreateMachineResponse = z.infer<typeof CreateMachineResponseSchema>
+
+export const GetSessionResponseSchema = CreateSessionResponseSchema
+export type GetSessionResponse = CreateSessionResponse
+
+export type AuthResponse = {
+    token: string
+    user: {
+        id: number
+        username?: string
+        firstName?: string
+        lastName?: string
+    }
+}
+
+export type SessionsResponse = { sessions: SessionSummary[] }
+export type SessionResponse = { session: Session }
+export type MessagesResponse = {
+    messages: DecryptedMessage[]
+    page: {
+        limit: number
+        nextBeforeSeq: number | null
+        nextBeforeAt: number | null
+        hasMore: boolean
+    }
+}
+
+export type MachinesResponse = { machines: Machine[] }
+
+export type SpawnResponse =
+    | { type: 'success'; sessionId: string }
+    | { type: 'error'; message: string }

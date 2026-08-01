@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React from 'react';
 import { logger } from '@/ui/logger';
 import { buildHapiMcpBridge } from '@/codex/utils/buildHapiMcpBridge';
@@ -356,11 +357,11 @@ class GrokRemoteLauncher extends RemoteLauncherBase {
     }
 
     private async handleSwitchFromUi(): Promise<void> {
-        await this.requestExit('switch', () => this.handleAbort());
+        await this.requestExit(RPC_METHODS.Switch, () => this.handleAbort());
     }
 
     private async handleSwitchRequest(): Promise<void> {
-        await this.requestExit('switch', () => this.handleAbort());
+        await this.requestExit(RPC_METHODS.Switch, () => this.handleAbort());
     }
 }
 

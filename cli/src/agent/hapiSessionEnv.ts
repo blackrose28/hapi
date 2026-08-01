@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Canonical env var name exported into the wrapped agent / CLI child process so
  * it can self-target its own hub session (REST, shell helpers) without listing

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Diff Processor - Handles turn_diff messages and tracks unified_diff changes
  * 

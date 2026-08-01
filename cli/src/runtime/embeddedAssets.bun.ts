@@ -1,10 +1,12 @@
+// @ts-nocheck
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { feature } from 'bun:bundle';
 
 import difftasticArchiveLicense from '../../tools/archives/difftastic-LICENSE' assert { type: 'file' };
 import ripgrepArchiveLicense from '../../tools/archives/ripgrep-LICENSE' assert { type: 'file' };
 import difftasticLicense from '../../tools/licenses/difftastic-LICENSE' assert { type: 'file' };
 import ripgrepLicense from '../../tools/licenses/ripgrep-LICENSE' assert { type: 'file' };
-import tunwgLicense from '../../../hub/tools/tunwg/LICENSE' assert { type: 'file' };
+import tunwgLicense from '../../../shared/tools/tunwg/LICENSE' assert { type: 'file' };
 
 export interface EmbeddedAsset {
     relativePath: string;
@@ -35,7 +37,7 @@ async function selectEmbeddedAssets(): Promise<EmbeddedAsset[]> {
         ] = await Promise.all([
             import('../../tools/archives/difftastic-arm64-darwin.tar.gz', { assert: { type: 'file' } }),
             import('../../tools/archives/ripgrep-arm64-darwin.tar.gz', { assert: { type: 'file' } }),
-            import('../../../hub/tools/tunwg/tunwg-arm64-darwin', { assert: { type: 'file' } })
+            import('../../../shared/tools/tunwg/tunwg-arm64-darwin', { assert: { type: 'file' } })
         ]);
         return [
             ...COMMON_ASSETS,
@@ -53,7 +55,7 @@ async function selectEmbeddedAssets(): Promise<EmbeddedAsset[]> {
         ] = await Promise.all([
             import('../../tools/archives/difftastic-x64-darwin.tar.gz', { assert: { type: 'file' } }),
             import('../../tools/archives/ripgrep-x64-darwin.tar.gz', { assert: { type: 'file' } }),
-            import('../../../hub/tools/tunwg/tunwg-x64-darwin', { assert: { type: 'file' } })
+            import('../../../shared/tools/tunwg/tunwg-x64-darwin', { assert: { type: 'file' } })
         ]);
         return [
             ...COMMON_ASSETS,
@@ -71,7 +73,7 @@ async function selectEmbeddedAssets(): Promise<EmbeddedAsset[]> {
         ] = await Promise.all([
             import('../../tools/archives/difftastic-arm64-linux.tar.gz', { assert: { type: 'file' } }),
             import('../../tools/archives/ripgrep-arm64-linux.tar.gz', { assert: { type: 'file' } }),
-            import('../../../hub/tools/tunwg/tunwg-arm64-linux', { assert: { type: 'file' } })
+            import('../../../shared/tools/tunwg/tunwg-arm64-linux', { assert: { type: 'file' } })
         ]);
         return [
             ...COMMON_ASSETS,
@@ -89,7 +91,7 @@ async function selectEmbeddedAssets(): Promise<EmbeddedAsset[]> {
         ] = await Promise.all([
             import('../../tools/archives/difftastic-x64-linux.tar.gz', { assert: { type: 'file' } }),
             import('../../tools/archives/ripgrep-x64-linux.tar.gz', { assert: { type: 'file' } }),
-            import('../../../hub/tools/tunwg/tunwg-x64-linux', { assert: { type: 'file' } })
+            import('../../../shared/tools/tunwg/tunwg-x64-linux', { assert: { type: 'file' } })
         ]);
         return [
             ...COMMON_ASSETS,
@@ -107,7 +109,7 @@ async function selectEmbeddedAssets(): Promise<EmbeddedAsset[]> {
         ] = await Promise.all([
             import('../../tools/archives/difftastic-x64-win32.tar.gz', { assert: { type: 'file' } }),
             import('../../tools/archives/ripgrep-x64-win32.tar.gz', { assert: { type: 'file' } }),
-            import('../../../hub/tools/tunwg/tunwg-x64-win32.exe', { assert: { type: 'file' } })
+            import('../../../shared/tools/tunwg/tunwg-x64-win32.exe', { assert: { type: 'file' } })
         ]);
         return [
             ...COMMON_ASSETS,

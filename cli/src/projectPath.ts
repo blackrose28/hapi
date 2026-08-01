@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { dirname, resolve, join } from 'path';
 import { fileURLToPath } from 'url';
 import { configuration } from '@/configuration';

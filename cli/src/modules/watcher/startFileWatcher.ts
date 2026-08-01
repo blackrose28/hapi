@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from "@/ui/logger";
 import { delay } from "@/utils/time";
 import { stat } from "node:fs/promises";

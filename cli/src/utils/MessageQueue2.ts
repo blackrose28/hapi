@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from "@/ui/logger";
 
 interface QueueItem<T> {
@@ -353,7 +354,7 @@ export class MessageQueue2<T> {
                 }
                 // Clean up abort handler
                 if (abortHandler && abortSignal) {
-                    abortSignal.removeEventListener('abort', abortHandler);
+                    abortSignal.removeEventListener(RPC_METHODS.Abort, abortHandler);
                 }
                 resolve(hasMessages);
             };
@@ -368,7 +369,7 @@ export class MessageQueue2<T> {
                     logger.debug('[MessageQueue2] Wait aborted');
                     finish(false);
                 };
-                abortSignal.addEventListener('abort', abortHandler);
+                abortSignal.addEventListener(RPC_METHODS.Abort, abortHandler);
             }
 
             // Set the waiter before checking the queue to avoid missed notifications

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentBackend, AgentBackendFactory } from './types';
 
 export class AgentRegistry {

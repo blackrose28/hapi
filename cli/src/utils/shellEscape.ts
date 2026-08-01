@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Strip newlines when passing args through Windows cmd.exe.
  * cmd.exe treats CR/LF as command separators and truncates multiline args.

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export function trimIdent(text: string): string {
     // Split the text into an array of lines
     const lines = text.split('\n');

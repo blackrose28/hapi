@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type AckResult = 'success' | 'version-mismatch'
 
 export type VersionedAckResult<ValueKey extends string> =

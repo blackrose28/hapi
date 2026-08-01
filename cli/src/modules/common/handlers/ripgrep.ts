@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { run as runRipgrep } from '@/modules/ripgrep/index'
@@ -18,7 +19,7 @@ interface RipgrepResponse {
 }
 
 export function registerRipgrepHandlers(rpcHandlerManager: RpcHandlerManager, workingDirectory: string): void {
-    rpcHandlerManager.registerHandler<RipgrepRequest, RipgrepResponse>('ripgrep', async (data) => {
+    rpcHandlerManager.registerHandler<RipgrepRequest, RipgrepResponse>(RPC_METHODS.Ripgrep, async (data) => {
         logger.debug('Ripgrep request received')
 
         if (data.cwd) {

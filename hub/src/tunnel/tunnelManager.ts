@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { platform, arch, homedir } from 'node:os'
 import { isBunCompiled } from '../utils/bunCompiled'
+import { APP_VERSION } from '@hapi/protocol/buildInfo'
 
 function getHapiHome(): string {
     return process.env.HAPI_HOME
@@ -43,15 +44,14 @@ function getTunwgPath(): string {
 
     if (isBunCompiled()) {
         const hapiHome = getHapiHome()
-        const packageJson = require('../../../cli/package.json')
-        const runtimePath = join(hapiHome, 'runtime', packageJson.version)
+        const runtimePath = join(hapiHome, 'runtime', APP_VERSION)
         return join(runtimePath, 'tools', 'tunwg', tunwgBinary)
     }
 
-    // Development mode: use downloaded binary from hub/tools/tunwg
+    // Development mode: use downloaded binary from shared/tools/tunwg
     const platformDir = getPlatformDir()
     const devBinaryName = isWin ? `tunwg-${platformDir}.exe` : `tunwg-${platformDir}`
-    return join(__dirname, '..', '..', 'tools', 'tunwg', devBinaryName)
+    return join(__dirname, '..', '..', '..', 'shared', 'tools', 'tunwg', devBinaryName)
 }
 
 export interface TunnelConfig {

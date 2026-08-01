@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * PushableAsyncIterable - A generic async iterable that allows external pushing
  * Provides a clean API for creating async iterables that can be pushed to from external sources

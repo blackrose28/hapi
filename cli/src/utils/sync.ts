@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { backoff } from "@/utils/time";
 
 export class InvalidateSync {

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { readFile } from 'node:fs/promises';
 
 const DEFAULT_TITLE_WATCH_INTERVAL_MS = 500;

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Converts Cursor Agent stream-json events to HAPI AgentMessage format.
  * Cursor emits NDJSON: system/init, thinking, assistant, tool_call, result.

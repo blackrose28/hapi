@@ -13,7 +13,7 @@
     },
     "cli": {
       "name": "@blackrose28/hapi",
-      "version": "0.18.5-sharedhub",
+      "version": "0.18.7-sharedhub",
       "bin": {
         "hapi": "bin/hapi.cjs",
       },
@@ -28,6 +28,7 @@
         "cross-spawn": "^7.0.6",
         "fastify": "^5.6.2",
         "fastify-type-provider-zod": "6.1.0",
+        "hapi-hub": "workspace:*",
         "ink": "^6.6.0",
         "ps-list": "^9.0.0",
         "react": "^19.2.3",
@@ -44,11 +45,11 @@
         "vitest": "^4.0.16",
       },
       "optionalDependencies": {
-        "@blackrose28/hapi-darwin-arm64": "0.18.5-sharedhub",
-        "@blackrose28/hapi-darwin-x64": "0.18.5-sharedhub",
-        "@blackrose28/hapi-linux-arm64": "0.18.5-sharedhub",
-        "@blackrose28/hapi-linux-x64": "0.18.5-sharedhub",
-        "@blackrose28/hapi-win32-x64": "0.18.5-sharedhub",
+        "@blackrose28/hapi-darwin-arm64": "0.18.7-sharedhub",
+        "@blackrose28/hapi-darwin-x64": "0.18.7-sharedhub",
+        "@blackrose28/hapi-linux-arm64": "0.18.7-sharedhub",
+        "@blackrose28/hapi-linux-x64": "0.18.7-sharedhub",
+        "@blackrose28/hapi-win32-x64": "0.18.7-sharedhub",
       },
     },
     "docs": {
@@ -506,15 +507,15 @@
 
     "@blackrose28/hapi": ["@blackrose28/hapi@workspace:cli"],
 
-    "@blackrose28/hapi-darwin-arm64": ["@blackrose28/hapi-darwin-arm64@0.18.5-sharedhub", "", { "os": "darwin", "cpu": "arm64", "bin": { "hapi": "bin/hapi" } }, "sha512-5olrEdgVGmdSbFy4BCz05cbR46+IZ3QZinrNdB37+r/6iqaaeqw87gPQGg/JphZ8l9kHTtMHkyASsgRCcFRGLQ=="],
+    "@blackrose28/hapi-darwin-arm64": ["@blackrose28/hapi-darwin-arm64@0.18.7-sharedhub", "", { "os": "darwin", "cpu": "arm64", "bin": { "hapi": "bin/hapi" } }, "sha512-wmO5pTI+G4rplnCHfngKB2V/98jMhlZMQg4XRg3xRjDK0kn8WN7zN4Xxd99AE9tEX+FbSoFRQO+JyG1G4XkfPQ=="],
 
-    "@blackrose28/hapi-darwin-x64": ["@blackrose28/hapi-darwin-x64@0.18.5-sharedhub", "", { "os": "darwin", "cpu": "x64", "bin": { "hapi": "bin/hapi" } }, "sha512-/AzpvL3geMa4RtKeS01bv1gagCIfJl+HI5n1dy1pyMch1QNzQ9/HxGFuHm+Ig6zT7Ivnq8WHOyXy6O7WeEQ/jg=="],
+    "@blackrose28/hapi-darwin-x64": ["@blackrose28/hapi-darwin-x64@0.18.7-sharedhub", "", { "os": "darwin", "cpu": "x64", "bin": { "hapi": "bin/hapi" } }, "sha512-ckhxUqQ0UasCvK8zYEt/+mWGDv3sd56YNR9QeMCga27fy/ms9TvrqqO7PUE4Pi661NPU95/ffiakw2nYaZTRlA=="],
 
-    "@blackrose28/hapi-linux-arm64": ["@blackrose28/hapi-linux-arm64@0.18.5-sharedhub", "", { "os": "linux", "cpu": "arm64", "bin": { "hapi": "bin/hapi" } }, "sha512-6wGR7KMMH7tt0BDnbzKzkP5GWtKlU1Rq40Aw0XTscw+kYMs+Ja8LeqgR1o34oTQFNUDhNv8R9Qcd9GIArP+POA=="],
+    "@blackrose28/hapi-linux-arm64": ["@blackrose28/hapi-linux-arm64@0.18.7-sharedhub", "", { "os": "linux", "cpu": "arm64", "bin": { "hapi": "bin/hapi" } }, "sha512-RMra1aybwzMFd+mIF0lyj5z61yxXkYQJ4PBcZKiwPCkdgvALRgRjmuKdsrN1n9Etfskn1IhcSa35pMxdGbndhA=="],
 
-    "@blackrose28/hapi-linux-x64": ["@blackrose28/hapi-linux-x64@0.18.5-sharedhub", "", { "os": "linux", "cpu": "x64", "bin": { "hapi": "bin/hapi" } }, "sha512-/CG5O7OT6BTXALwB6bV0a8HgE/SV+sgY8F6cEw1A0qL7/n8WIm50k1GVcElqo7jtadFfIWdqkEZPV8Mqx6zWQQ=="],
+    "@blackrose28/hapi-linux-x64": ["@blackrose28/hapi-linux-x64@0.18.7-sharedhub", "", { "os": "linux", "cpu": "x64", "bin": { "hapi": "bin/hapi" } }, "sha512-o3UZH2TogkRAPWp63kc7GG7v9mXvzZd4CKr+7+EutLGliOn7LR996VwIJH62FQC4n2TORJNQbKINuUYfuHLurw=="],
 
-    "@blackrose28/hapi-win32-x64": ["@blackrose28/hapi-win32-x64@0.18.5-sharedhub", "", { "os": "win32", "cpu": "x64", "bin": { "hapi": "bin/hapi.exe" } }, "sha512-KFrOGsjDXFrjQRa9NYA4xPb8FZc0rda3qu1sOXI+UJ+ndzBVB3zD4+4dC/G65xqMkcaiq1FeAIQAPCiesMUJpw=="],
+    "@blackrose28/hapi-win32-x64": ["@blackrose28/hapi-win32-x64@0.18.7-sharedhub", "", { "os": "win32", "cpu": "x64", "bin": { "hapi": "bin/hapi.exe" } }, "sha512-L5mIoO3aTib6V2qlladlv6Z17OOF7KY5sjDENjcpnz0hDfQ1JSyqhXlv7zDegp6foq0j2np+H3ZfXLy3G+5vaA=="],
 
     "@braintree/sanitize-url": ["@braintree/sanitize-url@7.1.2", "", {}, "sha512-jigsZK+sMF/cuiB7sERuo9V7N9jx+dhmHHnQyDSVdpZwVutaBu7WvNYqMDLSgFgfB30n452TP3vjDAvFC973mA=="],
 

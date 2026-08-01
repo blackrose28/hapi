@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { configuration } from '@/configuration'
 import { readRunnerProfile } from '@/runner/profile'
 

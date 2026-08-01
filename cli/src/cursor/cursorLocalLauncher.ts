@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger';
 import { cursorLocal } from './cursorLocal';
 import { CursorSession } from './session';

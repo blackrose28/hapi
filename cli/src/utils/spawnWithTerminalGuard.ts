@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { restoreTerminalState } from '@/ui/terminalState';
 import { spawnWithAbort, type SpawnWithAbortOptions } from '@/utils/spawnWithAbort';
 

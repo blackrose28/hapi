@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { CommandDefinition } from './types'
 
 export const hookForwarderCommand: CommandDefinition = {

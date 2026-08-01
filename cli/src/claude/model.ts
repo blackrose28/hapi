@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { SessionModel } from '@/api/types'
 
 export function normalizeClaudeSessionModel(model?: string | null): SessionModel {

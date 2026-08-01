@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { ChildProcess } from 'node:child_process';
 import spawn from 'cross-spawn';
 

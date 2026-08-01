@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Utility functions for Claude Code SDK integration
  * Provides helper functions for path resolution and logging

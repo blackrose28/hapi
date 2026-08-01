@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect } from 'vitest'
 import { buildCliArgs } from './run'
 

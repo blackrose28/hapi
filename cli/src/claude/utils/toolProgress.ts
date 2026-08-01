@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Parse the SDK's `tool_progress` heartbeat into a liveness signal.
  *

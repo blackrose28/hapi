@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentBackend, PermissionRequest, PermissionResponse } from './types';
 import type { AgentState, SessionPermissionMode } from '@/api/types';
 import type { ApiSessionClient } from '@/api/apiSession';

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { trimIdent } from "@/utils/trimIdent";
 import { shouldIncludeCoAuthoredBy } from "./claudeSettings";
 

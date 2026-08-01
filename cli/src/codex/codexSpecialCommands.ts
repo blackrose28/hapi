@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export type CodexSpecialCommand =
     | { type: 'clear' | 'compact' }
     | { type: 'invalid'; command: 'clear' | 'compact'; message: string }

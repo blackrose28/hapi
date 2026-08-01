@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export function getToolDescriptor(toolName: string): { edit: boolean, exitPlan: boolean } {
     if (toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') {
         return { edit: false, exitPlan: true };

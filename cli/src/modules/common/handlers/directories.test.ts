@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mkdir, rm, symlink, writeFile } from 'fs/promises'
 import { join } from 'path'

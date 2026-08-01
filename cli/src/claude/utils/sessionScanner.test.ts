@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createSessionScanner } from './sessionScanner'
 import { RawJSONLines } from '../types'

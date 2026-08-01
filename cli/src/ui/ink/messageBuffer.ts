@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 export interface BufferedMessage {
     id: string
     timestamp: Date

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Tests for difftastic module
  */
@@ -8,7 +9,7 @@ import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-describe('difftastic', () => {
+describe(RPC_METHODS.Difftastic, () => {
     let testDir: string;
     let file1Path: string;
     let file2Path: string;

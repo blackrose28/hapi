@@ -11,6 +11,7 @@ import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } f
 import { isPermissionModeAllowedForFlavor } from '@hapi/protocol';
 import { PermissionModeSchema } from '@hapi/protocol/schemas';
 import { startOpencodeHookServer } from './utils/startOpencodeHookServer';
+import { registerSessionConfigRpc } from '@/agent/sessionConfigRpc';
 import { formatMessageWithAttachments } from '@/utils/attachmentFormatter';
 import { getInvokedCwd } from '@/utils/invokedCwd';
 
@@ -115,58 +116,19 @@ export async function runOpencode(opts: {
         messageQueue.push(formattedText, mode, localId);
     });
 
-    const resolvePermissionMode = (value: unknown): PermissionMode => {
-        const parsed = PermissionModeSchema.safeParse(value);
-        if (!parsed.success || !isPermissionModeAllowedForFlavor(parsed.data, 'opencode')) {
-            throw new Error('Invalid permission mode');
-        }
-        return parsed.data as PermissionMode;
-    };
+    
 
-    const resolveModel = (value: unknown): string | null => {
-        if (value === null) {
-            return null;
-        }
-        if (typeof value !== 'string' || value.trim().length === 0) {
-            throw new Error('Invalid model');
-        }
-        return value.trim();
-    };
-
-    const resolveModelReasoningEffort = (value: unknown): string | null => {
-        if (value === null) {
-            return null;
-        }
-        if (typeof value !== 'string' || value.trim().length === 0) {
-            throw new Error('Invalid model reasoning effort');
-        }
-        return value.trim();
-    };
-
-    session.rpcHandlerManager.registerHandler('set-session-config', async (payload: unknown) => {
-        if (!payload || typeof payload !== 'object') {
-            throw new Error('Invalid session config payload');
-        }
-        const config = payload as { permissionMode?: unknown; model?: unknown; modelReasoningEffort?: unknown };
-        const applied: Record<string, unknown> = {};
-
-        if (config.permissionMode !== undefined) {
-            currentPermissionMode = resolvePermissionMode(config.permissionMode);
-            applied.permissionMode = currentPermissionMode;
-        }
-
-        if (config.model !== undefined) {
-            sessionModel = resolveModel(config.model);
-            applied.model = sessionModel;
-        }
-
-        if (config.modelReasoningEffort !== undefined) {
-            sessionModelReasoningEffort = resolveModelReasoningEffort(config.modelReasoningEffort);
-            applied.modelReasoningEffort = sessionModelReasoningEffort;
-        }
-
-        syncSessionMode();
-        return { applied };
+    registerSessionConfigRpc({
+        rpcHandlerManager: session.rpcHandlerManager,
+        flavor: 'opencode',
+        modelMode: 'nullable',
+        modelReasoningEffortMode: 'nullable',
+        onApply: (config: any) => {
+            if (config.permissionMode !== undefined) currentPermissionMode = config.permissionMode as any;
+            if (config.model !== undefined) sessionModel = config.model;
+            if (config.modelReasoningEffort !== undefined) sessionModelReasoningEffort = config.modelReasoningEffort;
+        },
+        onAfterApply: syncSessionMode
     });
 
     let crashed = false;

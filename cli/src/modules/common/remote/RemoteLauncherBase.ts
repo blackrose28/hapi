@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { render } from 'ink';
 import type { ReactElement } from 'react';
 import { MessageBuffer } from '@/ui/ink/messageBuffer';
@@ -76,18 +77,18 @@ export abstract class RemoteLauncherBase {
         rpcHandlerManager: RpcHandlerManagerLike,
         handlers: RemoteLauncherAbortHandlers
     ): void {
-        rpcHandlerManager.registerHandler('abort', async () => {
+        rpcHandlerManager.registerHandler(RPC_METHODS.Abort, async () => {
             await handlers.onAbort();
         });
 
-        rpcHandlerManager.registerHandler('switch', async () => {
+        rpcHandlerManager.registerHandler(RPC_METHODS.Switch, async () => {
             await handlers.onSwitch();
         });
     }
 
     protected clearAbortHandlers(rpcHandlerManager: RpcHandlerManagerLike): void {
-        rpcHandlerManager.registerHandler('abort', async () => {});
-        rpcHandlerManager.registerHandler('switch', async () => {});
+        rpcHandlerManager.registerHandler(RPC_METHODS.Abort, async () => {});
+        rpcHandlerManager.registerHandler(RPC_METHODS.Switch, async () => {});
     }
 
     protected async requestExit(

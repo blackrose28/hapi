@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { killRunawayHappyProcesses } from '@/runner/doctor'
 import { runDoctorCommand } from '@/ui/doctor'
 import type { CommandDefinition } from './types'

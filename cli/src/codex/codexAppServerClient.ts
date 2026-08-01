@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from '@/ui/logger';
 import { killProcessByChildProcess } from '@/utils/process';
@@ -276,7 +277,7 @@ export class CodexAppServerClient {
                     clearTimeout(timeout);
                 }
                 if (options?.signal) {
-                    options.signal.removeEventListener('abort', onAbort);
+                    options.signal.removeEventListener(RPC_METHODS.Abort, onAbort);
                 }
             };
 
@@ -293,7 +294,7 @@ export class CodexAppServerClient {
                     onAbort();
                     return;
                 }
-                options.signal.addEventListener('abort', onAbort, { once: true });
+                options.signal.addEventListener(RPC_METHODS.Abort, onAbort, { once: true });
             }
 
             if (Number.isFinite(timeoutMs)) {

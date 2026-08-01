@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -55,6 +56,7 @@ class FakeSocket {
 function makeMachine(id: string): Machine {
     return {
         id,
+        namespace: 'default',
         seq: 1,
         createdAt: 0,
         updatedAt: 0,

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { arch, platform } from 'node:os';
@@ -172,7 +173,7 @@ export function getTunwgPath(): string {
         return join(runtimePath(), 'tools', 'tunwg', tunwgBinary);
     }
 
-    // Development mode: use downloaded binary from hub/tools/tunwg
+    // Development mode: use downloaded binary from shared/tools/tunwg
     const platformDir = getPlatformDir();
     const devBinaryName = isWin ? `tunwg-${platformDir}.exe` : `tunwg-${platformDir}`;
     return join(__dirname, '..', '..', '..', 'hub', 'tools', 'tunwg', devBinaryName);

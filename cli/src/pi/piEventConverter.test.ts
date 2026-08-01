@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect } from 'vitest';
 import { convertPiEvent } from './piEventConverter';
 import type { PiAgentEvent } from './types';

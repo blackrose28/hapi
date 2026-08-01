@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getProjectPath } from './path';
 import { join } from 'node:path';

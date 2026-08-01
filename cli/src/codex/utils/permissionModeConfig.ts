@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { CodexPermissionMode } from '@hapi/protocol/types';
 import type { ApprovalPolicy, SandboxMode, SandboxPolicy } from '../appServerTypes';
 

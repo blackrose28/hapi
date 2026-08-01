@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 

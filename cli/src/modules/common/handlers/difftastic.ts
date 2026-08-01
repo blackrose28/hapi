@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { run as runDifftastic } from '@/modules/difftastic/index'
@@ -18,7 +19,7 @@ interface DifftasticResponse {
 }
 
 export function registerDifftasticHandlers(rpcHandlerManager: RpcHandlerManager, workingDirectory: string): void {
-    rpcHandlerManager.registerHandler<DifftasticRequest, DifftasticResponse>('difftastic', async (data) => {
+    rpcHandlerManager.registerHandler<DifftasticRequest, DifftasticResponse>(RPC_METHODS.Difftastic, async (data) => {
         logger.debug('Difftastic request received')
 
         if (data.cwd) {

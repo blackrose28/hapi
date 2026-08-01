@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it } from 'vitest'
 import { ApiMachineClient } from './apiMachine'
 import type { Machine } from './types'
@@ -6,6 +7,7 @@ import type { RpcHandlerManager } from './rpc/RpcHandlerManager'
 function createMachine(): Machine {
     return {
         id: 'machine-test',
+        namespace: 'default',
         seq: 1,
         createdAt: 1,
         updatedAt: 1,

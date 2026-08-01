@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { EnhancedMode } from '../loop';
 import type { CodexCliOverrides } from './codexCliOverrides';
 import type { McpServersConfig } from './buildHapiMcpBridge';

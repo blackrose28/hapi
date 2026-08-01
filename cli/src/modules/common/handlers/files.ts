@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from '@/ui/logger'
 import { readFile, stat, writeFile } from 'fs/promises'
 import { createHash } from 'crypto'
@@ -29,7 +30,7 @@ interface WriteFileResponse {
 }
 
 export function registerFileHandlers(rpcHandlerManager: RpcHandlerManager, workingDirectory: string): void {
-    rpcHandlerManager.registerHandler<ReadFileRequest, ReadFileResponse>('readFile', async (data) => {
+    rpcHandlerManager.registerHandler<ReadFileRequest, ReadFileResponse>(RPC_METHODS.ReadFile, async (data) => {
         logger.debug('Read file request received')
 
         const validation = validatePath(data.path, workingDirectory)
@@ -48,7 +49,7 @@ export function registerFileHandlers(rpcHandlerManager: RpcHandlerManager, worki
         }
     })
 
-    rpcHandlerManager.registerHandler<WriteFileRequest, WriteFileResponse>('writeFile', async (data) => {
+    rpcHandlerManager.registerHandler<WriteFileRequest, WriteFileResponse>(RPC_METHODS.WriteFile, async (data) => {
         logger.debug('Write file request received')
 
         const validation = validatePath(data.path, workingDirectory)

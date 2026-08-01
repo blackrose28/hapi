@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * HAPI MCP server
  * Provides HAPI CLI specific tools including chat session title management

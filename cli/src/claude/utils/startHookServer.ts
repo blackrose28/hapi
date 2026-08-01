@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Dedicated HTTP server for receiving Claude session hooks.
  *

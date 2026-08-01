@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { randomUUID } from 'node:crypto';
 import { open, stat } from 'node:fs/promises';
 import { BaseSessionScanner, type SessionFileScanResult, type SessionFileScanStats } from '@/modules/common/session/BaseSessionScanner';

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Unified MCP bridge setup for Codex local and remote modes.
  *

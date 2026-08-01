@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 /**
  * @description The legacy payload type identifier used for all generic agent messages.
  * Changing this value will affect the communication schema between CLI, Hub, and Web.
@@ -53,6 +55,8 @@ export type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'kimi' | 'grok' | 'ope
 // that are no longer launchable but must remain valid for reading/rendering
 // existing stored sessions.
 export const AGENT_FLAVORS: readonly AgentFlavor[] = ['claude', 'codex', 'cursor', 'gemini', 'grok', 'kimi', 'opencode', 'pi']
+export const AgentFlavorSchema = z.enum(AGENT_FLAVORS as unknown as [AgentFlavor, ...AgentFlavor[]])
+
 
 // Flavors offered when CREATING a new session. Gemini CLI is intentionally
 // excluded: Google sunset the consumer Gemini CLI (2026-06-18) so it can no

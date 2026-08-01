@@ -3,10 +3,11 @@ import {
     GEMINI_MODEL_PRESETS,
     GEMINI_MODEL_LABELS,
     getClaudeModelLabel,
-    type GrokPermissionMode
+    type GrokPermissionMode,
+    type AgentFlavor
 } from '@hapi/protocol'
 
-export type AgentType = 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi'
+export type AgentType = AgentFlavor
 export type SessionType = 'simple' | 'worktree'
 export type CodexReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhigh'
 export type ReasoningEffort = CodexReasoningEffort | string
@@ -50,7 +51,7 @@ export const MODEL_OPTIONS: Record<AgentType, { value: string; label: string }[]
     ],
     gemini: [
         { value: 'auto', label: 'Default' },
-        ...GEMINI_MODEL_PRESETS.map(m => ({ value: m, label: GEMINI_MODEL_LABELS[m] })),
+        ...GEMINI_MODEL_PRESETS.map((model) => ({ value: model, label: GEMINI_MODEL_LABELS[model] ?? model })),
     ],
     opencode: [],
     grok: [],

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { configuration, parseExtraHeaders } from '@/configuration'
 import { buildHubRequestHeaders, buildSocketIoExtraHeaderOptions } from './hubExtraHeaders'

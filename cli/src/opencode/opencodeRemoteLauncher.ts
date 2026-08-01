@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React from 'react';
 import { logger } from '@/ui/logger';
 import { buildHapiMcpBridge } from '@/codex/utils/buildHapiMcpBridge';
@@ -122,7 +123,7 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
 
         // Expose the cached models metadata via per-session RPC so the hub can
         // forward it to the web UI's model selector without round-tripping ACP.
-        session.client.rpcHandlerManager.registerHandler('listOpencodeModels', async () => {
+        session.client.rpcHandlerManager.registerHandler(RPC_METHODS.ListOpencodeModels, async () => {
             const metadata = backend.getSessionModelsMetadata?.(acpSessionId);
             if (!metadata) {
                 return { success: true, availableModels: [], currentModelId: null, availableEfforts: [], currentEffortId: null };
@@ -350,11 +351,11 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
     }
 
     private async handleSwitchFromUi(): Promise<void> {
-        await this.requestExit('switch', () => this.handleAbort());
+        await this.requestExit(RPC_METHODS.Switch, () => this.handleAbort());
     }
 
     private async handleSwitchRequest(): Promise<void> {
-        await this.requestExit('switch', () => this.handleAbort());
+        await this.requestExit(RPC_METHODS.Switch, () => this.handleAbort());
     }
 }
 

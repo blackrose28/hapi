@@ -1,5 +1,6 @@
 export * from './agentModels'
 export * from './messages'
+export * from './buildInfo'
 export * from './flavors'
 export * from './models'
 export * from './modes'
@@ -12,3 +13,6 @@ export * from './version'
 export type * from './types'
 
 export * from './scratchlistAttachments'
+export * from './slashCommands'
+export * from './schemas'
+export * from './rpcMethods'

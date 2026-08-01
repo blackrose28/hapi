@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe,expect,it } from 'vitest'
 import { canonicalHubUrl,exchangeRunnerEnrollment } from './enrollmentClient'
 const input={code:'0123456789abcdef',profile:'work',machine:{id:'m1',name:'M',platform:'linux' as const,arch:'x64' as const}}

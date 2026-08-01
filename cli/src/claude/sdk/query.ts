@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Main query implementation for Claude Code SDK
  * Handles spawning Claude process and managing message streams
@@ -444,7 +445,7 @@ export function query(config: {
     const handleProcessExit = () => {
         void cleanup()
     }
-    config.options?.abort?.addEventListener('abort', handleAbort)
+    config.options?.abort?.addEventListener(RPC_METHODS.Abort, handleAbort)
     process.on('exit', handleProcessExit)
 
     // Create query instance BEFORE registering close handler
@@ -505,7 +506,7 @@ export function query(config: {
     processExitPromise.catch(() => {}).finally(() => {
         void cleanup()
         process.removeListener('exit', handleProcessExit)
-        config.options?.abort?.removeEventListener('abort', handleAbort)
+        config.options?.abort?.removeEventListener(RPC_METHODS.Abort, handleAbort)
         if (process.env.CLAUDE_SDK_MCP_SERVERS) {
             delete process.env.CLAUDE_SDK_MCP_SERVERS
         }

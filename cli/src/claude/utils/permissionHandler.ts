@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Permission Handler for canCallTool integration
  * 
@@ -366,16 +367,16 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
                 this.pendingRequests.delete(id);
                 reject(new Error('Permission request aborted'));
             };
-            signal.addEventListener('abort', abortHandler, { once: true });
+            signal.addEventListener(RPC_METHODS.Abort, abortHandler, { once: true });
 
             // Store the pending request
             this.addPendingRequest(id, toolName, input, {
                 resolve: (result: PermissionResult) => {
-                    signal.removeEventListener('abort', abortHandler);
+                    signal.removeEventListener(RPC_METHODS.Abort, abortHandler);
                     resolve(result);
                 },
                 reject: (error: Error) => {
-                    signal.removeEventListener('abort', abortHandler);
+                    signal.removeEventListener(RPC_METHODS.Abort, abortHandler);
                     reject(error);
                 }
             });

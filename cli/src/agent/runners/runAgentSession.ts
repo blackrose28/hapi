@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { AgentState, SessionPermissionMode } from '@/api/types';
 import { logger } from '@/ui/logger';
 import { MessageQueue2 } from '@/utils/MessageQueue2';
@@ -97,7 +98,7 @@ export async function runAgentSession(opts: {
         return parsed.data as SessionPermissionMode;
     };
 
-    session.rpcHandlerManager.registerHandler('set-session-config', async (payload: unknown) => {
+    session.rpcHandlerManager.registerHandler(RPC_METHODS.SetSessionConfig, async (payload: unknown) => {
         if (!payload || typeof payload !== 'object') {
             throw new Error('Invalid session config payload');
         }
@@ -132,7 +133,7 @@ export async function runAgentSession(opts: {
         }
     };
 
-    session.rpcHandlerManager.registerHandler('abort', async () => {
+    session.rpcHandlerManager.registerHandler(RPC_METHODS.Abort, async () => {
         await handleAbort();
     });
 

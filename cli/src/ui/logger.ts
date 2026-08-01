@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Design decisions:
  * - Local file logging only happens when DEBUG is set. HAPI can run many

@@ -160,15 +160,6 @@ const en = {
   'newSession.create': 'Create',
   'newSession.creating': 'Creating…',
 
-  // Spawn session (old component)
-  'spawn.title': 'Create Session',
-  'spawn.sessionType': 'Session type',
-  'spawn.useAsIs': 'Use selected directory as-is',
-  'spawn.createWorktree': 'Create a new worktree next to repo',
-  'spawn.worktreePlaceholder': 'feature-x (default 1228-xxxx)',
-  'spawn.cancel': 'Cancel',
-  'spawn.create': 'Create Session',
-  'spawn.creating': 'Creating…',
   'session.directoryMissingSimple': 'Directory does not exist. Creating the session will create it automatically.',
   'session.directoryMissingSimpleConfirm': 'Directory does not exist. Click again to create it automatically.',
   'session.directoryMissingWorktree': 'Worktree sessions require an existing repository directory.',

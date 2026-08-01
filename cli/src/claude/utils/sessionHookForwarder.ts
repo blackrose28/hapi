@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { request } from 'node:http';
 
 function logError(message: string, error?: unknown): void {

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * HTTP control server for runner management
  * Provides endpoints for listing sessions, stopping sessions, and runner shutdown

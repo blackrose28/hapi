@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it } from 'vitest'
 import { extractErrorInfo, apiValidationError } from './errorUtils'
 

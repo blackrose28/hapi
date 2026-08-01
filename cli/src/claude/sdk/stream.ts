@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Stream implementation for handling async message streams
  * Provides an async iterable interface for processing SDK messages

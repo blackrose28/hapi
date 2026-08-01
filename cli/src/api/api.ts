@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import axios from 'axios'
 import type { AgentState, CreateMachineResponse, CreateSessionResponse, RunnerState, Machine, MachineMetadata, Metadata, Session } from '@/api/types'
 import { AgentStateSchema, CreateMachineResponseSchema, CreateSessionResponseSchema, RunnerStateSchema, MachineMetadataSchema, MetadataSchema } from '@/api/types'
@@ -150,6 +151,7 @@ export class ApiClient {
 
         return {
             id: raw.id,
+            namespace: raw.namespace,
             seq: raw.seq,
             createdAt: raw.createdAt,
             updatedAt: raw.updatedAt,

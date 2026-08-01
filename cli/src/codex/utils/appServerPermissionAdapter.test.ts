@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it, vi } from 'vitest';
 import { registerAppServerPermissionHandlers } from './appServerPermissionAdapter';
 

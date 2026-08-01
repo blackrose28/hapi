@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { access, mkdir } from 'node:fs/promises';

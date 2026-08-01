@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it } from 'vitest'
 import { HAPI_SESSION_TOOL_DEFINITIONS, HAPI_SESSION_TOOL_NAMES } from './hapiSessionTools'
 

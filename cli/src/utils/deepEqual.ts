@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 // Deep equality helper for comparing tool arguments
 export function deepEqual(a: any, b: any): boolean {
     if (a === b) return true;

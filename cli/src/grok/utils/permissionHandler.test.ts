@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, expect, it, vi } from 'vitest';
 import type { ApiSessionClient } from '@/api/apiSession';
 import type { AgentState } from '@/api/types';

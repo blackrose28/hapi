@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React, { act, useEffect } from 'react';
 import { PassThrough } from 'node:stream';
 import { render, type Instance } from 'ink';
@@ -160,7 +161,7 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput(' ', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
         expect(latestState?.actionInProgress).toBe(null);
         expect(onSwitch).not.toHaveBeenCalled();
 
@@ -189,10 +190,10 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput(' ', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
 
         await triggerInput('\u001b[1:3u', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
         expect(latestState?.actionInProgress).toBe(null);
     });
 
@@ -201,7 +202,7 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput('\u001b[32u', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
     });
 
     it('accepts CSI u space sequences with modifiers', async () => {
@@ -209,7 +210,7 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput('\u001b[32;2u', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
     });
 
     it('ignores CSI u key-release space sequences', async () => {
@@ -217,10 +218,10 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput(' ', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
 
         await triggerInput('\u001b[32;2:3u', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
         expect(onSwitch).not.toHaveBeenCalled();
     });
 
@@ -229,7 +230,7 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput('', { name: 'space' });
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
     });
 
     it('ignores key-release sequences from key.sequence', async () => {
@@ -237,10 +238,10 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput(' ', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
 
         await triggerInput('', { sequence: '\u001b[1:3u' });
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
     });
 
     it('does not switch on key-release space sequences', async () => {
@@ -257,7 +258,7 @@ describe('useSwitchControls', () => {
         await mount({ onSwitch });
 
         await triggerInput(' ', {});
-        expect(latestState?.confirmationMode).toBe('switch');
+        expect(latestState?.confirmationMode).toBe(RPC_METHODS.Switch);
 
         await advanceTimers(5000);
         expect(latestState?.confirmationMode).toBe(null);

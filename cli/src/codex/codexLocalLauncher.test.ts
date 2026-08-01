@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';

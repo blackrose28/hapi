@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import React from "react";
 import { Session } from "./session";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
@@ -56,7 +57,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
 
     private async handleSwitchRequest(): Promise<void> {
         logger.debug('[remote]: doSwitch');
-        await this.requestExit('switch', async () => {
+        await this.requestExit(RPC_METHODS.Switch, async () => {
             await this.abort();
         });
     }

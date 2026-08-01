@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Utilities for building Codex CLI config arguments (-c) for MCP servers
  * hooks, MCP servers, and developer instructions.

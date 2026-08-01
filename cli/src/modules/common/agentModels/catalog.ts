@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import {
     CLAUDE_MODEL_PRESETS,
     getClaudeModelLabel,

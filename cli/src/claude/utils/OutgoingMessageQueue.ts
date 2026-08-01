@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * Outgoing Message Queue with strict ordering using incremental IDs
  * 

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { logger } from "@/ui/logger";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 declare module '*.cjs' {
     const path: string;
     export default path;

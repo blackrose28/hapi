@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { describe, it, expect } from 'vitest'
 import { request } from 'node:http'
 import { startHookServer, type SessionHookData } from './startHookServer'

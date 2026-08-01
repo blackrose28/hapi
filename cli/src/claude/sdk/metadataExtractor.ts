@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * SDK Metadata Extractor
  * Captures available tools and slash commands from Claude SDK initialization

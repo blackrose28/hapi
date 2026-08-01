@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import chalk from 'chalk'
 import type { CommandDefinition } from './types'
 

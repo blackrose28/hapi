@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import type { ApiSessionClient } from '@/api/apiSession';
 import type { Metadata } from '@/api/types';
 

@@ -9,6 +9,7 @@ import { bootstrapSession } from '@/agent/sessionFactory';
 import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } from '@/agent/runnerLifecycle';
 import { isPermissionModeAllowedForFlavor } from '@hapi/protocol';
 import { PermissionModeSchema } from '@hapi/protocol/schemas';
+import { registerSessionConfigRpc } from '@/agent/sessionConfigRpc';
 import { formatMessageWithAttachments } from '@/utils/attachmentFormatter';
 import { getInvokedCwd } from '@/utils/invokedCwd';
 
@@ -86,26 +87,16 @@ export async function runCursor(opts: {
         messageQueue.push(formattedText, enhancedMode, localId);
     });
 
-    const resolvePermissionMode = (value: unknown): PermissionMode => {
-        const parsed = PermissionModeSchema.safeParse(value);
-        if (!parsed.success || !isPermissionModeAllowedForFlavor(parsed.data, 'cursor')) {
-            throw new Error('Invalid permission mode');
-        }
-        return parsed.data as PermissionMode;
-    };
+    
 
-    session.rpcHandlerManager.registerHandler('set-session-config', async (payload: unknown) => {
-        if (!payload || typeof payload !== 'object') {
-            throw new Error('Invalid session config payload');
-        }
-        const config = payload as { permissionMode?: unknown };
-
-        if (config.permissionMode !== undefined) {
-            currentPermissionMode = resolvePermissionMode(config.permissionMode);
-        }
-
-        syncSessionMode();
-        return { applied: { permissionMode: currentPermissionMode } };
+    registerSessionConfigRpc({
+        rpcHandlerManager: session.rpcHandlerManager,
+        flavor: 'cursor',
+        modelMode: 'ignore',
+        onApply: (config) => {
+            if (config.permissionMode !== undefined) currentPermissionMode = config.permissionMode as any;
+        },
+        onAfterApply: syncSessionMode
     });
 
     let crashed = false;

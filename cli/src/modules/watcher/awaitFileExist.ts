@@ -1,3 +1,4 @@
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { access } from "fs/promises";
 import { delay } from "@/utils/time";
 
