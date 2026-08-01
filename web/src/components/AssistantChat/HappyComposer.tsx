@@ -573,7 +573,7 @@ export function HappyComposer(props: {
         () => getModelOptionsForFlavor(agentFlavor, model, availableModelOptions),
         [agentFlavor, model, availableModelOptions]
     )
-    const codexReasoningEffortOptions = useMemo(
+    const modelReasoningEffortOptions = useMemo(
         () => agentFlavor === 'codex' || agentFlavor === 'opencode'
             ? getCodexComposerReasoningEffortOptions(
                 modelReasoningEffort,

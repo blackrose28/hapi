@@ -31,12 +31,22 @@ export type PlanItem = {
 
 export type AgentMessage =
     | { type: 'text'; text: string }
-    | { type: 'reasoning'; text: string; id?: string; live?: boolean }
+    | { type: 'reasoning'; text: string; id?: string; streamId?: string; live?: boolean }
     | { type: 'tool_call'; id: string; name: string; input: unknown; status: 'pending' | 'in_progress' | 'completed' | 'failed' }
     | { type: 'tool_result'; id: string; output: unknown; status: 'completed' | 'failed' }
     | { type: 'plan'; items: PlanItem[] }
     | { type: 'turn_complete'; stopReason: string }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string }
+    | {
+          type: 'usage';
+          inputTokens?: number;
+          outputTokens?: number;
+          totalTokens?: number;
+          thoughtTokens?: number;
+          cacheReadTokens?: number;
+          contextTokens?: number;
+          contextWindow?: number;
+      };
 
 export type PermissionOption = {
     optionId: string;
@@ -63,6 +73,12 @@ export type AgentSessionModelDescriptor = {
     modelId: string;
     name?: string;
     reasoningEfforts?: Array<{ value: string; name?: string; isDefault?: boolean }>;
+};
+
+export type AgentSessionConfigOptionDescriptor = {
+    id: string;
+    currentValue?: string;
+    options: Array<{ value: string; name?: string }>;
 };
 
 export type AgentAvailableCommand = { name: string; description?: string };

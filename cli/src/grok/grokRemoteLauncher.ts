@@ -312,6 +312,8 @@ class GrokRemoteLauncher extends RemoteLauncherBase {
             case 'turn_complete':
                 this.messageBuffer.addMessage('Turn complete', 'status');
                 break;
+            case 'usage':
+                break;
             default: {
                 const exhaustive: never = message;
                 return exhaustive;

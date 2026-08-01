@@ -18,7 +18,7 @@ import type {
     ListDirectoryResponse,
     OpencodeModelsResponse,
     OpencodeModelSummary,
-    OpencodeReasoningEffortResponse,
+    ListOpencodeReasoningEffortOptionsResponse,
     PathExistsResponse,
     UploadFileResponse
 } from '@hapi/protocol/schemas'
@@ -52,7 +52,7 @@ export type RpcCursorModel = CursorModelSummary
 export type RpcListCursorModelsResponse = CursorModelsResponse
 export type RpcOpencodeModel = OpencodeModelSummary
 export type RpcListOpencodeModelsResponse = OpencodeModelsResponse
-export type RpcListOpencodeReasoningEffortOptionsResponse = OpencodeReasoningEffortResponse
+export type RpcListOpencodeReasoningEffortOptionsResponse = ListOpencodeReasoningEffortOptionsResponse
 
 export type RpcEditorProject = {
     path: string
@@ -276,13 +276,14 @@ export class RpcGateway {
         resumeSessionId?: string,
         effort?: string,
         permissionMode?: PermissionMode,
-        recoveryContext?: string
+        recoveryContext?: string,
+        existingSessionId?: string
     ): Promise<{ type: 'success'; sessionId: string } | { type: 'error'; message: string }> {
         try {
             const result = await this.machineRpc(
                 machineId,
                 'spawn-happy-session',
-                { type: 'spawn-in-directory', directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, resumeSessionId, effort, permissionMode, recoveryContext }
+                { type: 'spawn-in-directory', directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, resumeSessionId, effort, permissionMode, recoveryContext, existingSessionId }
             )
             if (result && typeof result === 'object') {
                 const obj = result as Record<string, unknown>
@@ -626,7 +627,6 @@ export class RpcGateway {
 
     async listOpencodeReasoningEffortOptionsForSession(sessionId: string): Promise<RpcListOpencodeReasoningEffortOptionsResponse> {
         return await this.sessionRpc(sessionId, RPC_METHODS.ListOpencodeReasoningEffortOptions, {}) as RpcListOpencodeReasoningEffortOptionsResponse
-    }
     }
 
     async listGrokModelsForSession(sessionId: string): Promise<RpcListGrokModelsResponse> {

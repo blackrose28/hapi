@@ -46,7 +46,7 @@ export function isRunnerStateCompatibleWithIdentity(
         return false
     }
 
-    if (!current.cliApiTokenHash || state.startedWithCliApiTokenHash !== current.cliApiTokenHash) {
+    if (state.startedWithCliApiTokenHash !== current.cliApiTokenHash) {
         return false
     }
 

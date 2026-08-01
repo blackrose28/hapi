@@ -957,6 +957,7 @@ export class SyncEngine {
         effort?: string,
         permissionMode?: PermissionMode,
         recoveryContext?: string,
+        existingSessionId?: string
     ): Promise<{ type: 'success'; sessionId: string } | { type: 'error'; message: string }> {
         return await this.rpcGateway.spawnSession(
             machineId,
@@ -970,7 +971,8 @@ export class SyncEngine {
             resumeSessionId,
             effort,
             permissionMode,
-            recoveryContext
+            recoveryContext,
+            existingSessionId
         )
     }
 
@@ -1489,6 +1491,7 @@ export class SyncEngine {
         const preferredPermissionMode = opts?.permissionMode
             ?? session.permissionMode
             ?? session.metadata?.preferredPermissionMode
+        const existingSessionId = (flavor === 'codex' || flavor === 'cursor') ? session.id : undefined
         const spawnResult = await this.rpcGateway.spawnSession(
             targetMachine.id,
             target.directory,
@@ -1501,7 +1504,8 @@ export class SyncEngine {
             resumeToken,
             session.effort ?? undefined,
             preferredPermissionMode,
-            recoveryContext
+            recoveryContext,
+            existingSessionId
         )
 
         if (spawnResult.type !== 'success') {
@@ -2068,8 +2072,6 @@ export class SyncEngine {
     async listOpencodeModelsForCwd(machineId: string, cwd: string): Promise<RpcListOpencodeModelsResponse> {
         return await this.rpcGateway.listOpencodeModelsForCwd(machineId, cwd)
     }
-
-<<<<<<< HEAD
     async listGrokModelsForSession(sessionId: string): Promise<RpcListGrokModelsResponse> {
         return await this.rpcGateway.listGrokModelsForSession(sessionId)
     }

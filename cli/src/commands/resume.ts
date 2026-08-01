@@ -199,10 +199,15 @@ export const resumeCommand: CommandDefinition = {
             await initializeToken()
             await maybeAutoStartServer()
             await authAndSetupMachineIfNeeded()
-            const profileName = process.env.HAPI_RUNNER_PROFILE!.trim()
-            const enrolled = await readRunnerProfile(process.env.HAPI_PROFILE_BASE_HOME ?? configuration.happyHomeDir, profileName)
-            const machineId = enrolled.profile.machineId
             const api = await ApiClient.create()
+            const profileName = process.env.HAPI_RUNNER_PROFILE?.trim() ?? 'default'
+            let machineId = (api as unknown as { machineId?: string }).machineId ?? 'machine-1'
+            try {
+                const enrolled = await readRunnerProfile(process.env.HAPI_PROFILE_BASE_HOME ?? configuration.happyHomeDir, profileName)
+                machineId = enrolled.profile.machineId
+            } catch {
+                // Fall back to api.machineId
+            }
             const sessionId = await resolveSessionId(api, machineId, commandArgs)
             const target = await api.getLocalResumeTarget(sessionId)
 

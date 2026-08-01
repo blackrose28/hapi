@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import type { OpencodeReasoningEffortResponse } from '@hapi/protocol/apiTypes'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ListOpencodeReasoningEffortOptionsResponse as OpencodeReasoningEffortResponse } from '@hapi/protocol/schemas'
 import type { ApiClient } from '@/api/client'
 import { queryKeys } from '@/lib/query-keys'
 
@@ -37,6 +37,22 @@ export function useOpencodeReasoningEffortOptions(args: {
     error: string | null
 } {
     const { api, sessionId } = args
+    let hasQueryClient = true
+    try {
+        useQueryClient()
+    } catch {
+        hasQueryClient = false
+    }
+
+    if (!hasQueryClient) {
+        return {
+            options: [],
+            currentValue: null,
+            isLoading: false,
+            error: null
+        }
+    }
+
     const enabled = Boolean(args.enabled && api && sessionId)
 
     const query = useQuery({
@@ -63,8 +79,8 @@ export function useOpencodeReasoningEffortOptions(args: {
     })
 
     return {
-        options: query.data?.options ?? [],
-        currentValue: query.data?.currentValue ?? null,
+        options: query.data?.options?.map((o: { effortId: string; name?: string }) => ({ value: o.effortId, name: o.name })) ?? [],
+        currentValue: query.data?.currentEffortId ?? null,
         isLoading: query.isLoading,
         error: query.data?.success === false
             ? (query.data.error ?? 'Failed to load OpenCode reasoning effort options')

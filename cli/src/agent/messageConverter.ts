@@ -19,7 +19,21 @@ export type CodexMessage =
         is_error?: boolean;
     }
     | { type: 'plan'; entries: PlanItem[] }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string }
+    | {
+        type: 'token_count';
+        info: {
+            total: {
+                inputTokens?: number;
+                outputTokens?: number;
+                cachedInputTokens?: number;
+                thoughtTokens?: number;
+                totalTokens?: number;
+            };
+            contextTokens?: number;
+            modelContextWindow?: number;
+        };
+    };
 
 export function convertAgentMessage(message: AgentMessage): CodexMessage | null {
     switch (message.type) {
@@ -54,6 +68,24 @@ export function convertAgentMessage(message: AgentMessage): CodexMessage | null 
             return { type: 'error', message: message.message };
         case 'turn_complete':
             return null;
+        case 'usage': {
+            const inputTokens = message.inputTokens ?? 0;
+            const outputTokens = message.outputTokens ?? 0;
+            return {
+                type: 'token_count',
+                info: {
+                    total: {
+                        inputTokens: message.inputTokens,
+                        outputTokens: message.outputTokens,
+                        cachedInputTokens: message.cacheReadTokens ?? 0,
+                        thoughtTokens: message.thoughtTokens ?? 0,
+                        totalTokens: message.totalTokens ?? (inputTokens + outputTokens)
+                    },
+                    contextTokens: message.contextTokens,
+                    modelContextWindow: message.contextWindow
+                }
+            };
+        }
         default: {
             // Unreachable while every AgentMessage variant is handled above —
             // the `never` binding is what enforces that at compile time. The

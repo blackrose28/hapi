@@ -23,7 +23,7 @@ describe('Claude HAPI MCP configuration', () => {
 
 describe('Claude HAPI title prompt wording', () => {
     it('describes hapi_session tools without claiming it is the whole provider tool universe', () => {
-        expect(systemPrompt).toContain('The HAPI-added MCP server named "hapi_session" provides session tools: change_title, report_to_team, and mark_team_mention_no_action.')
+        expect(systemPrompt).toContain('The HAPI-added MCP server named "hapi_session" provides session tools: change_title, report_to_team, mark_team_mention_no_action, and display_image.')
         expect(systemPrompt).toContain('Use report_to_team to post structured Team Chat updates')
         expect(systemPrompt).toContain('Use mark_team_mention_no_action when a tagged Team mention is seen but does not need a reply')
         expect(systemPrompt).toContain('Other provider, user, project, and global tools may also be available.')

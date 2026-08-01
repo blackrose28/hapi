@@ -1,8 +1,12 @@
-import type { ChatBlock, TeamMentionBlock, ToolCallBlock, ToolPermission } from '@/chat/types'
+import type { AgentReasoningBlock, ChatBlock, TeamMentionBlock, ToolCallBlock, ToolPermission } from '@/chat/types'
 import type { TracedMessage } from '@/chat/tracer'
 import { createCliOutputBlock, isCliOutputText, mergeCliOutputBlocks } from '@/chat/reducerCliOutput'
 import { parseMessageAsEvent } from '@/chat/reducerEvents'
 import { ensureToolBlock, extractTitleFromChangeTitleInput, isChangeTitleToolName, type PermissionEntry } from '@/chat/reducerTools'
+
+function asString(val: unknown): string | null {
+    return typeof val === 'string' && val.length > 0 ? val : null
+}
 
 /**
  * Recognizes subagent-spawning tool calls across agent flavors. Claude/Codex
@@ -216,10 +220,7 @@ export function reduceTimeline(
                         const existing = reasoningBlocksByStreamId.get(streamId)
                         if (existing) {
                             existing.text = c.text
-                            existing.usage = msg.usage
-                            existing.model = msg.model
                             existing.meta = msg.meta
-                            existing.invokedAt = msg.invokedAt
                             continue
                         }
                     }

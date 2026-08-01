@@ -149,8 +149,8 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
             }
             return {
                 success: true,
-                options: effortOption.options,
-                currentValue: effortOption.currentValue ?? null
+                options: effortOption.options.map((o) => ({ effortId: o.value, name: o.name })),
+                currentEffortId: effortOption.currentValue ?? null
             };
         });
 
@@ -234,7 +234,6 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
                             message: `Failed to switch effort to ${requestedEffort ?? 'default'}. Continuing with ${this.currentBackendEffort ?? '(default)'}.`
                         });
                         batch.mode.modelReasoningEffort = this.currentBackendEffort;
-                    }
                     }
                 }
             }
@@ -339,6 +338,8 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
                 break;
             case 'turn_complete':
                 this.messageBuffer.addMessage('Turn complete', 'status');
+                break;
+            case 'usage':
                 break;
             default: {
                 const _exhaustive: never = message;

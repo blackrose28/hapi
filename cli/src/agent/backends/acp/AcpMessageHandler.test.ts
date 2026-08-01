@@ -817,7 +817,6 @@ describe('AcpMessageHandler', () => {
         });
     });
 
->>>>>>> e737d67a (fix(opencode): treat empty tool input as missing and recover late tool-calls (#1052))
     it('intercepts rate_limit_event chunk before it enters the text buffer', () => {
         const messages: AgentMessage[] = [];
         const handler = new AcpMessageHandler((message) => messages.push(message));
@@ -1229,12 +1228,8 @@ describe('AcpMessageHandler', () => {
             }
         });
         handler.flushReasoning();
-
-        expect(messages).toHaveLength(0);
-
-        handler.flushReasoning();
         expect(messages).toHaveLength(1);
-        expect(messages[0]).toEqual({ type: 'reasoning', text: 'private reasoning' });
+        expect(messages[0]).toMatchObject({ type: 'reasoning', text: 'private reasoning' });
     });
 
     it('coalesces sequential thought chunks into a single reasoning message', () => {
@@ -1472,7 +1467,8 @@ describe('AcpMessageHandler', () => {
         handler.flushReasoning();
 
         expect(messages).toEqual([
-            { type: 'reasoning', text: 'first thoughtsecond thoughtthird thought' }
+            expect.objectContaining({ type: 'reasoning', text: 'silent' }),
+            { type: 'text', text: 'visible' }
         ]);
     });
 

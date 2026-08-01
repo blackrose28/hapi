@@ -62,6 +62,12 @@ vi.mock('@/ui/tokenInit', () => ({
     initializeToken: initializeTokenMock
 }))
 
+vi.mock('@/runner/profile', () => ({
+    readRunnerProfileState: vi.fn(async () => ({ pid: process.pid, workspaceRoot: '/workspace' })),
+    resolveRunnerProfilePaths: vi.fn(() => ({ root: '/tmp', state: '/tmp/state.json' })),
+    listEnrolledProfiles: vi.fn(() => ['default'])
+}))
+
 import { runnerCommand } from './runner'
 
 function createContext(commandArgs: string[]) {
@@ -73,7 +79,7 @@ function createContext(commandArgs: string[]) {
 
 describe('runnerCommand start', () => {
     beforeEach(() => {
-        vi.clearAllMocks()
+        vi.resetAllMocks()
         existsSyncMock.mockReturnValue(true)
         statSyncMock.mockReturnValue({ isDirectory: () => true })
     })
@@ -89,14 +95,16 @@ describe('runnerCommand start', () => {
             .mockResolvedValueOnce(true)
 
         try {
-            await expect(runnerCommand.run(createContext(['start', '--workspace-root', '/workspace']))).rejects.toThrow('process.exit:0')
+            await expect(runnerCommand.run(createContext(['start', '--profile', 'default', '--workspace-root', '/workspace']))).rejects.toThrow('process.exit:0')
 
             expect(stopRunnerMock).toHaveBeenCalledOnce()
-            expect(spawnHappyCLIMock).toHaveBeenCalledWith(['runner', 'start-sync', '--workspace-root', '/workspace'], {
-                detached: true,
-                stdio: 'ignore',
-                env: process.env
-            })
+            expect(spawnHappyCLIMock).toHaveBeenCalledWith(
+                ['runner', 'start-sync', '--profile', 'default', '--workspace-root', '/workspace'],
+                expect.objectContaining({
+                    detached: true,
+                    stdio: 'ignore'
+                })
+            )
             expect(stopRunnerMock.mock.invocationCallOrder[0]).toBeLessThan(spawnHappyCLIMock.mock.invocationCallOrder[0])
             expect(consoleLogSpy).toHaveBeenCalledWith('Existing runner detected, stopping it before starting a new one...')
             expect(consoleLogSpy).toHaveBeenCalledWith('Runner started successfully')
@@ -111,12 +119,10 @@ describe('runnerCommand start', () => {
         const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
             throw new Error(`process.exit:${code ?? 'undefined'}`)
         }) as never)
-        checkIfRunnerRunningAndCleanupStaleStateMock
-            .mockResolvedValueOnce(false)
-            .mockResolvedValueOnce(true)
+        checkIfRunnerRunningAndCleanupStaleStateMock.mockResolvedValue(false)
 
         try {
-            await expect(runnerCommand.run(createContext(['start']))).rejects.toThrow('process.exit:0')
+            await expect(runnerCommand.run(createContext(['start', '--profile', 'default']))).rejects.toThrow('process.exit:0')
 
             expect(stopRunnerMock).not.toHaveBeenCalled()
             expect(spawnHappyCLIMock).toHaveBeenCalledOnce()

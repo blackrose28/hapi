@@ -14,6 +14,8 @@ export interface SpawnSessionOptions {
     token?: string
     sessionType?: 'simple' | 'worktree'
     worktreeName?: string
+    existingSessionId?: string
+    serviceTier?: string
     recoveryContext?: string
 }
 

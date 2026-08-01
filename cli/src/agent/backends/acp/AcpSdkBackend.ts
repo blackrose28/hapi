@@ -48,6 +48,11 @@ export type AcpThoughtLevelConfig = {
     options: AcpThoughtLevelOption[];
 };
 
+export type AcpUsageUpdate = {
+    contextTokens?: number;
+    contextWindow?: number;
+};
+
 export class AcpSdkBackend implements AgentBackend {
     private transport: AcpStdioTransport | null = null;
     private permissionHandler: ((request: PermissionRequest) => void) | null = null;
@@ -428,6 +433,13 @@ export class AcpSdkBackend implements AgentBackend {
         this.isProcessingMessage = true;
         this.lastSessionUpdateAt = Date.now();
         let stopReason: string | null = null;
+        let promptUsage: {
+            inputTokens: number;
+            outputTokens: number;
+            totalTokens?: number;
+            thoughtTokens?: number;
+            cacheReadTokens?: number;
+        } | null = null;
 
         try {
             // No timeout for prompt requests - they can run for extended periods
@@ -438,6 +450,13 @@ export class AcpSdkBackend implements AgentBackend {
             }, { timeoutMs: Infinity });
 
             stopReason = isObject(response) ? asString(response.stopReason) : null;
+            promptUsage = isObject(response) && isObject(response.usage) ? {
+                inputTokens: this.asFiniteNumber(response.usage.inputTokens) ?? 0,
+                outputTokens: this.asFiniteNumber(response.usage.outputTokens) ?? 0,
+                totalTokens: this.asFiniteNumber(response.usage.totalTokens) ?? undefined,
+                thoughtTokens: this.asFiniteNumber(response.usage.thoughtTokens) ?? undefined,
+                cacheReadTokens: this.asFiniteNumber(response.usage.cacheReadTokens) ?? undefined
+            } : null;
         } finally {
             // Start the post-response drain window when the prompt response returns,
             // not at the last update timestamp. Under load, the response itself may
@@ -632,6 +651,7 @@ export class AcpSdkBackend implements AgentBackend {
             this.captureAvailableCommands(sessionId, update);
         }
         this.forwardSessionInfoUpdate(sessionId, update);
+        this.captureUsageUpdate(update);
         this.messageHandler?.handleUpdate(update);
     }
 
@@ -669,6 +689,11 @@ export class AcpSdkBackend implements AgentBackend {
 
     private readLatestUsageUpdate(): AcpUsageUpdate | null {
         return this.latestUsageUpdate;
+    }
+
+    private asFiniteNumber(val: unknown): number | null {
+        if (typeof val === 'number' && Number.isFinite(val)) return val;
+        return null;
     }
     /**
      * Grok's `_x.ai/settings/update` notification (distinct from

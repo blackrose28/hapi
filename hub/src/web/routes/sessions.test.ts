@@ -105,13 +105,14 @@ function createApp(session: Session, opts?: {
             { value: 'high', name: 'High', isDefault: true }
         ],
         currentValue: 'high'
+    })
     const listOpencodeReasoningEffortOptionsForSession = async () => ({
         success: true,
         options: [
-            { value: 'low', name: 'Low' },
-            { value: 'medium', name: 'Medium' }
+            { effortId: 'low', name: 'Low' },
+            { effortId: 'medium', name: 'Medium' }
         ],
-        currentValue: 'low'
+        currentEffortId: 'low'
     })
     const listCursorModelsForSession = async () => ({
         success: true,
@@ -956,9 +957,6 @@ describe('sessions routes', () => {
         })
     })
 
-<<<<<<< HEAD
-    it('returns OpenCode models for active OpenCode sessions and caches them', async () => {
-=======
     it('returns OpenCode reasoning effort options for active OpenCode sessions', async () => {
         const session = createSession({
             metadata: { path: '/tmp/project', host: 'localhost', flavor: 'opencode' }
@@ -971,10 +969,10 @@ describe('sessions routes', () => {
         expect(await response.json()).toEqual({
             success: true,
             options: [
-                { value: 'low', name: 'Low' },
-                { value: 'medium', name: 'Medium' }
+                { effortId: 'low', name: 'Low' },
+                { effortId: 'medium', name: 'Medium' }
             ],
-            currentValue: 'low'
+            currentEffortId: 'low'
         })
     })
 
@@ -987,7 +985,6 @@ describe('sessions routes', () => {
     })
 
     it('returns OpenCode models for active OpenCode sessions', async () => {
->>>>>>> cad58cfa (fix(opencode): use ACP-reported reasoning effort options (#853))
         const session = createSession({
             metadata: { path: '/tmp/project', host: 'localhost', flavor: 'opencode' }
         })

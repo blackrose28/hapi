@@ -13,7 +13,7 @@ describe('useOpencodeReasoningEffortOptions retry policy', () => {
         expect(getOpencodeReasoningEffortRefetchInterval(true, { success: false, error: 'not ready' }, 2)).toBe(1000)
         expect(getOpencodeReasoningEffortRefetchInterval(true, {
             success: true,
-            options: [{ value: 'low', name: 'Low' }]
+            options: [{ effortId: 'low', name: 'Low' }]
         }, 1)).toBe(false)
     })
 

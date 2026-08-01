@@ -842,7 +842,6 @@ export function SessionChat(props: {
                         }
                         piModels={agentFlavor === 'pi' ? (piModelsState.availableModels.length > 0 ? piModelsState.availableModels : piCachedModels) : undefined}
                         piSelectedModel={agentFlavor === 'pi' ? piSelectedModel : undefined}
-                        availableModelReasoningEffortOptions={opencodeReasoningEffortOptions}
                         availableEffortOptions={
                             agentFlavor === 'grok' && grokEffortState.options.length > 0
                                 ? grokEffortState.options

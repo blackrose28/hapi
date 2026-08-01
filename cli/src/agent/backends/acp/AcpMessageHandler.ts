@@ -474,7 +474,6 @@ export class AcpMessageHandler {
     drainBuffers(): void {
         this.flushReasoning();
         this.flushText();
->>>>>>> c5e80e9a (fix: restore opencode hook plugin channel and coalesce ACP reasoning chunks across all consumers (#631))
     }
 
     private appendTextChunk(text: string): void {

@@ -14,7 +14,8 @@ const harness = {
     availableCommandUpdates: [] as Array<Array<{ name: string; description?: string }>>,
     sessionInfoUpdateListener: null as null | ((update: { sessionId: string | null; title: string | null }) => void),
     refreshSessionInfoCalls: [] as Array<{ sessionId: string; cwd: string }>,
-    bridgeOptions: null as { enableChangeTitle?: boolean } | null
+    bridgeOptions: null as { enableChangeTitle?: boolean } | null,
+    thoughtLevelOption: null as { id: string; currentValue?: string; options: Array<{ value: string; name?: string }> } | null
 };
 
 vi.mock('./utils/opencodeBackend', () => ({
@@ -64,7 +65,8 @@ vi.mock('./utils/opencodeBackend', () => ({
             harness.refreshSessionInfoCalls.push({ sessionId, cwd });
         }),
         disconnect: vi.fn(async () => {}),
-        getSessionModelsMetadata: vi.fn(() => undefined)
+        getSessionModelsMetadata: vi.fn(() => undefined),
+        getThoughtLevelConfigOption: vi.fn(() => harness.thoughtLevelOption)
     }))
 }));
 
@@ -186,6 +188,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         harness.sessionInfoUpdateListener = null;
         harness.refreshSessionInfoCalls = [];
         harness.bridgeOptions = null;
+        harness.thoughtLevelOption = null;
     });
 
     it('disables the change_title MCP tool and syncs native OpenCode session titles', async () => {
@@ -457,10 +460,10 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         expect(result).toEqual({
             success: true,
             options: [
-                { value: 'low', name: 'Low' },
-                { value: 'medium', name: 'Medium' }
+                { effortId: 'low', name: 'Low' },
+                { effortId: 'medium', name: 'Medium' }
             ],
-            currentValue: 'low'
+            currentEffortId: 'low'
         });
     });
 

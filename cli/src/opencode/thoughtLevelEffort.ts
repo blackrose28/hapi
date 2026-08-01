@@ -5,7 +5,7 @@ export function resolveThoughtLevelEffort(
     thoughtLevelOption: AgentSessionConfigOptionDescriptor,
     fallback: string | null
 ): string | null {
-    const supported = new Set(thoughtLevelOption.options.map((option) => option.value));
+    const supported = new Set(thoughtLevelOption.options.map((option: { value: string; name?: string }) => option.value));
     if (supported.has(requested)) {
         return requested;
     }

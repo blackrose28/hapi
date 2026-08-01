@@ -15,76 +15,81 @@ const socketHarness = vi.hoisted(() => ({
 }))
 
 const axiosHarness = vi.hoisted(() => ({
-    get: vi.fn()
+    get: vi.fn(),
+    post: vi.fn()
 }))
+const ioMock = vi.hoisted(() => vi.fn())
+
+function createHarnessSocket() {
+    const state: (typeof socketHarness.sockets)[number] = {
+        connected: false,
+        connectCalls: 0,
+        connectImmediately: true,
+        emitted: [] as Array<{ event: string; args: unknown[] }>,
+        listeners: new Map<string, Array<(...args: any[]) => void>>(),
+        trigger: () => {},
+        triggerConnect: () => {},
+        triggerConnectError: () => {}
+    }
+    state.trigger = (event: string, ...args: any[]) => {
+        for (const listener of state.listeners.get(event) ?? []) {
+            listener(...args)
+        }
+    }
+    const triggerConnect = () => {
+        state.connected = true
+        state.trigger('connect')
+    }
+    state.triggerConnect = triggerConnect
+    state.triggerConnectError = () => {
+        state.trigger('connect_error', new Error('connect failed'))
+    }
+    const socket = {
+        get connected() {
+            return state.connected
+        },
+        on: (event: string, listener: (...args: any[]) => void) => {
+            const listeners = state.listeners.get(event) ?? []
+            listeners.push(listener)
+            state.listeners.set(event, listeners)
+            return socket
+        },
+        off: (event: string, listener: (...args: any[]) => void) => {
+            const listeners = state.listeners.get(event) ?? []
+            state.listeners.set(event, listeners.filter((candidate) => candidate !== listener))
+            return socket
+        },
+        emit: (event: string, ...args: unknown[]) => {
+            state.emitted.push({ event, args })
+            return socket
+        },
+        emitWithAck: async () => ({}),
+        timeout: () => ({ emitWithAck: async () => ({}) }),
+        connect: () => {
+            state.connectCalls += 1
+            if (state.connectImmediately) {
+                triggerConnect()
+            }
+            return socket
+        },
+        disconnect: () => {
+            state.connected = false
+            return socket
+        }
+    }
+    Object.assign(socket, { volatile: socket })
+    socketHarness.sockets.push(state)
+    return socket
+}
 
 vi.mock('socket.io-client', () => ({
-    io: () => {
-        const state: (typeof socketHarness.sockets)[number] = {
-            connected: false,
-            connectCalls: 0,
-            connectImmediately: true,
-            emitted: [] as Array<{ event: string; args: unknown[] }>,
-            listeners: new Map<string, Array<(...args: any[]) => void>>(),
-            trigger: () => {},
-            triggerConnect: () => {},
-            triggerConnectError: () => {}
-        }
-        state.trigger = (event: string, ...args: any[]) => {
-            for (const listener of state.listeners.get(event) ?? []) {
-                listener(...args)
-            }
-        }
-        const triggerConnect = () => {
-            state.connected = true
-            state.trigger('connect')
-        }
-        state.triggerConnect = triggerConnect
-        state.triggerConnectError = () => {
-            state.trigger('connect_error', new Error('connect failed'))
-        }
-        const socket = {
-            get connected() {
-                return state.connected
-            },
-            on: (event: string, listener: (...args: any[]) => void) => {
-                const listeners = state.listeners.get(event) ?? []
-                listeners.push(listener)
-                state.listeners.set(event, listeners)
-                return socket
-            },
-            off: (event: string, listener: (...args: any[]) => void) => {
-                const listeners = state.listeners.get(event) ?? []
-                state.listeners.set(event, listeners.filter((candidate) => candidate !== listener))
-                return socket
-            },
-            emit: (event: string, ...args: unknown[]) => {
-                state.emitted.push({ event, args })
-                return socket
-            },
-            emitWithAck: async () => ({}),
-            timeout: () => ({ emitWithAck: async () => ({}) }),
-            connect: () => {
-                state.connectCalls += 1
-                if (state.connectImmediately) {
-                    triggerConnect()
-                }
-                return socket
-            },
-            disconnect: () => {
-                state.connected = false
-                return socket
-            }
-        }
-        Object.assign(socket, { volatile: socket })
-        socketHarness.sockets.push(state)
-        return socket
-    }
+    io: (...args: unknown[]) => ioMock(...args)
 }))
 
 vi.mock('axios', () => ({
     default: {
         get: axiosHarness.get,
+        post: axiosHarness.post,
         isAxiosError: (error: unknown) => (
             typeof error === 'object'
             && error !== null
@@ -100,9 +105,8 @@ import { TerminalManager } from '@/terminal/TerminalManager'
 import { configuration } from '@/configuration'
 import type { ApiAuthentication } from './api'
 
-const ioMock = vi.fn()
-const axiosGetMock = vi.fn()
-const axiosPostMock = vi.fn()
+const axiosGetMock = axiosHarness.get
+const axiosPostMock = axiosHarness.post
 
 const dummyAuth: ApiAuthentication = {
     kind: 'runner',
@@ -176,6 +180,10 @@ function triggerIncomingUserMessage(
     })
 }
 
+
+beforeEach(() => {
+    ioMock.mockImplementation(() => createHarnessSocket())
+})
 
     it('reconnects a disconnected active session during final flush', async () => {
         socketHarness.sockets.length = 0
@@ -442,6 +450,7 @@ describe('ApiSessionClient.updateMetadata', () => {
         ioMock.mockReset()
         axiosGetMock.mockReset()
         axiosPostMock.mockReset()
+        ioMock.mockImplementation(() => makeSocket())
     })
 
     function makeSocket() {

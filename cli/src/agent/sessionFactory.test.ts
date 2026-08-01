@@ -20,6 +20,7 @@ vi.mock('@/api/api', () => ({
     ApiClient: {
         create: async () => ({
             getSession: getSessionMock,
+            getOrCreateSession: getSessionMock,
             getOrCreateMachine: getOrCreateMachineMock,
             sessionSyncClient: sessionSyncClientMock
         })

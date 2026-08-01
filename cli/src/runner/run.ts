@@ -1148,6 +1148,9 @@ export function buildCliArgs(
   if (options.effort && (agent === 'claude' || agent === 'grok' || agent === 'pi')) {
     args.push('--effort', options.effort);
   }
+  if (options.serviceTier && agent === 'codex') {
+    args.push('--service-tier', options.serviceTier);
+  }
   if (options.modelReasoningEffort && (agent === 'codex' || agent === 'opencode')) {
     args.push('--model-reasoning-effort', options.modelReasoningEffort);
   }
