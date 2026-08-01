@@ -1928,7 +1928,6 @@ export class SyncEngine {
         return await this.rpcGateway.listCodexModelsForMachine(machineId)
     }
 
-<<<<<<< HEAD
     async listAgentModelsForSession(
         sessionId: string,
         agent: AgentFlavor

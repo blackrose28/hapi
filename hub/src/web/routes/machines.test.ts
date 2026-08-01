@@ -472,23 +472,4 @@ describe('machines routes', () => {
         expect(await response.json()).toEqual({ type: 'success', sessionId: 'session-1' })
         expect(calls).toEqual([{ resumeSessionId: '019ed35e-db26-7770-abb3-1c7ee3c92f52' }])
     })
-
-=======
-            await next()
-        })
-        app.route('/api', createMachinesRoutes(() => engine as SyncEngine))
-
-        const response = await app.request('/api/machines/machine-1/cursor-models')
-
-        expect(response.status).toBe(200)
-        expect(await response.json()).toEqual({
-            success: true,
-            availableModels: [
-                { modelId: 'composer-2.5', name: 'Composer 2.5' },
-                { modelId: 'gpt-5.5-high-fast', name: 'GPT-5.5 High Fast' }
-            ],
-            currentModelId: 'composer-2.5'
-        })
-    })
->>>>>>> 1d03f186 (feat(cursor): support model selection (#684))
 })

@@ -4,7 +4,7 @@ import { authAndSetupMachineIfNeeded } from '@/ui/auth'
 import { initializeToken } from '@/ui/tokenInit'
 import { maybeAutoStartServer } from '@/utils/autoStartServer'
 import type { CommandDefinition } from './types'
-import { CURSOR_PERMISSION_MODES } from '@hapi/protocol/modes'
+import { CURSOR_PERMISSION_MODES, type CursorPermissionMode } from '@hapi/protocol/modes'
 import { parseRemoteAgentCommandOptions } from './agentCommandOptions'
 
 export type ParsedCursorCommandOptions = {

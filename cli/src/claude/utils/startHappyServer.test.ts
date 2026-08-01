@@ -45,7 +45,7 @@ describe('startHappyServer change_title gating', () => {
         stopServer = server.stop
 
         expect(server.toolNames).not.toContain('change_title')
-        expect(server.toolNames).toEqual(['report_to_team', 'mark_team_mention_no_action'])
+        expect(server.toolNames).toEqual(['report_to_team', 'mark_team_mention_no_action', 'display_image'])
 
         const mcp = new Client({ name: 'hapi-test', version: '1.0.0' })
         client = mcp

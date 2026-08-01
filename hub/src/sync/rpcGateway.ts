@@ -603,11 +603,11 @@ export class RpcGateway {
     }
 
     async listCursorModelsForSession(sessionId: string): Promise<RpcListCursorModelsResponse> {
-        return await this.sessionRpc(sessionId, RPC_METHODS.ListCursorModels, {}, MODEL_LIST_RPC_TIMEOUT_MS) as RpcListCursorModelsResponse
+        return await this.sessionRpc(sessionId, RPC_METHODS.ListCursorModels, {}) as RpcListCursorModelsResponse
     }
 
     async listCursorModelsForMachine(machineId: string): Promise<RpcListCursorModelsResponse> {
-        return await this.machineRpc(machineId, RPC_METHODS.ListCursorModels, {}, MODEL_LIST_RPC_TIMEOUT_MS) as RpcListCursorModelsResponse
+        return await this.machineRpc(machineId, RPC_METHODS.ListCursorModels, {}) as RpcListCursorModelsResponse
     }
 
     async listOpencodeModelsForSession(sessionId: string): Promise<RpcListOpencodeModelsResponse> {

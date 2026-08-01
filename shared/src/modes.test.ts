@@ -96,5 +96,3 @@ describe('isPermissionModeAllowedForFlavor', () => {
         expect(isPermissionModeAllowedForFlavor('autoReview', 'claude')).toBe(false)
     })
 })
-    })
-})

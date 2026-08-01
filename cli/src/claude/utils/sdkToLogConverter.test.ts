@@ -1097,14 +1097,13 @@ describe('SDKToLogConverter', () => {
             expect(assistant!.parentUuid).toBe(user!.uuid)
         })
 
-        it('should still pass unknown message types through', () => {
+        it('should drop unknown message types', () => {
             const logMessage = converter.convert({
                 type: 'some_future_signal',
                 payload: { hello: 'world' }
             } as unknown as SDKMessage)
 
-            expect(logMessage).toBeTruthy()
-            expect(logMessage!.type).toBe('some_future_signal')
+            expect(logMessage).toBeNull()
         })
     })
 

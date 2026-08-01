@@ -16,34 +16,43 @@ export function useCursorModels(args: {
     const { api, sessionId } = args
     const enabled = Boolean(args.enabled && api && sessionId)
 
-    const query = useQuery({
-        queryKey: sessionId
-            ? queryKeys.sessionCursorModels(sessionId)
-            : ['session-cursor-models', 'unknown'] as const,
-        queryFn: async () => {
-            if (!api) {
-                throw new Error('API unavailable')
-            }
-            if (!sessionId) {
-                throw new Error('Cursor models target unavailable')
-            }
-            return await api.getSessionCursorModels(sessionId)
-        },
-        enabled,
-        staleTime: 60_000,
-        retry: false,
-    })
+    try {
+        const query = useQuery({
+            queryKey: sessionId
+                ? queryKeys.sessionCursorModels(sessionId)
+                : ['session-cursor-models', 'unknown'] as const,
+            queryFn: async () => {
+                if (!api) {
+                    throw new Error('API unavailable')
+                }
+                if (!sessionId) {
+                    throw new Error('Cursor models target unavailable')
+                }
+                return await api.getSessionCursorModels(sessionId)
+            },
+            enabled,
+            staleTime: 60_000,
+            retry: false,
+        })
 
-    return {
-        availableModels: query.data?.availableModels ?? [],
-        currentModelId: query.data?.currentModelId ?? null,
-        isLoading: query.isLoading,
-        error: query.data?.success === false
-            ? (query.data.error ?? 'Failed to load Cursor models')
-            : query.error instanceof Error
-                ? query.error.message
-                : query.error
-                    ? 'Failed to load Cursor models'
-                    : null,
+        return {
+            availableModels: query.data?.availableModels ?? [],
+            currentModelId: query.data?.currentModelId ?? null,
+            isLoading: query.isLoading,
+            error: query.data?.success === false
+                ? (query.data.error ?? 'Failed to load Cursor models')
+                : query.error instanceof Error
+                    ? query.error.message
+                    : query.error
+                        ? 'Failed to load Cursor models'
+                        : null,
+        }
+    } catch {
+        return {
+            availableModels: [],
+            currentModelId: null,
+            isLoading: false,
+            error: null,
+        }
     }
 }

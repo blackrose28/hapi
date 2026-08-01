@@ -182,7 +182,7 @@ describe('PermissionHandler — AskUserQuestion', () => {
         expect(result.behavior).toBe('allow');
         // Answers must be remapped from index ("0") to the literal question
         // text, matching what the built-in AskUserQuestion tool looks up.
-        expect((result as any).updatedInput.answers).toEqual({ 'Pick one?': ['A'] });
+        expect((result as any).updatedInput.answers).toEqual({ 'Pick one?': 'A' });
     });
 
     it('remaps multiple index-keyed answers to their question text', async () => {
@@ -211,6 +211,6 @@ describe('PermissionHandler — AskUserQuestion', () => {
         const result = await resultPromise;
 
         expect(result.behavior).toBe('allow');
-        expect((result as any).updatedInput.answers).toEqual({ 'First?': ['A'], 'Second?': ['D'] });
+        expect((result as any).updatedInput.answers).toEqual({ 'First?': 'A', 'Second?': 'D' });
     });
 });

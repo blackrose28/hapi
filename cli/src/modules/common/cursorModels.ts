@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { CursorModelsResponse, CursorModelSummary } from '@hapi/protocol/apiTypes';
+import type { CursorModelsResponse, CursorModelSummary } from '@hapi/protocol/schemas';
 import { getErrorMessage } from './rpcResponses';
 
 export type ListCursorModelsResponse = CursorModelsResponse;

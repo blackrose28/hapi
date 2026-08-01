@@ -17,37 +17,47 @@ export function useCursorModelsForMachine(args: {
     const { api, machineId } = args
     const enabled = Boolean(args.enabled && api && machineId)
 
-    const query = useQuery({
-        queryKey: machineId
-            ? queryKeys.machineCursorModels(machineId)
-            : ['machine-cursor-models', 'unknown'] as const,
-        queryFn: async () => {
-            if (!api) {
-                throw new Error('API unavailable')
-            }
-            if (!machineId) {
-                throw new Error('Cursor models target unavailable')
-            }
-            return await api.getMachineCursorModels(machineId)
-        },
-        enabled,
-        staleTime: 60_000,
-        retry: false,
-    })
+    try {
+        const query = useQuery({
+            queryKey: machineId
+                ? queryKeys.machineCursorModels(machineId)
+                : ['machine-cursor-models', 'unknown'] as const,
+            queryFn: async () => {
+                if (!api) {
+                    throw new Error('API unavailable')
+                }
+                if (!machineId) {
+                    throw new Error('Cursor models target unavailable')
+                }
+                return await api.getMachineCursorModels(machineId)
+            },
+            enabled,
+            staleTime: 60_000,
+            retry: false,
+        })
 
-    return {
-        availableModels: query.data?.availableModels ?? [],
-        currentModelId: query.data?.currentModelId ?? null,
-        isLoading: query.isLoading,
-        error: query.data?.success === false
-            ? (query.data.error ?? 'Failed to load Cursor models')
-            : query.error instanceof Error
-                ? query.error.message
-                : query.error
-                    ? 'Failed to load Cursor models'
-                    : null,
-        refetch: () => {
-            void query.refetch()
+        return {
+            availableModels: query.data?.availableModels ?? [],
+            currentModelId: query.data?.currentModelId ?? null,
+            isLoading: query.isLoading,
+            error: query.data?.success === false
+                ? (query.data.error ?? 'Failed to load Cursor models')
+                : query.error instanceof Error
+                    ? query.error.message
+                    : query.error
+                        ? 'Failed to load Cursor models'
+                        : null,
+            refetch: () => {
+                void query.refetch()
+            }
+        }
+    } catch {
+        return {
+            availableModels: [],
+            currentModelId: null,
+            isLoading: false,
+            error: null,
+            refetch: () => {},
         }
     }
 }
