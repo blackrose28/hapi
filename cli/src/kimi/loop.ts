@@ -4,7 +4,7 @@ import { logger } from '@/ui/logger';
 import { runLocalRemoteSession } from '@/agent/loopBase';
 import { KimiSession } from './session';
 import { kimiLocalLauncher } from './kimiLocalLauncher';
-import { kimiRemoteLauncher } from './kimiRemoteLauncher';
+import { runAgentSession } from '@/agent/runners/runAgentSession';
 import { ApiClient, ApiSessionClient } from '@/lib';
 import type { KimiMode, PermissionMode } from './types';
 
@@ -57,9 +57,14 @@ export async function kimiLoop(opts: KimiLoopOptions): Promise<void> {
         runLocal: (instance) => kimiLocalLauncher(instance, {
             model: getCurrentModel()
         }),
-        runRemote: (instance) => kimiRemoteLauncher(instance, {
-            model: getCurrentModel()
-        }),
+        runRemote: async () => {
+            await runAgentSession({
+                agentType: 'kimi',
+                startedBy: opts.startedBy,
+                permissionMode: opts.permissionMode
+            });
+            return 'exit';
+        },
         onSessionReady: opts.onSessionReady
     });
 }

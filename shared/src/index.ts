@@ -4,11 +4,8 @@ export * from './buildInfo'
 export * from './flavors'
 export * from './models'
 export * from './modes'
-<<<<<<< HEAD
 export * from './piThinkingLevel'
-=======
 export * from './resume'
->>>>>>> 197f3275 (feat: add hapi resume command (#647))
 export * from './socket'
 export * from './sessionSummary'
 export * from './terminalSnippets'
@@ -19,6 +16,5 @@ export * from './version'
 export type * from './types'
 
 export * from './scratchlistAttachments'
-export * from './slashCommands'
 export * from './schemas'
 export * from './rpcMethods'

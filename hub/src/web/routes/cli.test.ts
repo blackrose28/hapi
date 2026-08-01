@@ -1,25 +1,31 @@
-import { beforeAll, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { Hono } from 'hono'
 import type { SyncEngine } from '../../sync/syncEngine'
-import { createConfiguration } from '../../configuration'
 import { createCliRoutes } from './cli'
+
+const dummyAuthenticator = {
+    authenticate: async () => ({
+        ok: true as const,
+        credential: {
+            organizationId: 'org-1',
+            runnerId: 'runner-1',
+            machineId: 'machine-1'
+        }
+    })
+} as any
 
 function createApp(engine: Partial<SyncEngine>) {
     const app = new Hono()
-    app.route('/cli', createCliRoutes(() => engine as SyncEngine))
+    app.route('/cli', createCliRoutes(() => engine as SyncEngine, dummyAuthenticator, () => true))
     return app
 }
 
 function authHeaders() {
     return {
-        authorization: 'Bearer test-token'
+        authorization: 'Runner cred-1.sec-1',
+        'X-Hapi-Machine-Id': 'machine-1'
     }
 }
-
-beforeAll(async () => {
-    const config = await createConfiguration()
-    config._setCliApiToken('test-token', 'env', false)
-})
 
 describe('cli resume routes', () => {
     it('returns local resumable sessions', async () => {

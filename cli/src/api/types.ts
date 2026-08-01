@@ -7,7 +7,6 @@ import {
     CliMessagesResponseSchema,
     CreateMachineResponseSchema,
     CreateSessionResponseSchema,
-    GetSessionResponseSchema,
     MetadataSchema,
     PermissionModeSchema,
     RunnerStateSchema,
@@ -17,7 +16,7 @@ import {
     LocalHandoffResponseSchema,
     LocalResumeTargetResponseSchema,
     ResumableSessionsResponseSchema
-} from '@hapi/protocol/schemas'
+} from '@hapi/protocol'
 import type { CodexCollaborationMode, PermissionMode, Machine, MachineMetadata, RunnerState } from '@hapi/protocol'
 import { z } from 'zod'
 import { UsageSchema } from '@/claude/types'
@@ -37,8 +36,7 @@ export type {
     Session,
     CliMessagesResponse,
     CreateMachineResponse,
-    CreateSessionResponse,
-    GetSessionResponse
+    CreateSessionResponse
 } from '@hapi/protocol'
 export type SessionPermissionMode = PermissionMode
 export type SessionCollaborationMode = CodexCollaborationMode

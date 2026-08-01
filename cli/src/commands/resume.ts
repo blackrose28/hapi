@@ -11,6 +11,8 @@ import type {
     OpencodePermissionMode
 } from '@hapi/protocol/types'
 import { ApiClient } from '@/api/api'
+import { configuration } from '@/configuration'
+import { readRunnerProfile } from '@/runner/profile'
 import type { ReasoningEffort } from '@/codex/appServerTypes'
 import { authAndSetupMachineIfNeeded } from '@/ui/auth'
 import { initializeToken } from '@/ui/tokenInit'
@@ -103,17 +105,7 @@ async function dispatchLocalResume(target: LocalResumeTarget): Promise<void> {
     }
 
     if (target.flavor === 'gemini') {
-        const { runGemini } = await import('@/gemini/runGemini')
-        await runGemini({
-            existingSessionId: base.existingSessionId,
-            workingDirectory: base.workingDirectory,
-            resumeSessionId: base.resumeSessionId,
-            startedBy: base.startedBy,
-            permissionMode: base.permissionMode as GeminiPermissionMode | undefined,
-            startingMode: 'local',
-            model: target.model ?? undefined
-        })
-        return
+        throw new Error('Gemini CLI is no longer supported and cannot be resumed.')
     }
 
     if (target.flavor === 'opencode') {
@@ -124,6 +116,43 @@ async function dispatchLocalResume(target: LocalResumeTarget): Promise<void> {
             resumeSessionId: base.resumeSessionId,
             startedBy: base.startedBy,
             permissionMode: base.permissionMode as OpencodePermissionMode | undefined,
+            startingMode: 'local',
+            model: target.model ?? undefined
+        })
+        return
+    }
+
+    if (target.flavor === 'kimi') {
+        const { runKimi } = await import('@/kimi/runKimi')
+        await runKimi({
+            workingDirectory: base.workingDirectory,
+            resumeSessionId: base.resumeSessionId,
+            startedBy: base.startedBy,
+            permissionMode: base.permissionMode as any,
+            startingMode: 'local',
+            model: target.model ?? undefined
+        })
+        return
+    }
+
+    if (target.flavor === 'pi') {
+        const { runPi } = await import('@/pi/runPi')
+        await runPi({
+            workingDirectory: base.workingDirectory,
+            resumeSessionId: base.resumeSessionId,
+            startedBy: base.startedBy,
+            startingMode: 'local',
+            model: target.model ?? undefined
+        })
+        return
+    }
+
+    if (target.flavor === 'grok') {
+        const { runGrok } = await import('@/grok/runGrok')
+        await runGrok({
+            resumeSessionId: base.resumeSessionId,
+            startedBy: base.startedBy,
+            permissionMode: base.permissionMode as any,
             startingMode: 'local',
             model: target.model ?? undefined
         })
@@ -169,7 +198,10 @@ export const resumeCommand: CommandDefinition = {
         try {
             await initializeToken()
             await maybeAutoStartServer()
-            const { machineId } = await authAndSetupMachineIfNeeded()
+            await authAndSetupMachineIfNeeded()
+            const profileName = process.env.HAPI_RUNNER_PROFILE!.trim()
+            const enrolled = await readRunnerProfile(process.env.HAPI_PROFILE_BASE_HOME ?? configuration.happyHomeDir, profileName)
+            const machineId = enrolled.profile.machineId
             const api = await ApiClient.create()
             const sessionId = await resolveSessionId(api, machineId, commandArgs)
             const target = await api.getLocalResumeTarget(sessionId)

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '@/api/types'
+import { HAPI_SESSION_ID_ENV, bootstrapSession } from './sessionFactory'
 
 const {
     getSessionMock,
@@ -182,23 +183,16 @@ describe('bootstrapExistingSession', () => {
 
 describe('bootstrapSession HAPI_SESSION_ID export', () => {
     beforeEach(() => {
+        getSessionMock.mockReset()
         getOrCreateMachineMock.mockReset()
-        getOrCreateSessionMock.mockReset()
         sessionSyncClientMock.mockReset()
-        apiClientCreateMock.mockReset()
         delete process.env[HAPI_SESSION_ID_ENV]
     })
 
     it('exports the hub session id so spawned agents inherit it', async () => {
-        getOrCreateSessionMock.mockResolvedValue({ id: 'hub-session-42' })
+        getSessionMock.mockResolvedValue({ id: 'hub-session-42', metadata: {} })
         getOrCreateMachineMock.mockResolvedValue({ id: 'machine-1' })
         sessionSyncClientMock.mockReturnValue({})
-        apiClientCreateMock.mockResolvedValue({
-            machineId: 'machine-1',
-            getOrCreateMachine: getOrCreateMachineMock,
-            getOrCreateSession: getOrCreateSessionMock,
-            sessionSyncClient: sessionSyncClientMock
-        })
 
         const result = await bootstrapSession({
             flavor: 'claude',

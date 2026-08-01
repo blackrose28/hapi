@@ -350,8 +350,6 @@ export const TerminalHistoryResultSchema = z.union([
 ])
 export type TerminalHistoryResult = z.infer<typeof TerminalHistoryResultSchema>
 
-export const SessionEndReasonSchema = z.enum(['completed', 'terminated', 'error'])
-export type SessionEndReason = z.infer<typeof SessionEndReasonSchema>
 export const UpdateNewMessageBodySchema = z.object({
     t: z.literal('new-message'),
     sid: z.string(),

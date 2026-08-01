@@ -222,6 +222,39 @@ export class MessageQueue2<T> {
     }
 
     /**
+     * Push an isolated message to the beginning of the queue with a mode.
+     */
+    unshiftIsolate(message: string, mode: T, localId?: string): void {
+        if (this.closed) {
+            throw new Error('Cannot unshift to closed queue');
+        }
+
+        const modeHash = this.modeHasher(mode);
+        logger.debug(`[MessageQueue2] unshiftIsolate() called with mode hash: ${modeHash}`);
+
+        this.queue.unshift({
+            message,
+            mode,
+            modeHash,
+            localId,
+            isolate: true
+        });
+
+        if (this.onMessageHandler) {
+            this.onMessageHandler(message, mode);
+        }
+
+        if (this.waiter) {
+            logger.debug(`[MessageQueue2] Notifying waiter`);
+            const waiter = this.waiter;
+            this.waiter = null;
+            waiter(true);
+        }
+
+        logger.debug(`[MessageQueue2] unshiftIsolate() completed. Queue size: ${this.queue.length}`);
+    }
+
+    /**
      * Remove the first queued message that matches the given localId.
      * Returns true if a message was removed, false if not found.
      * Best-effort: if the CLI is offline when cancel is issued, the message

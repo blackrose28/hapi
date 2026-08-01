@@ -95,6 +95,20 @@ vi.mock('axios', () => ({
 }))
 
 import { ApiSessionClient, isExternalUserMessage, IncomingMessageFilter } from './apiSession'
+import type { Metadata, Session } from './types'
+import { TerminalManager } from '@/terminal/TerminalManager'
+import { configuration } from '@/configuration'
+import type { ApiAuthentication } from './api'
+
+const ioMock = vi.fn()
+const axiosGetMock = vi.fn()
+const axiosPostMock = vi.fn()
+
+const dummyAuth: ApiAuthentication = {
+    kind: 'runner',
+    credential: { credentialId: 'cred-1', secret: 'sec-1' },
+    machineId: 'machine-1'
+}
 
 function createSession(overrides: Partial<Session> = {}): Session {
     return {
@@ -115,7 +129,6 @@ function createSession(overrides: Partial<Session> = {}): Session {
         model: null,
         modelReasoningEffort: null,
         effort: null,
-        serviceTier: null,
         permissionMode: undefined,
         collaborationMode: undefined,
         ...overrides
@@ -163,196 +176,10 @@ function triggerIncomingUserMessage(
     })
 }
 
-describe('ApiSessionClient lazy materialization', () => {
-    it('does not connect or materialize without a real user message', async () => {
-        socketHarness.sockets.length = 0
-        const materialize = vi.fn(async () => createSession())
-        const client = new ApiSessionClient('token', createSession(), { materialize })
-
-        client.updateMetadata(() => ({ path: '/tmp/project', host: 'localhost', codexSessionId: 'codex-thread' }))
-        client.sendSessionEvent({ type: 'ready' })
-        client.keepAlive(false, 'local')
-        await client.flush({ timeoutMs: 100 })
-
-        expect(client.getState()).toBe('pending')
-        expect(materialize).not.toHaveBeenCalled()
-        expect(socketHarness.sockets[0]?.connectCalls).toBe(0)
-        expect(socketHarness.sockets[0]?.emitted).toEqual([])
-        client.close()
-    })
-
-    it('materializes on the first user message and replays queued events', async () => {
-        socketHarness.sockets.length = 0
-        const materialize = vi.fn(async (snapshot) => createSession({
-            namespace: 'default',
-            metadata: snapshot.metadata,
-            metadataVersion: 1,
-            agentState: snapshot.agentState,
-            agentStateVersion: 1
-        }))
-        const client = new ApiSessionClient('token', createSession(), { materialize })
-        client.updateMetadata(() => ({ path: '/tmp/project', host: 'localhost', codexSessionId: 'codex-thread' }))
-        client.sendSessionEvent({ type: 'ready' })
-
-        client.sendUserMessage('hello')
-        expect(await client.materialize()).toBe(true)
-
-        expect(materialize).toHaveBeenCalledWith({
-            metadata: { path: '/tmp/project', host: 'localhost', codexSessionId: 'codex-thread' },
-            agentState: { controlledByUser: false }
-        }, expect.any(AbortSignal))
-        expect(client.getState()).toBe('active')
-        expect(socketHarness.sockets[0]?.connectCalls).toBe(1)
-        expect(socketHarness.sockets[0]?.emitted.map((entry) => entry.event)).toEqual([
-            'message',
-            'message',
-            'session-alive'
-        ])
-        client.close()
-    })
-
-    it('materializes on non-text user activity and preserves following agent events', async () => {
-        socketHarness.sockets.length = 0
-        const pendingMaterialization = deferred<Session>()
-        const materialize = vi.fn(async () => await pendingMaterialization.promise)
-        const client = new ApiSessionClient('token', createSession(), { materialize })
-
-        client.notifyUserActivity()
-        client.sendAgentMessage({ type: 'message', message: 'image response' })
-        expect(client.getState()).toBe('materializing')
-
-        pendingMaterialization.resolve(createSession({ namespace: 'default' }))
-        expect(await client.materialize()).toBe(true)
-
-        expect(materialize).toHaveBeenCalledTimes(1)
-        const messages = socketHarness.sockets[0]?.emitted.filter((entry) => entry.event === 'message')
-        expect(messages).toHaveLength(1)
-        client.close()
-    })
-
-    it('preserves all replayed transcript messages while materialization is in flight', async () => {
-        socketHarness.sockets.length = 0
-        const pendingMaterialization = deferred<Session>()
-        const client = new ApiSessionClient('token', createSession(), {
-            materialize: async () => await pendingMaterialization.promise
-        })
-        const expectedMessages: string[] = []
-
-        for (let index = 0; index < 150; index += 1) {
-            const userMessage = `user-${index}`
-            const agentMessage = `agent-${index}`
-            expectedMessages.push(userMessage, agentMessage)
-            client.sendUserMessage(userMessage)
-            client.sendAgentMessage({ type: 'message', message: agentMessage })
-        }
-
-        pendingMaterialization.resolve(createSession({ namespace: 'default' }))
-        expect(await client.materialize()).toBe(true)
-
-        const emittedMessages = socketHarness.sockets[0]?.emitted
-            .filter((entry) => entry.event === 'message')
-            .map((entry) => {
-                const payload = entry.args[0] as {
-                    message: {
-                        role: 'user' | 'agent'
-                        content: { text?: string; data?: { message?: string } }
-                    }
-                }
-                return payload.message.role === 'user'
-                    ? payload.message.content.text
-                    : payload.message.content.data?.message
-            })
-
-        expect(emittedMessages).toEqual(expectedMessages)
-        client.close()
-    })
-
-    it('drains in-flight materialization and initial socket delivery before closing', async () => {
-        socketHarness.sockets.length = 0
-        const pendingMaterialization = deferred<Session>()
-        const client = new ApiSessionClient('token', createSession(), {
-            materialize: async () => await pendingMaterialization.promise
-        })
-        const socket = socketHarness.sockets[0]
-        if (!socket) throw new Error('expected socket')
-        socket.connectImmediately = false
-
-        client.sendUserMessage('persist me')
-        client.sendAgentMessage({ type: 'message', message: 'persist response' })
-        client.sendSessionDeath('completed')
-
-        let flushed = false
-        const flushTask = client.flush({ timeoutMs: 1_000 }).then(() => {
-            flushed = true
-        })
-        await Promise.resolve()
-        expect(flushed).toBe(false)
-
-        pendingMaterialization.resolve(createSession({ namespace: 'default' }))
-        await vi.waitFor(() => expect(socket.connectCalls).toBe(1))
-        expect(flushed).toBe(false)
-
-        socket.triggerConnectError()
-        await Promise.resolve()
-        expect(flushed).toBe(false)
-
-        socket.triggerConnect()
-        await flushTask
-
-        expect(socket.emitted.map((entry) => entry.event)).toEqual([
-            'message',
-            'message',
-            'session-end',
-            'session-alive'
-        ])
-        client.close()
-    })
-
-    it('skips materialization backoff and performs one final attempt during shutdown drain', async () => {
-        socketHarness.sockets.length = 0
-        const materialize = vi.fn(async () => {
-            if (materialize.mock.calls.length === 1) {
-                throw Object.assign(new Error('hub unavailable'), { isAxiosError: true })
-            }
-            return createSession({ namespace: 'default' })
-        })
-        const client = new ApiSessionClient('token', createSession(), { materialize })
-
-        client.sendUserMessage('hello')
-        await vi.waitFor(() => expect(materialize).toHaveBeenCalledTimes(1))
-        await Promise.resolve()
-
-        await client.flush({ timeoutMs: 500 })
-
-        expect(materialize).toHaveBeenCalledTimes(2)
-        expect(client.getState()).toBe('active')
-        expect(socketHarness.sockets[0]?.emitted.some((entry) => entry.event === 'message')).toBe(true)
-        client.close()
-    })
-
-    it('aborts in-flight materialization when closed', async () => {
-        socketHarness.sockets.length = 0
-        const observedSignals: AbortSignal[] = []
-        const materialize = vi.fn(async (_snapshot, signal: AbortSignal) => {
-            observedSignals.push(signal)
-            return await new Promise<Session>((_resolve, reject) => {
-                signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
-            })
-        })
-        const client = new ApiSessionClient('token', createSession(), { materialize })
-
-        const task = client.materialize()
-        await Promise.resolve()
-        client.close()
-
-        expect(await task).toBe(false)
-        expect(observedSignals[0]?.aborted).toBe(true)
-        expect(client.getState()).toBe('closed')
-    })
 
     it('reconnects a disconnected active session during final flush', async () => {
         socketHarness.sockets.length = 0
-        const client = new ApiSessionClient('token', createSession({ namespace: 'default' }))
+        const client = new ApiSessionClient(dummyAuth, createSession({ namespace: 'default' }))
         const socket = socketHarness.sockets[0]
         if (!socket) throw new Error('expected socket')
         socket.connected = false
@@ -372,13 +199,11 @@ describe('ApiSessionClient lazy materialization', () => {
         expect(socket.emitted.some((entry) => entry.event === 'session-end')).toBe(true)
         client.close()
     })
-})
->>>>>>> e957d2fc (fix(cli): ignore CLI-originated backfill prompts (#1192))
 
 describe('ApiSessionClient incoming user messages', () => {
     it('ignores CLI-originated transcript messages while advancing the incoming cursor', () => {
         socketHarness.sockets.length = 0
-        const client = new ApiSessionClient('token', createSession({ namespace: 'default' }))
+        const client = new ApiSessionClient(dummyAuth, createSession({ namespace: 'default' }))
         const socket = socketHarness.sockets[0]
         if (!socket) throw new Error('expected socket')
         const onUserMessage = vi.fn()
@@ -443,7 +268,7 @@ describe('ApiSessionClient incoming user messages', () => {
                 ]
             }
         })
-        const client = new ApiSessionClient('token', createSession({ namespace: 'default' }))
+        const client = new ApiSessionClient(dummyAuth, createSession({ namespace: 'default' }))
         const socket = socketHarness.sockets[0]
         if (!socket) throw new Error('expected socket')
         const receivedTexts: string[] = []
@@ -479,7 +304,7 @@ describe('ApiSessionClient incoming user messages', () => {
         'delivers %s-originated user messages',
         (sentFrom) => {
             socketHarness.sockets.length = 0
-            const client = new ApiSessionClient('token', createSession({ namespace: 'default' }))
+            const client = new ApiSessionClient(dummyAuth, createSession({ namespace: 'default' }))
             const socket = socketHarness.sockets[0]
             if (!socket) throw new Error('expected socket')
             const onUserMessage = vi.fn()

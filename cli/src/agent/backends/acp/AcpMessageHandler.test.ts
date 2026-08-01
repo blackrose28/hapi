@@ -686,8 +686,7 @@ describe('AcpMessageHandler', () => {
         // boundary sees the reassembled envelope.
         const messages: AgentMessage[] = [];
         const handler = new AcpMessageHandler(
-            (message) => messages.push(message),
-            { textChunkMode: 'delta' }
+            (message) => messages.push(message)
         );
 
         const metadataJson = JSON.stringify({
@@ -741,8 +740,7 @@ describe('AcpMessageHandler', () => {
     it('still emits genuine assistant text that happens to be JSON', () => {
         const messages: AgentMessage[] = [];
         const handler = new AcpMessageHandler(
-            (message) => messages.push(message),
-            { textChunkMode: 'delta' }
+            (message) => messages.push(message)
         );
 
         const answer = '{"name":"hapi","version":"0.23.4"}';

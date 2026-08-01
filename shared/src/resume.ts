@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { CodexCollaborationModeSchema, PermissionModeSchema } from './schemas'
-
-export const AgentFlavorSchema = z.enum(['claude', 'codex', 'gemini', 'opencode', 'cursor'])
+import { AgentFlavorSchema } from './modes'
 
 export const LocalResumeTargetSchema = z.object({
     sessionId: z.string().min(1),

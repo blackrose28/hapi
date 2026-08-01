@@ -470,7 +470,6 @@ describe('Runner Integration Tests', { timeout: 20_000 }, () => {
       await stopRunner();
       utimesSync(packagePath, originalTimes.atime, originalTimes.mtime);
     }
-    }
   });
 
   // TODO: Add a test to see if a corrupted file will work

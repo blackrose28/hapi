@@ -1,13 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { initializeApiUrlMock, readSettingsMock, updateSettingsMock } = vi.hoisted(() => ({
-    initializeApiUrlMock: vi.fn(async () => {}),
+const { readSettingsMock, updateSettingsMock } = vi.hoisted(() => ({
     readSettingsMock: vi.fn(),
     updateSettingsMock: vi.fn()
-}))
-
-vi.mock('@/ui/apiUrlInit', () => ({
-    initializeApiUrl: initializeApiUrlMock
 }))
 
 vi.mock('@/persistence', () => ({
@@ -16,16 +11,14 @@ vi.mock('@/persistence', () => ({
 }))
 
 import { configuration } from '@/configuration'
-import { initializeToken } from './tokenInit'
+import { initializeExtraHeaders } from './extraHeadersInit'
 
-describe('initializeToken extra headers', () => {
+describe('initializeExtraHeaders', () => {
     const originalExtraHeadersEnv = process.env.HAPI_EXTRA_HEADERS_JSON
 
     beforeEach(() => {
         delete process.env.HAPI_EXTRA_HEADERS_JSON
-        configuration._setCliApiToken('token-from-env')
         configuration._setExtraHeaders({})
-        initializeApiUrlMock.mockClear()
         readSettingsMock.mockReset()
         updateSettingsMock.mockReset()
     })
@@ -39,7 +32,7 @@ describe('initializeToken extra headers', () => {
         configuration._setExtraHeaders({})
     })
 
-    it('loads extra headers from settings even when the token is already initialized', async () => {
+    it('loads extra headers from settings', async () => {
         readSettingsMock.mockResolvedValue({
             extraHeaders: {
                 'CF-Access-Client-Id': 'client-id',
@@ -47,28 +40,11 @@ describe('initializeToken extra headers', () => {
             }
         })
 
-        await initializeToken()
+        await initializeExtraHeaders()
 
         expect(configuration.extraHeaders).toEqual({
             'CF-Access-Client-Id': 'client-id',
             'CF-Access-Client-Secret': 'client-secret'
-        })
-    })
-
-    it('loads both the token and extra headers from settings', async () => {
-        configuration._setCliApiToken('')
-        readSettingsMock.mockResolvedValue({
-            cliApiToken: 'token-from-settings',
-            extraHeaders: {
-                Cookie: 'CF_Authorization=from-settings'
-            }
-        })
-
-        await initializeToken()
-
-        expect(configuration.cliApiToken).toBe('token-from-settings')
-        expect(configuration.extraHeaders).toEqual({
-            Cookie: 'CF_Authorization=from-settings'
         })
     })
 
@@ -79,7 +55,7 @@ describe('initializeToken extra headers', () => {
             extraHeaders: { 'X-Source': 'settings' }
         })
 
-        await initializeToken()
+        await initializeExtraHeaders()
 
         expect(configuration.extraHeaders).toEqual({ 'X-Source': 'environment' })
         expect(readSettingsMock).not.toHaveBeenCalled()
@@ -94,7 +70,7 @@ describe('initializeToken extra headers', () => {
                 extraHeaders: { Cookie: 'CF_Authorization=from-settings' }
             })
 
-            await initializeToken()
+            await initializeExtraHeaders()
 
             expect(configuration.extraHeaders).toEqual({})
             expect(readSettingsMock).not.toHaveBeenCalled()
@@ -111,7 +87,7 @@ describe('initializeToken extra headers', () => {
             }
         })
 
-        await initializeToken()
+        await initializeExtraHeaders()
 
         expect(configuration.extraHeaders).toEqual({
             Cookie: 'CF_Authorization=valid'

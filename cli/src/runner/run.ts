@@ -101,9 +101,6 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
   });
 
   logger.debug('[RUNNER RUN] Starting runner process...');
-  logger.debugLargeJson('[RUNNER RUN] Environment', getEnvironmentInfo());
-
-<<<<<<< HEAD
   // Detect authorized handoff from a parent runner doing the
   // mtime-drift self-restart (see heartbeat block below). The parent sets
   // HAPI_RUNNER_HANDOFF_FROM_PID=<parent_pid> on the spawned child's env;
@@ -906,35 +903,6 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
         }
       }
 
-<<<<<<< HEAD
-      // Check if runner needs update
-      const installedCliMtimeMs = getInstalledCliMtimeMs();
-      if (typeof installedCliMtimeMs === 'number' &&
-          typeof startedWithCliMtimeMs === 'number' &&
-          installedCliMtimeMs !== startedWithCliMtimeMs) {
-        logger.debug('[RUNNER RUN] Runner is outdated, triggering self-restart with latest version, clearing heartbeat interval');
-
-        clearInterval(restartOnStaleVersionAndHeartbeat);
-
-        // Spawn new runner through the CLI
-        // We do not need to clean ourselves up - we will be killed by
-        // the CLI start command.
-        // 1. It will first check if runner is running (yes in this case)
-        // 2. If the version is stale (it will read runner.state.json file and check startedWithCliVersion) & compare it to its own version
-        // 3. Next it will start a new runner with the latest version with runner-sync :D
-        // Done!
-        try {
-          const restartArgs = ['runner', 'start', '--profile', enrolled.profile.profile];
-          if (workspaceRoot) {
-            restartArgs.push('--workspace-root', workspaceRoot);
-          }
-          spawnHappyCLI(restartArgs, {
-            detached: true,
-            stdio: 'ignore'
-          });
-        } catch (error) {
-          logger.debug('[RUNNER RUN] Failed to spawn new runner, this is quite likely to happen during integration tests as we are cleaning out dist/ directory', error);
-=======
       // Check if runner needs update.
       // Skip entirely when the operator owns process supervision (systemd, tmux,
       // custom rebuild pipelines, etc.) and source mtimes change for reasons
@@ -944,7 +912,6 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
       if (process.env.HAPI_DISABLE_VERSION_HANDOFF === '1') {
         if (process.env.DEBUG) {
           logger.debug('[RUNNER RUN] HAPI_DISABLE_VERSION_HANDOFF=1 set, skipping mtime/version drift self-restart');
->>>>>>> a6176014 (fix(runner): self-restart resilience under systemd / external process supervision (#814))
         }
       } else {
         const installedCliMtimeMs = getInstalledCliMtimeMs();
@@ -1017,7 +984,7 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
           // success) until it holds the lock, and the lock is ours until
           // we release.
           try {
-            await releaseRunnerLock(runnerLockHandle);
+            await releaseProfileLock();
           } catch (error) {
             logger.debug('[RUNNER RUN] Failed to release lock for child handoff; continuing wait anyway', error);
           }
@@ -1030,21 +997,13 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
             // Re-acquire the lock with a long window (the child has likely
             // either succeeded and we're seeing a stale state, or it gave
             // up - in either case the lock should be available shortly).
-            const reacquired = await acquireRunnerLock(60, 500);
+            const reacquired = await acquireRunnerProfileLock(enrolled.paths).catch(() => null);
             if (!reacquired) {
-              // Lock is held by someone else (third-party runner, or a
-              // child that succeeded but state file hasn't reflected the
-              // new pid yet). Cleanest action: exit, log clearly. The
-              // operator will see an offline machine if the holder also
-              // dies, but staying alive without the lock invariant is
-              // worse - it lets a parallel runner register against the
-              // same machine id.
               logger.debug('[RUNNER RUN] Could not re-acquire runner lock after failed handoff; another process holds it. Exiting cleanly.');
               clearInterval(restartOnStaleVersionAndHeartbeat);
               process.exit(0);
               return;
             }
-            runnerLockHandle = reacquired;
             deferHandoffRetry();
             return;
           }
@@ -1073,14 +1032,10 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
           startedWithCliMtimeMs,
           startedWithApiUrl: fileState.startedWithApiUrl,
           startedWithMachineId: fileState.startedWithMachineId,
-<<<<<<< HEAD
           workspaceRoot: fileState.workspaceRoot,
-=======
-          startedWithCliApiTokenHash: fileState.startedWithCliApiTokenHash,
           startedWithExtraHeadersHash: fileState.startedWithExtraHeadersHash,
           startedWithArgv,
           startedWithVersionHandoffDisabled,
->>>>>>> a6176014 (fix(runner): self-restart resilience under systemd / external process supervision (#814))
           lastHeartbeat: new Date().toLocaleString(),
           runnerLogPath: fileState.runnerLogPath
         };

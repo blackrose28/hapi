@@ -54,7 +54,7 @@ export class ApiClient {
 
     private authHeaders(): Record<string, string> {
         return buildHubRequestHeaders({
-            Authorization: `Bearer ${this.token}`,
+            ...this.headers(),
             'Content-Type': 'application/json'
         })
     }

@@ -7,14 +7,9 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
-<<<<<<< HEAD
 import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult, type LocalResumeTarget, type ResumableSession } from '@hapi/protocol'
 import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
-=======
-import type { LocalResumeTarget, ResumableSession } from '@hapi/protocol'
-import type { AgentFlavor, CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import { unwrapRoleWrappedRecordEnvelope } from '@hapi/protocol/messages'
->>>>>>> 856af6d8 (Show first user message in resume picker)
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant, CancelQueuedMessageResult } from '../store'
 import type { HapiSessionExportResult } from '@hapi/protocol/sessionExport'
@@ -973,11 +968,10 @@ export class SyncEngine {
             })
             .filter((session) => !opts?.machineId || session.machineId === opts.machineId)
             .sort((a, b) => b.updatedAt - a.updatedAt)
->>>>>>> 197f3275 (feat: add hapi resume command (#647))
     }
 
     private resolveFirstUserMessage(sessionId: string): string | undefined {
-        for (const message of this.store.messages.getFirstMessages(sessionId, 50)) {
+        for (const message of this.db.messages.getFirstMessages(sessionId, 50)) {
             const roleWrapped = unwrapRoleWrappedRecordEnvelope(message.content)
             const text = roleWrapped?.role === 'user'
                 ? extractUserMessageText(roleWrapped.content)
@@ -1010,33 +1004,10 @@ export class SyncEngine {
             return targetResult
         }
 
-<<<<<<< HEAD
-        const flavor = isKnownFlavor(metadata.flavor) ? metadata.flavor : 'claude'
-        const resumeToken = flavor === 'codex'
-            ? metadata.codexSessionId
-            : flavor === 'gemini'
-                ? metadata.geminiSessionId
-                : flavor === 'kimi'
-                    ? metadata.kimiSessionId
-                    : flavor === 'grok'
-                        ? metadata.grokSessionId
-                        : flavor === 'opencode'
-                            ? metadata.opencodeSessionId
-                            : flavor === 'cursor'
-                                ? metadata.cursorSessionId
-                                : flavor === 'pi'
-                                    ? metadata.piSessionId
-                                    : metadata.claudeSessionId
-
-        if (!resumeToken) {
-            return { type: 'error', message: 'Resume session ID unavailable', code: 'resume_unavailable' }
-        }
-=======
         const target = targetResult.target
         const metadata = session.metadata!
         const flavor = target.flavor
         const resumeToken = target.agentSessionId
->>>>>>> 197f3275 (feat: add hapi resume command (#647))
 
         const onlineMachines = this.machineCache.getOnlineMachinesByNamespace(namespace)
         if (onlineMachines.length === 0) {
@@ -1129,8 +1100,6 @@ export class SyncEngine {
         return { type: 'success', sessionId: spawnResult.sessionId }
     }
 
-<<<<<<< HEAD
-=======
     async handoffSessionToLocal(sessionId: string, namespace: string): Promise<LocalHandoffResult> {
         const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
         if (!access.ok) {
@@ -1176,7 +1145,7 @@ export class SyncEngine {
     }
 
     private recoverClaudeSessionIdFromMessages(sessionId: string, namespace: string): string | null {
-        const messages = this.messageService.getMessages(sessionId, 200)
+        const messages = this.messageService.getAllSessionMessages(sessionId, 200)
         for (let i = messages.length - 1; i >= 0; i -= 1) {
             const found = this.extractClaudeSessionId(messages[i].content)
             if (!found) continue
@@ -1230,7 +1199,7 @@ export class SyncEngine {
             if (!latest?.metadata) return
             if (latest.metadata.claudeSessionId === claudeSessionId) return
 
-            const result = this.store.sessions.updateSessionMetadata(
+            const result = this.db.sessions.updateSessionMetadata(
                 sessionId,
                 { ...latest.metadata, claudeSessionId },
                 latest.metadataVersion,
@@ -1247,7 +1216,6 @@ export class SyncEngine {
         }
     }
 
->>>>>>> 197f3275 (feat: add hapi resume command (#647))
     private hasSameAgentSessionIds(
         prev: Session['metadata'] | null,
         next: NonNullable<Session['metadata']>

@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import {
     hashRunnerCliApiToken,
     hashRunnerExtraHeaders,
@@ -172,10 +173,8 @@ describe('runner identity', () => {
             {},
             {
                 apiUrl: 'http://example.com',
-                machineId: 'machine-123',
-                cliApiTokenHash: hashRunnerCliApiToken('secret-token')
+                machineId: 'machine-123'
             }
         )).toBe(false)
->>>>>>> c87720ab (fix(cli): load extra headers from settings (#1041))
     })
 })

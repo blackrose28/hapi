@@ -36,15 +36,12 @@ describe('convertAgentMessage', () => {
             is_error: true
         });
     });
-<<<<<<< HEAD
-=======
-
     it('preserves stable reasoning id when provided', () => {
         const converted = convertAgentMessage({
             type: 'reasoning',
             text: 'thinking',
             id: 'reasoning-stream-1'
-        });
+        } as any);
 
         expect(converted).toEqual({
             type: 'reasoning',
@@ -75,7 +72,7 @@ describe('convertAgentMessage', () => {
             totalTokens: 13_892,
             contextTokens: 13_879,
             contextWindow: 65_536
-        });
+        } as any);
 
         expect(converted).toEqual({
             type: 'token_count',
@@ -92,11 +89,11 @@ describe('convertAgentMessage', () => {
             }
         });
     });
+
     it('returns null instead of echoing an unrecognized message shape', () => {
         // Unreachable through the type system, but callers forward any non-null
         // result straight into the chat stream — so the runtime contract has to
         // be fail-closed.
         expect(convertAgentMessage({ type: 'not_a_real_type' } as never)).toBeNull();
     });
->>>>>>> 6bddc9d0 (fix(cli): stop internal agent events from leaking into chat as raw JSON (#1165))
 });

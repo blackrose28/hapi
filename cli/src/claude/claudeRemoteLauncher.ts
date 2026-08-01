@@ -530,7 +530,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                         const { items, mode, isolate } = inFlightMessage;
                         for (const item of [...items].reverse()) {
                             if (isolate) {
-                                session.queue.unshiftIsolated(item.message, mode, item.localId);
+                                session.queue.unshiftIsolate(item.message, mode, item.localId);
                             } else {
                                 session.queue.unshift(item.message, mode, item.localId);
                             }
