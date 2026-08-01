@@ -2,6 +2,7 @@ import { PROTOCOL_VERSION } from "@hapi/protocol";
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { CreateOrLoadMachineRequestSchema, CreateOrLoadSessionRequestSchema, CursorMigrateToAcpRequestSchema, MarkTeamMentionNoActionInputSchema, ReportToTeamInputSchema } from '@hapi/protocol/schemas'
+import type { Machine, Session, SyncEngine } from '../../sync/syncEngine'
 import type { RunnerAuthenticator } from '../../auth/runnerAuthenticator'
 import { SessionIdentityConflictError } from '../../store/sessions'
 
@@ -95,9 +96,10 @@ export function createCliRoutes(
         if (!parsed.success) {
             return c.json({ error: 'Invalid body' }, 400)
         }
-        if (!parsed.data.metadata || typeof parsed.data.metadata !== 'object'
-            || !('machineId' in parsed.data.metadata)
-            || parsed.data.metadata.machineId !== c.get('authenticatedMachineId')) {
+        const effectiveMachineId = (parsed.data.metadata && typeof parsed.data.metadata === 'object' && 'machineId' in parsed.data.metadata && typeof parsed.data.metadata.machineId === 'string')
+            ? parsed.data.metadata.machineId
+            : parsed.data.machine?.id
+        if (!effectiveMachineId || effectiveMachineId !== c.get('authenticatedMachineId')) {
             return c.json({ error: 'Session machine binding mismatch' }, 403)
         }
         const namespace = c.get('namespace')

@@ -138,8 +138,8 @@ describe('reduceChatBlocks', () => {
                     input_tokens: 100,
                     output_tokens: 10,
                     context_tokens: 100,
-                    scope_role: 'parent'
-                }
+                    scopeRole: 'parent'
+                } as any
             },
             {
                 id: 'child-usage',
@@ -152,8 +152,8 @@ describe('reduceChatBlocks', () => {
                     input_tokens: 999,
                     output_tokens: 1,
                     context_tokens: 999,
-                    scope_role: 'child'
-                }
+                    scopeRole: 'child'
+                } as any
             }
         ] as NormalizedMessage[]
 
@@ -207,7 +207,7 @@ describe('reduceChatBlocks', () => {
             userMessage('queued-user-later', 'start a new task', 2)
         ]
 
-        const reduced = reduceChatBlocks(renderedMessages, null, { goalStateMessages })
+        const reduced = reduceChatBlocks(renderedMessages, null, [], { goalStateMessages })
 
         expect(reduced.blocks).toHaveLength(0)
         expect(reduced.latestGoal).toBeNull()

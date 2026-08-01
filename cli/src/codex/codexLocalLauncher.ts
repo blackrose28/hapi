@@ -162,9 +162,9 @@ export async function codexLocalLauncher(session: CodexSession, _recoveryContext
                     }
 
                     // Auto-update session summary from first agent message
-                    if (!hasSummary && converted.message.type === 'message') {
+                    if (!hasSummary && message.type === 'message') {
                         hasSummary = true;
-                        const firstLine = converted.message.message.split('\n')[0].trim();
+                        const firstLine = message.message.split('\n')[0].trim();
                         const summaryText = firstLine.length > 120
                             ? firstLine.slice(0, 117) + '\u2026'
                             : firstLine;

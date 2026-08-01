@@ -163,13 +163,13 @@ describe('cli lazy session creation', () => {
             'machine-1',
             { host: 'localhost' },
             null,
-            'default'
+            'org-1'
         )
         expect(getOrCreateSession).toHaveBeenCalledWith(
             'lazy-tag',
             { path: '/tmp/project' },
             { controlledByUser: true },
-            'default',
+            'org-1',
             undefined,
             undefined,
             undefined,
@@ -221,7 +221,7 @@ describe('cli lazy session creation', () => {
             body: JSON.stringify({
                 id: sessionId,
                 tag: 'lazy-tag',
-                metadata: {}
+                metadata: { machineId: 'machine-1' }
             })
         })
 

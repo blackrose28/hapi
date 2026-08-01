@@ -1,6 +1,5 @@
 import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Session } from './types'
 
 const socketHarness = vi.hoisted(() => ({
     sockets: [] as Array<{
@@ -84,7 +83,10 @@ function createHarnessSocket() {
 }
 
 vi.mock('socket.io-client', () => ({
-    io: (...args: unknown[]) => ioMock(...args)
+    io: (...args: unknown[]) => {
+        ioMock(...args)
+        return createHarnessSocket()
+    }
 }))
 
 vi.mock('axios', () => ({
@@ -97,69 +99,7 @@ vi.mock('axios', () => ({
             && 'isAxiosError' in error
             && error.isAxiosError === true
         )
-=======
-vi.mock('socket.io-client', () => ({
-    io: () => {
-        const state = {
-            connected: false,
-            connectCalls: 0,
-            connectImmediately: true,
-            emitted: [] as Array<{ event: string; args: unknown[] }>,
-            listeners: new Map<string, Array<(...args: any[]) => void>>(),
-            triggerConnect: () => {},
-            triggerConnectError: () => {}
-        }
-        const triggerConnect = () => {
-            state.connected = true
-            for (const listener of state.listeners.get('connect') ?? []) listener()
-        }
-        state.triggerConnect = triggerConnect
-        state.triggerConnectError = () => {
-            for (const listener of state.listeners.get('connect_error') ?? []) {
-                listener(new Error('connect failed'))
-            }
-        }
-        const socket = {
-            get connected() {
-                return state.connected
-            },
-            on: (event: string, listener: (...args: any[]) => void) => {
-                const listeners = state.listeners.get(event) ?? []
-                listeners.push(listener)
-                state.listeners.set(event, listeners)
-                return socket
-            },
-            off: (event: string, listener: (...args: any[]) => void) => {
-                const listeners = state.listeners.get(event) ?? []
-                state.listeners.set(event, listeners.filter((candidate) => candidate !== listener))
-                return socket
-            },
-            emit: (event: string, ...args: unknown[]) => {
-                state.emitted.push({ event, args })
-                return socket
-            },
-            emitWithAck: async () => ({}),
-            timeout: () => ({ emitWithAck: async () => ({}) }),
-            connect: () => {
-                state.connectCalls += 1
-                if (state.connectImmediately) {
-                    triggerConnect()
-                }
-                return socket
-            },
-            disconnect: () => {
-                state.connected = false
-                return socket
-    io: (...args: unknown[]) => {
-        ioMock(...args)
-        const socket = createHarnessSocket()
-        socketHarness.sockets.push(socket)
-        return socket
     }
-}))
-
-vi.mock('axios', () => ({
-    default: axiosHarness
 }))
 
 import { ApiSessionClient, isExternalUserMessage, IncomingMessageFilter } from './apiSession'
@@ -249,15 +189,11 @@ beforeEach(() => {
     ioMock.mockImplementation(() => createHarnessSocket())
 })
 
-    it('reconnects a disconnected active session during final flush', async () => {
-        socketHarness.sockets.length = 0
-        const client = new ApiSessionClient(dummyAuth, createSession({ namespace: 'default' }))
-=======
 describe('ApiSessionClient lazy materialization', () => {
     it('does not connect or materialize without a real user message', async () => {
         socketHarness.sockets.length = 0
         const materialize = vi.fn(async () => createSession())
-        const client = new ApiSessionClient('token', createSession(), { materialize })
+        const client = new ApiSessionClient(dummyAuth, createSession(), { materialize })
 
         client.updateMetadata(() => ({ path: '/tmp/project', host: 'localhost', codexSessionId: 'codex-thread' }))
         client.sendSessionEvent({ type: 'ready' })
@@ -280,7 +216,7 @@ describe('ApiSessionClient lazy materialization', () => {
             agentState: snapshot.agentState,
             agentStateVersion: 1
         }))
-        const client = new ApiSessionClient('token', createSession(), { materialize })
+        const client = new ApiSessionClient(dummyAuth, createSession(), { materialize })
         client.updateMetadata(() => ({ path: '/tmp/project', host: 'localhost', codexSessionId: 'codex-thread' }))
         client.sendSessionEvent({ type: 'ready' })
 
@@ -305,7 +241,7 @@ describe('ApiSessionClient lazy materialization', () => {
         socketHarness.sockets.length = 0
         const pendingMaterialization = deferred<Session>()
         const materialize = vi.fn(async () => await pendingMaterialization.promise)
-        const client = new ApiSessionClient('token', createSession(), { materialize })
+        const client = new ApiSessionClient(dummyAuth, createSession(), { materialize })
 
         client.notifyUserActivity()
         client.sendAgentMessage({ type: 'message', message: 'image response' })
@@ -323,7 +259,7 @@ describe('ApiSessionClient lazy materialization', () => {
     it('preserves all replayed transcript messages while materialization is in flight', async () => {
         socketHarness.sockets.length = 0
         const pendingMaterialization = deferred<Session>()
-        const client = new ApiSessionClient('token', createSession(), {
+        const client = new ApiSessionClient(dummyAuth, createSession(), {
             materialize: async () => await pendingMaterialization.promise
         })
         const expectedMessages: string[] = []
@@ -360,7 +296,7 @@ describe('ApiSessionClient lazy materialization', () => {
     it('drains in-flight materialization and initial socket delivery before closing', async () => {
         socketHarness.sockets.length = 0
         const pendingMaterialization = deferred<Session>()
-        const client = new ApiSessionClient('token', createSession(), {
+        const client = new ApiSessionClient(dummyAuth, createSession(), {
             materialize: async () => await pendingMaterialization.promise
         })
         const socket = socketHarness.sockets[0]
@@ -461,6 +397,7 @@ describe('ApiSessionClient lazy materialization', () => {
 
         expect(socket.emitted.some((entry) => entry.event === 'session-end')).toBe(true)
     })
+})
 
 describe('ApiSessionClient incoming user messages', () => {
     it('ignores CLI-originated transcript messages while advancing the incoming cursor', () => {

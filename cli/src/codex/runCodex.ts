@@ -61,7 +61,7 @@ export async function runCodex(opts: {
             modelReasoningEffort: opts.modelReasoningEffort
         });
     const { api, session, sessionInfo } = bootstrap;
-    const codexSourceSessionId = typeof sessionInfo.metadata?.codexSourceSessionId === 'string'
+    const codexSourceSessionId = typeof sessionInfo?.metadata?.codexSourceSessionId === 'string'
         ? sessionInfo.metadata.codexSourceSessionId
         : undefined;
 
@@ -82,7 +82,7 @@ export async function runCodex(opts: {
     // 需要在首次附着 transcript 时回放已有历史；恢复已有 Hapi 会话时则保持原来的增量模式，避免重复灌入旧消息。
     const replayTranscriptHistoryOnStart = useLazyBootstrap || Boolean(opts.resumeSessionId && !opts.existingSessionId);
 
-    const persistedPermissionMode = sessionInfo.permissionMode ?? sessionInfo.metadata?.preferredPermissionMode;
+    const persistedPermissionMode = sessionInfo?.permissionMode ?? sessionInfo?.metadata?.preferredPermissionMode;
     let currentPermissionMode: PermissionMode = opts.permissionMode
         ?? (persistedPermissionMode && isPermissionModeAllowedForFlavor(persistedPermissionMode, 'codex') ? persistedPermissionMode as PermissionMode : undefined)
         ?? 'default';
