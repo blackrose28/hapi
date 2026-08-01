@@ -485,6 +485,8 @@ export interface ClientToServerEvents {
         effort?: string | null
         collaborationMode?: CodexCollaborationMode
     }) => void
+    /** CLI agent finished session/load (or equivalent) and can accept prompts. */
+    'session-ready': (data: { sid: string; time: number }) => void
     'session-end': (data: { sid: string; time: number; reason?: SessionEndReason }) => void
     /**
      * Per-tool liveness heartbeat, emitted volatile: a heartbeat that could not be

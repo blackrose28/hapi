@@ -14,6 +14,7 @@ export const queryKeys = {
     sessionTeamMembershipsBase: ['session-team-memberships'] as const,
     sessionTeamMemberships: (sessionId: string) => ['session-team-memberships', sessionId] as const,
     machines: ['machines'] as const,
+    sqliteStorage: ['sqlite-storage'] as const,
     machineCodexModels: (machineId: string) => ['machine-codex-models', machineId] as const,
     machineAgentModels: (machineId: string, agent: string, cwd?: string | null) => ['machine-agent-models', machineId, agent, cwd ?? ''] as const,
     gitStatus: (sessionId: string) => ['git-status', sessionId] as const,

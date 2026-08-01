@@ -86,6 +86,7 @@ const en = {
   // Session actions
   'session.action.rename': 'Rename',
   'session.action.archive': 'Archive',
+  'session.action.reopen': 'Reopen',
   'session.action.delete': 'Delete',
   'session.action.copy': 'Copy',
 
@@ -101,6 +102,8 @@ const en = {
   'dialog.archive.terminalCount': 'Running terminals: {n}/{max}',
   'dialog.archive.confirm': 'Archive',
   'dialog.archive.confirming': 'Archiving…',
+  'dialog.reopen.errorTitle': 'Could not reopen session',
+  'dialog.reopen.dismiss': 'Dismiss',
   'dialog.delete.title': 'Delete Session',
   'dialog.delete.description': 'Are you sure you want to delete "{name}"? This action cannot be undone.',
   'dialog.delete.confirm': 'Delete',

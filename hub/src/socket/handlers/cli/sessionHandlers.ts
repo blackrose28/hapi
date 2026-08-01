@@ -31,6 +31,11 @@ type SessionEndPayload = {
     reason?: SessionEndReason
 }
 
+type SessionReadyPayload = {
+    sid: string
+    time: number
+}
+
 type ResolveSessionAccess = (sessionId: string) => AccessResult<StoredSession>
 
 type EmitAccessError = (scope: 'session' | 'machine', id: string, reason: AccessErrorReason) => void
@@ -69,6 +74,7 @@ export type SessionHandlersDeps = {
     resolveSessionAccess: ResolveSessionAccess
     emitAccessError: EmitAccessError
     onSessionAlive?: (payload: SessionAlivePayload) => void
+    onSessionReady?: (payload: SessionReadyPayload) => void
     onSessionEnd?: (payload: SessionEndPayload) => void
     onWebappEvent?: (event: SyncEvent) => void
     onBackgroundTaskDelta?: (sessionId: string, delta: { started: number; completed: number }) => void
@@ -122,7 +128,7 @@ function extractAgentTextMessage(content: unknown): string | null {
 }
 
 export function registerSessionHandlers(socket: CliSocketWithData, deps: SessionHandlersDeps): void {
-    const { store, resolveSessionAccess, emitAccessError, onSessionAlive, onSessionEnd, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage } = deps
+    const { store, resolveSessionAccess, emitAccessError, onSessionAlive, onSessionReady, onSessionEnd, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage } = deps
 
     socket.on('message', (data: unknown) => {
         const parsed = messageSchema.safeParse(data)
@@ -312,7 +318,13 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
                 body: {
                     t: 'update-session' as const,
                     sid,
-                    metadata: { version: result.version, value: metadata },
+                    // Broadcast the persisted (merged) value, not the pre-merge
+                    // payload — otherwise other CLIs in the session room would
+                    // overwrite their local cache with a tokenless metadata
+                    // snapshot even though the DB row was preserved.
+                    // See store.sessions.mergeSessionMetadata for the merge
+                    // contract.
+                    metadata: { version: result.version, value: result.value },
                     agentState: null
                 }
             }
@@ -380,6 +392,18 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
             return
         }
         onSessionAlive?.(data)
+    })
+
+    socket.on('session-ready', (data: SessionReadyPayload) => {
+        if (!data || typeof data.sid !== 'string' || typeof data.time !== 'number') {
+            return
+        }
+        const sessionAccess = resolveSessionAccess(data.sid)
+        if (!sessionAccess.ok) {
+            emitAccessError('session', data.sid, sessionAccess.reason)
+            return
+        }
+        onSessionReady?.(data)
     })
 
     socket.on('tool-progress', (data: unknown) => {

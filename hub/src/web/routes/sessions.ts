@@ -369,6 +369,38 @@ export function createSessionsRoutes(
         return c.json({ ok: true })
     })
 
+    app.post('/sessions/:id/reopen', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'operate'
+        })
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const result = await engine.reopenSession(sessionResult.sessionId, sessionResult.session.namespace)
+        if (result.type === 'incomplete') {
+            return c.json({ error: result.message, missing: result.missing }, 422)
+        }
+        if (result.type === 'error') {
+            const status = result.code === 'session_not_found' ? 404
+                : result.code === 'metadata_conflict' ? 409
+                : result.code === 'no_machine_online' ? 503
+                : 500
+            return c.json({ error: result.message, code: result.code }, status)
+        }
+
+        return c.json({
+            sessionId: result.sessionId,
+            resumed: result.resumed,
+            ...(result.cursorSessionProtocol ? { cursorSessionProtocol: result.cursorSessionProtocol } : {})
+        })
+    })
+
     app.post('/sessions/:id/switch', async (c) => {
         const engine = requireSyncEngine(c, getSyncEngine)
         if (engine instanceof Response) {

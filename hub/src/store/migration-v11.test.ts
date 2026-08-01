@@ -24,6 +24,8 @@ describe('Store V10→V11 migration: terminal snippets', () => {
         const dir = mkdtempSync(join(tmpdir(), 'hapi-migration-v11-'))
         const dbPath = join(dir, 'test.db')
 
+        let store: Store | undefined
+
         try {
             // Start from the complete schema so the downgraded fixture retains
             // every table required by a real V10 HAPI database.
@@ -36,7 +38,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
             expect(getUserVersion(v10Db)).toBe(10)
             v10Db.close()
 
-            const store = new Store(dbPath)
+            store = new Store(dbPath)
             const migratedDb = getDatabase(store)
 
             expect(getUserVersion(migratedDb)).toBe(14)
@@ -58,6 +60,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
             expect(getUserVersion(getDatabase(reopenedStore))).toBe(14)
             expect(reopenedStore.terminalSnippets.list('default')).toEqual([created])
         } finally {
+            store?.close()
             rmSync(dir, { recursive: true, force: true })
         }
     })
@@ -65,6 +68,8 @@ describe('Store V10→V11 migration: terminal snippets', () => {
     it('reopens a valid migrated database and keeps terminal snippets usable', () => {
         const dir = mkdtempSync(join(tmpdir(), 'hapi-reopen-v11-'))
         const dbPath = join(dir, 'test.db')
+
+        let store: Store | undefined
 
         try {
             const firstStore = new Store(dbPath)
@@ -80,6 +85,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
             expect(getUserVersion(getDatabase(reopenedStore))).toBe(14)
             expect(reopenedStore.terminalSnippets.list('default')).toEqual([created])
         } finally {
+            store?.close()
             rmSync(dir, { recursive: true, force: true })
         }
     })

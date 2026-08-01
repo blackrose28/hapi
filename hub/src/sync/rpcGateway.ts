@@ -167,6 +167,27 @@ export type RpcListGrokReasoningEffortOptionsResponse = {
     error?: string
 }
 
+/**
+ * tiann/hapi#916: thrown by {@link RpcGateway.rpcCall} when the target CLI is
+ * unreachable (handler not registered or socket disconnected). Callers can
+ * narrow on this to treat "CLI gone" as a benign condition (e.g. archive
+ * still succeeds at the hub level) without swallowing real RPC errors like
+ * timeouts or protocol failures.
+ */
+export class RpcTargetMissingError extends Error {
+    readonly code: 'handler-not-registered' | 'socket-disconnected'
+    readonly method: string
+
+    constructor(method: string, reason: 'handler-not-registered' | 'socket-disconnected') {
+        super(reason === 'handler-not-registered'
+            ? `RPC handler for ${method} is not registered on the client`
+            : `Client disconnected while executing RPC ${method}`)
+        this.name = 'RpcTargetMissingError'
+        this.code = reason
+        this.method = method
+    }
+}
+
 export class RpcGateway {
     constructor(
         private readonly io: Server,
@@ -615,12 +636,12 @@ export class RpcGateway {
     private async rpcCall(method: string, params: unknown): Promise<unknown> {
         const socketId = this.rpcRegistry.getSocketIdForMethod(method)
         if (!socketId) {
-            throw new Error(`RPC handler not registered: ${method}`)
+            throw new RpcTargetMissingError(method, 'handler-not-registered')
         }
 
         const socket = this.io.of('/cli').sockets.get(socketId)
         if (!socket) {
-            throw new Error(`RPC socket disconnected: ${method}`)
+            throw new RpcTargetMissingError(method, 'socket-disconnected')
         }
 
         const response = await socket.timeout(30_000).emitWithAck('rpc-request', {

@@ -30,6 +30,7 @@ describe('Store V11→V12 Team Chat ownership migration', () => {
             expect((migrated.prepare('PRAGMA table_info(team_chats)').all() as Array<{ name: string }>).some((column) => column.name === 'owner_membership_id')).toBe(true)
             migrated.close()
         } finally {
+            
             rmSync(dir, { recursive: true, force: true })
         }
     })

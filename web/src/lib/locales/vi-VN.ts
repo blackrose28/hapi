@@ -90,6 +90,7 @@ export default {
   'session.action.archive': 'Lưu trữ',
   'session.action.delete': 'Xoá',
   'session.action.copy': 'Sao chép',
+  'session.action.reopen': 'Mở lại',
 
   // Dialogs
   'dialog.rename.title': 'Đổi tên phiên',
@@ -104,6 +105,9 @@ export default {
   'dialog.archive.terminalCount': 'Terminal đang chạy: {n}/{max}',
   'dialog.archive.confirm': 'Lưu trữ',
   'dialog.archive.confirming': 'Đang lưu trữ…',
+
+  'dialog.reopen.errorTitle': 'Không thể mở lại phiên',
+  'dialog.reopen.dismiss': 'Đóng',
 
   'dialog.delete.title': 'Xoá phiên',
   'dialog.delete.description': 'Bạn có chắc muốn xoá "{name}"? Thao tác này không thể hoàn tác.',

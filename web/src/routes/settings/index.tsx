@@ -7,6 +7,11 @@ import { getTerminalFontSizeOptions, useTerminalFontSize, type TerminalFontSize 
 import { useAppearance, getAppearanceOptions, type AppearancePreference } from '@/hooks/useTheme'
 import { PROTOCOL_VERSION } from '@hapi/protocol'
 
+
+
+
+
+
 const locales: { value: Locale; nativeLabel: string }[] = [
     { value: 'en', nativeLabel: 'English' },
     { value: 'zh-CN', nativeLabel: '简体中文' },
@@ -463,6 +468,9 @@ export default function SettingsPage() {
                             )}
                         </div>
                     </div>
+
+                    
+
 
                     {/* About section */}
                     <div className="border-b border-[var(--app-divider)]">

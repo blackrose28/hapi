@@ -57,6 +57,7 @@ describe('Store V12→V13 session machine migration', () => {
             expect((migrated.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
             migrated.close()
         } finally {
+            
             rmSync(dir, { recursive: true, force: true })
         }
     })

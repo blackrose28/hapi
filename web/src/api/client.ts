@@ -1,3 +1,4 @@
+import type { SqliteStorageUsageResponse } from "@hapi/protocol/schemas"
 import type {
     AttachmentMetadata,
     EditorDirectoryResponse,
@@ -42,6 +43,7 @@ import type {
     TeamMentionRequest,
     TeamChatMessage
 } from '@/types/api'
+import type { ReopenSessionResponse } from '@hapi/protocol/schemas'
 import {
     TerminalSnippetResponseSchema,
     TerminalSnippetsResponseSchema,
@@ -61,12 +63,15 @@ type ApiClientOptions = {
 
 type ErrorPayload = {
     error?: unknown
+    code?: unknown
 }
 
 function parseErrorCode(bodyText: string): string | undefined {
     try {
         const parsed = JSON.parse(bodyText) as ErrorPayload
-        return typeof parsed.error === 'string' ? parsed.error : undefined
+        if (typeof parsed.code === 'string') return parsed.code
+        if (typeof parsed.error === 'string') return parsed.error
+        return undefined
     } catch {
         return undefined
     }
@@ -534,6 +539,16 @@ export class ApiClient {
         })
     }
 
+    async reopenSession(sessionId: string): Promise<ReopenSessionResponse> {
+        return await this.request<ReopenSessionResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/reopen`,
+            {
+                method: 'POST',
+                body: JSON.stringify({})
+            }
+        )
+    }
+
     async switchSession(sessionId: string): Promise<void> {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/switch`, {
             method: 'POST',
@@ -976,6 +991,10 @@ export class ApiClient {
             method: 'POST',
             body: JSON.stringify({})
         })
+    }
+
+    async getSqliteStorageUsage(): Promise<SqliteStorageUsageResponse> {
+        return await this.request<SqliteStorageUsageResponse>('/api/storage/sqlite')
     }
 
     async deleteArchivedSessions(): Promise<{ deleted: number }> {

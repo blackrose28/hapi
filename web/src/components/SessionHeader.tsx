@@ -13,7 +13,8 @@ import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionGoalControl } from '@/components/SessionGoalControl'
 import { SessionTaskListControl } from '@/components/SessionTaskListControl'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { formatReopenError } from '@/lib/reopenError'
 import { getSessionModelLabel } from '@/lib/sessionModelLabel'
 import { useTranslation } from '@/lib/use-translation'
 import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
@@ -174,6 +175,7 @@ export function SessionHeader(props: {
     onOpenOutline?: () => void
     api: ApiClient | null
     onSessionDeleted?: () => void
+    onSessionReopened?: (newSessionId: string) => void
     compactMode?: boolean
     pinIndex?: number
     onFocusSession?: () => void
@@ -184,7 +186,7 @@ export function SessionHeader(props: {
 }) {
     const { t } = useTranslation()
     const navigate = useNavigate()
-    const { session, api, onSessionDeleted, compactMode, pinIndex } = props
+    const { session, api, onSessionDeleted, onSessionReopened, compactMode, pinIndex } = props
     const title = useMemo(() => getSessionTitle(session), [session])
     const worktreeBranch = session.metadata?.worktree?.branch
     const modelLabel = getSessionModelLabel(session)
@@ -240,11 +242,12 @@ export function SessionHeader(props: {
         props.onFocusSession?.()
     }, [canFocusSession, props.onFocusSession])
 
-    const { archiveSession, renameSession, deleteSession, isPending } = useSessionActions(
+    const { archiveSession, reopenSession, renameSession, deleteSession, isPending } = useSessionActions(
         api,
         session.id,
         session.metadata?.flavor ?? null
     )
+    const [reopenError, setReopenError] = useState<string | null>(null)
 
     const { machines } = useMachines(api, true)
     const { teamChats } = useTeamChats(api)
@@ -253,6 +256,18 @@ export function SessionHeader(props: {
     const handleDelete = async () => {
         await deleteSession()
         onSessionDeleted?.()
+    }
+
+    const handleReopen = async () => {
+        setReopenError(null)
+        try {
+            const result = await reopenSession()
+            if (result.sessionId && result.sessionId !== session.id) {
+                onSessionReopened?.(result.sessionId)
+            }
+        } catch (error) {
+            setReopenError(formatReopenError(error))
+        }
     }
 
     const handleMenuToggle = () => {
@@ -753,10 +768,24 @@ export function SessionHeader(props: {
                 sessionActive={session.active}
                 onRename={() => setRenameOpen(true)}
                 onArchive={() => setArchiveOpen(true)}
+                onReopen={handleReopen}
                 onDelete={() => setDeleteOpen(true)}
                 anchorPoint={menuAnchorPoint}
                 menuId={menuId}
             />
+
+            {reopenError ? (
+                <ConfirmDialog
+                    isOpen={true}
+                    onClose={() => setReopenError(null)}
+                    title={t('dialog.reopen.errorTitle')}
+                    description={reopenError}
+                    confirmLabel={t('dialog.reopen.dismiss')}
+                    confirmingLabel={t('dialog.reopen.dismiss')}
+                    onConfirm={async () => setReopenError(null)}
+                    isPending={false}
+                />
+            ) : null}
 
             <RenameSessionDialog
                 isOpen={renameOpen}

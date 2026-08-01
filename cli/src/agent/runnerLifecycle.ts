@@ -23,8 +23,9 @@ export type RunnerLifecycle = {
 
 export function createRunnerLifecycle(options: RunnerLifecycleOptions): RunnerLifecycle {
     let exitCode = 0
-    let archiveReason = 'User terminated'
+    let archiveReason = 'Hub restart'
     let sessionEndReason: SessionEndReason = 'terminated'
+    let sessionEndReasonExplicit = false
     let cleanupStarted = false
     let cleanupPromise: Promise<void> | null = null
 
@@ -95,6 +96,10 @@ export function createRunnerLifecycle(options: RunnerLifecycleOptions): RunnerLi
 
     const setSessionEndReason = (reason: SessionEndReason) => {
         sessionEndReason = reason
+        sessionEndReasonExplicit = true
+        if (reason === 'completed' && archiveReason === 'Hub restart') {
+            archiveReason = 'Session completed'
+        }
     }
 
     const markCrash = (error: unknown) => {
@@ -110,6 +115,7 @@ export function createRunnerLifecycle(options: RunnerLifecycleOptions): RunnerLi
         })
 
         process.on('SIGINT', () => {
+            archiveReason = 'User terminated'
             void cleanupAndExit()
         })
 

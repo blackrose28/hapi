@@ -6,6 +6,76 @@ import type { StoredSession, VersionedUpdateResult } from './types'
 import { safeJsonParse } from './json'
 import { updateVersionedField } from './versionedUpdates'
 
+
+// Carry-forward fields that the hub preserves across any metadata
+// replacement when the incoming write omits them.
+const PARSE_IDENTITY_FIELDS = ['path', 'host'] as const
+const ROUTING_FIELDS = ['flavor', 'machineId'] as const
+const SIMPLE_RESUME_TOKENS = [
+    'claudeSessionId',
+    'codexSessionId',
+    'geminiSessionId',
+    'opencodeSessionId',
+    'cursorSessionId',
+    'kimiSessionId'
+] as const
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function carryForwardIfMissing(
+    prior: Record<string, unknown>,
+    next: Record<string, unknown>,
+    merged: Record<string, unknown> | null,
+    fields: ReadonlyArray<string>
+): Record<string, unknown> | null {
+    let result = merged
+    for (const field of fields) {
+        if (next[field] === null) {
+            if (result === null) {
+                result = { ...next }
+            }
+            delete result[field]
+            continue
+        }
+        if (next[field] === undefined && prior[field] !== undefined) {
+            if (result === null) {
+                result = { ...next }
+            }
+            result[field] = prior[field]
+        }
+    }
+    return result
+}
+
+function preserveCursorProtocolPair(
+    prior: Record<string, unknown>,
+    next: Record<string, unknown>,
+    merged: Record<string, unknown> | null
+): Record<string, unknown> | null {
+    if (next.cursorSessionId !== undefined) {
+        return merged
+    }
+    if (next.cursorSessionProtocol === undefined && prior.cursorSessionProtocol !== undefined) {
+        const result = merged ?? { ...next }
+        result.cursorSessionProtocol = prior.cursorSessionProtocol
+        return result
+    }
+    return merged
+}
+
+export function mergeSessionMetadata(prior: unknown, next: unknown): unknown {
+    if (!isPlainObject(prior) || !isPlainObject(next)) {
+        return next
+    }
+    let merged: Record<string, unknown> | null = null
+    merged = carryForwardIfMissing(prior, next, merged, PARSE_IDENTITY_FIELDS)
+    merged = carryForwardIfMissing(prior, next, merged, ROUTING_FIELDS)
+    merged = carryForwardIfMissing(prior, next, merged, SIMPLE_RESUME_TOKENS)
+    merged = preserveCursorProtocolPair(prior, next, merged)
+    return merged ?? next
+}
 type DbSessionRow = {
     id: string
     tag: string | null
@@ -135,33 +205,46 @@ export function updateSessionMetadata(
 ): VersionedUpdateResult<unknown | null> {
     const now = Date.now()
     const touchUpdatedAt = options?.touchUpdatedAt !== false
-    const machineId = getMetadataMachineId(metadata)
 
-    return updateVersionedField({
-        db,
-        table: 'sessions',
-        id,
-        namespace,
-        field: 'metadata',
-        versionField: 'metadata_version',
-        expectedVersion,
-        value: metadata,
-        encode: (value) => {
-            const json = JSON.stringify(value)
-            return json === undefined ? null : json
-        },
-        decode: safeJsonParse,
-        setClauses: [
-            'machine_id = @machine_id',
-            'updated_at = CASE WHEN @touch_updated_at = 1 THEN @updated_at ELSE updated_at END',
-            'seq = seq + 1'
-        ],
-        params: {
-            updated_at: now,
-            machine_id: machineId,
-            touch_updated_at: touchUpdatedAt ? 1 : 0
-        }
-    })
+    try {
+        return db.transaction((): VersionedUpdateResult<unknown | null> => {
+            const priorRow = db.prepare(
+                'SELECT metadata FROM sessions WHERE id = ? AND namespace = ?'
+            ).get(id, namespace) as { metadata: string | null } | undefined
+
+            const prior = priorRow ? safeJsonParse(priorRow.metadata) : null
+            const merged = mergeSessionMetadata(prior, metadata)
+            const machineId = getMetadataMachineId(merged)
+
+            return updateVersionedField({
+                db,
+                table: 'sessions',
+                id,
+                namespace,
+                field: 'metadata',
+                versionField: 'metadata_version',
+                expectedVersion,
+                value: merged,
+                encode: (value) => {
+                    const json = JSON.stringify(value)
+                    return json === undefined ? null : json
+                },
+                decode: safeJsonParse,
+                setClauses: [
+                    'machine_id = @machine_id',
+                    'updated_at = CASE WHEN @touch_updated_at = 1 THEN @updated_at ELSE updated_at END',
+                    'seq = seq + 1'
+                ],
+                params: {
+                    updated_at: now,
+                    machine_id: machineId,
+                    touch_updated_at: touchUpdatedAt ? 1 : 0
+                }
+            })
+        })()
+    } catch {
+        return { result: 'error' }
+    }
 }
 
 export function updateSessionAgentState(

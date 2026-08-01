@@ -8,6 +8,7 @@ import { replaySessionTodos, TodosSchema } from './todos'
 import { extractBackgroundTaskDelta } from './backgroundTasks'
 
 const QUEUED_MESSAGE_THINKING_GRACE_MS = 15_000
+const METADATA_RETRY_ATTEMPTS = 5
 
 export class SessionCache {
     private readonly sessions: Map<string, Session> = new Map()
@@ -148,7 +149,7 @@ export class SessionCache {
             model: stored.model,
             modelReasoningEffort: stored.modelReasoningEffort,
             effort: stored.effort,
-            permissionMode: existing?.permissionMode,
+            permissionMode: existing?.permissionMode ?? metadata?.preferredPermissionMode,
             collaborationMode: existing?.collaborationMode
         }
 
@@ -202,6 +203,7 @@ export class SessionCache {
         }
         if (payload.permissionMode !== undefined) {
             session.permissionMode = payload.permissionMode
+            this.persistPreferredPermissionMode(session, payload.permissionMode)
         }
         if (payload.model !== undefined) {
             if (payload.model !== session.model) {
@@ -426,6 +428,7 @@ export class SessionCache {
 
         if (config.permissionMode !== undefined) {
             session.permissionMode = config.permissionMode
+            this.persistPreferredPermissionMode(session, config.permissionMode)
         }
         if (config.model !== undefined) {
             const modelValue = config.model
@@ -538,31 +541,100 @@ export class SessionCache {
     }
 
     async renameSession(sessionId: string, name: string): Promise<void> {
-        const session = this.sessions.get(sessionId)
-        if (!session) {
-            throw new Error('Session not found')
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.sessions.get(sessionId) ?? this.refreshSession(sessionId)
+            if (!session) {
+                throw new Error('Session not found')
+            }
+
+            const currentMetadata = session.metadata ?? { path: '', host: '' }
+            const newMetadata = { ...currentMetadata, name }
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                newMetadata,
+                session.metadataVersion,
+                session.namespace,
+                { touchUpdatedAt: false }
+            )
+
+            if (result.result === 'error') {
+                throw new Error('Failed to update session metadata')
+            }
+
+            if (result.result === 'success') {
+                this.refreshSession(sessionId)
+                return
+            }
+            
+            // version-mismatch -> refresh and retry
+            this.refreshSession(sessionId)
+        }
+        
+        throw new Error('Session was modified concurrently. Please try again.')
+    }
+
+    /**
+     * tiann/hapi#916: hub-side write of the archive-metadata fields normally
+     * authored by the CLI's `archiveAndClose`. Called by `syncEngine.archiveSession`
+     * when the kill-RPC fails because the CLI is unreachable (e.g. the
+     * hub-restart cascade already killed it). Without this, the route would
+     * either 500 (pre-fix) or silently return ok=true while leaving
+     * `lifecycleState=running` on disk — both confuse the operator.
+     *
+     * Idempotent: if `lifecycleState` is already `archived` we return without
+     * touching the row to avoid resetting `lifecycleStateSince`. Best-effort:
+     * if every retry hits `version-mismatch` (genuine contention) the original
+     * `archiveSession` flow still marks the session inactive in cache via
+     * `handleSessionEnd`, just without flipping the persisted lifecycle.
+     */
+    markSessionArchivedFromHub(sessionId: string, reason: string): void {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.sessions.get(sessionId) ?? this.refreshSession(sessionId)
+            if (!session) return
+            const current = session.metadata
+            if (!current) return
+            if (current.lifecycleState === 'archived') {
+                return
+            }
+
+            const next: Record<string, unknown> = {
+                ...current,
+                lifecycleState: 'archived',
+                lifecycleStateSince: Date.now(),
+                archivedBy: 'hub',
+                archiveReason: reason
+            }
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                next,
+                session.metadataVersion,
+                session.namespace,
+                { touchUpdatedAt: false }
+            )
+
+            if (result.result === 'error') {
+                // tiann/hapi#916 review feedback: persistence failure must
+                // surface so the route returns 5xx. Silently returning here
+                // would let `/archive` claim success while the row stays
+                // unarchived in the DB.
+                throw new Error('Failed to archive session metadata from hub')
+            }
+
+            if (result.result === 'success') {
+                this.refreshSession(sessionId)
+                return
+            }
+
+            this.refreshSession(sessionId)
         }
 
-        const currentMetadata = session.metadata ?? { path: '', host: '' }
-        const newMetadata = { ...currentMetadata, name }
-
-        const result = this.store.sessions.updateSessionMetadata(
-            sessionId,
-            newMetadata,
-            session.metadataVersion,
-            session.namespace,
-            { touchUpdatedAt: false }
-        )
-
-        if (result.result === 'error') {
-            throw new Error('Failed to update session metadata')
-        }
-
-        if (result.result === 'version-mismatch') {
-            throw new Error('Session was modified concurrently. Please try again.')
-        }
-
-        this.refreshSession(sessionId)
+        // tiann/hapi#916 review feedback: exhausted retries means we never
+        // got a successful write. Match the renameSession / mergeSessions
+        // contract and surface this as an error so non-RPC failures stay
+        // 5xx per the issue's acceptance criteria.
+        throw new Error('Session was modified concurrently while archiving from hub')
     }
 
     /** Best-effort: store the last user request text for title fallback. Never throws. */
@@ -586,6 +658,140 @@ export class SessionCache {
         if (result.result === 'success') {
             this.refreshSession(sessionId)
         }
+    }
+
+    /**
+     * Clear archive-related metadata on an archived session so it can be resumed.
+     * - Removes `lifecycleState`, `archivedBy`, `archiveReason`, and stamps
+     *   `lifecycleStateSince` so subsequent CLI lifecycle writes still win on time.
+     * - For Cursor sessions that pre-date #799 (no `cursorSessionProtocol` set, but a
+     *   `cursorSessionId` exists) defaults the protocol to `stream-json` so routing
+     *   reaches the legacy launcher instead of the new ACP path.
+     *
+     * Returns the protocol that was applied (or already present) for cursor sessions,
+     * or `undefined` for other flavors. Throws on version mismatch / store error.
+     * No-op when metadata is null (callers should pre-check).
+     */
+    async clearSessionArchiveMetadata(sessionId: string): Promise<{ cursorSessionProtocol?: 'acp' | 'stream-json' }> {
+        // tiann/hapi#919: retry-with-refresh on version-mismatch. The reopen
+        // flow runs this on every archived-session resume — a stale snapshot
+        // here used to forever-409 the only reopen affordance.
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.sessions.get(sessionId) ?? this.refreshSession(sessionId)
+            if (!session) {
+                throw new Error('Session not found')
+            }
+
+            const currentMetadata = session.metadata
+            if (!currentMetadata) {
+                throw new Error('Session metadata missing')
+            }
+
+            const next: Record<string, unknown> = { ...currentMetadata }
+            delete next.lifecycleState
+            delete next.archivedBy
+            delete next.archiveReason
+            next.lifecycleStateSince = Date.now()
+
+            let cursorSessionProtocol: 'acp' | 'stream-json' | undefined
+            if (currentMetadata.flavor === 'cursor') {
+                const existing = (currentMetadata as any).cursorSessionProtocol
+                if (existing === 'acp' || existing === 'stream-json') {
+                    cursorSessionProtocol = existing
+                } else if (currentMetadata.cursorSessionId) {
+                    // Pre-#799 default: presence of cursorSessionId without protocol means stream-json.
+                    cursorSessionProtocol = 'stream-json'
+                    next.cursorSessionProtocol = 'stream-json'
+                }
+            }
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                next,
+                session.metadataVersion,
+                session.namespace,
+                { touchUpdatedAt: false }
+            )
+
+            if (result.result === 'error') {
+                throw new Error('Failed to update session metadata')
+            }
+
+            if (result.result === 'success') {
+                this.refreshSession(sessionId)
+                return cursorSessionProtocol ? { cursorSessionProtocol } : {}
+            }
+
+            this.refreshSession(sessionId)
+        }
+
+        throw new Error('Session was modified concurrently. Please try again.')
+    }
+
+    /**
+     * Restore archive-related metadata fields that were captured before a reopen attempt.
+     * Used when `resumeSession` fails after `clearSessionArchiveMetadata` already ran so the
+     * session does not drift into a "not archived, not active" zombie state.
+     *
+     * Restores the four archive fields **exactly**: if a field was present in the snapshot
+     * it is written, if it was absent it is deleted (covering the case where
+     * `lifecycleState` was never set on an old session).
+     */
+    async restoreSessionArchiveMetadata(
+        sessionId: string,
+        snapshot: {
+            lifecycleState?: string
+            lifecycleStateSince?: number
+            archivedBy?: string
+            archiveReason?: string
+        }
+    ): Promise<void> {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.sessions.get(sessionId) ?? this.refreshSession(sessionId)
+            if (!session) {
+                throw new Error('Session not found')
+            }
+
+            const currentMetadata = session.metadata
+            if (!currentMetadata) {
+                throw new Error('Session metadata missing')
+            }
+
+            const next: Record<string, unknown> = { ...currentMetadata }
+
+            if (snapshot.lifecycleState !== undefined) next.lifecycleState = snapshot.lifecycleState
+            else delete next.lifecycleState
+
+            if (snapshot.lifecycleStateSince !== undefined) next.lifecycleStateSince = snapshot.lifecycleStateSince
+            else delete next.lifecycleStateSince
+
+            if (snapshot.archivedBy !== undefined) next.archivedBy = snapshot.archivedBy
+            else delete next.archivedBy
+
+            if (snapshot.archiveReason !== undefined) next.archiveReason = snapshot.archiveReason
+            else delete next.archiveReason
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                next,
+                session.metadataVersion,
+                session.namespace,
+                { touchUpdatedAt: false }
+            )
+
+            if (result.result === 'error') {
+                throw new Error('Failed to update session metadata')
+            }
+
+            if (result.result === 'success') {
+                this.refreshSession(sessionId)
+                return
+            }
+
+            this.refreshSession(sessionId)
+        }
+
+        throw new Error('Session was modified concurrently. Please try again.')
     }
 
     async deleteSession(sessionId: string): Promise<void> {
@@ -810,8 +1016,40 @@ export class SessionCache {
             merged.host = oldObj.host
             changed = true
         }
+        if (typeof oldObj.preferredPermissionMode === 'string' && typeof newObj.preferredPermissionMode !== 'string') {
+            merged.preferredPermissionMode = oldObj.preferredPermissionMode
+            changed = true
+        }
 
         return changed ? merged : newMetadata
+    }
+
+    private persistPreferredPermissionMode(session: Session, permissionMode: PermissionMode): void {
+        const currentMetadata = session.metadata
+        if (!currentMetadata || currentMetadata.preferredPermissionMode === permissionMode) {
+            return
+        }
+
+        const nextMetadata = { ...currentMetadata, preferredPermissionMode: permissionMode }
+        const result = this.store.sessions.updateSessionMetadata(
+            session.id,
+            nextMetadata,
+            session.metadataVersion,
+            session.namespace,
+            { touchUpdatedAt: false }
+        )
+
+        if (result.result === 'error') {
+            return
+        }
+
+        const parsed = MetadataSchema.safeParse(result.value)
+        if (!parsed.success) {
+            return
+        }
+
+        session.metadata = parsed.data
+        session.metadataVersion = result.version
     }
 
     private mergeAgentState(oldState: unknown | null, newState: unknown | null): unknown | null {

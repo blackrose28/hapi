@@ -76,6 +76,11 @@ export type ResumeSessionResult =
     | { type: 'success'; sessionId: string }
     | { type: 'error'; message: string; code: 'session_not_found' | 'access_denied' | 'no_machine_online' | 'resume_unavailable' | 'resume_failed' }
 
+export type ReopenSessionResult =
+    | { type: 'success'; sessionId: string; resumed: boolean; cursorSessionProtocol?: 'acp' | 'stream-json' }
+    | { type: 'error'; message: string; code: 'session_not_found' | 'access_denied' | 'no_machine_online' | 'resume_unavailable' | 'resume_failed' | 'metadata_conflict' }
+    | { type: 'incomplete'; message: string; missing: [string, ...string[]] }
+
 type CloseSessionTerminals = (input: { namespace: string; sessionId: string }) => void
 
 const MAX_AUTO_RESUME_ATTEMPTS = 3
@@ -126,6 +131,8 @@ export class SyncEngine {
     private readonly teamChatService: TeamChatService
     private readonly rpcGateway: RpcGateway
     private inactivityTimer: NodeJS.Timeout | null = null
+    /** Sessions that emitted `session-ready` (Cursor ACP load/newSession complete). */
+    private readonly sessionReadyIds = new Set<string>()
     private readonly resumeAttempts = new Map<string, number>()
     private readonly resumingSessionIds = new Set<string>()
     private readonly db: Store;
@@ -384,6 +391,9 @@ export class SyncEngine {
             this.sessionCache.refreshSession(event.sessionId)
             const after = this.sessionCache.getSession(event.sessionId)
             if (after?.metadata && !this.hasSameAgentSessionIds(before?.metadata ?? null, after.metadata)) {
+                if (!this.canRunCursorDedup(after)) {
+                    return
+                }
                 void this.sessionCache.deduplicateByAgentSessionId(event.sessionId).catch(() => {
                     // best-effort: dedup failure is harmless, web-side safety net hides remaining duplicates
                 })
@@ -421,8 +431,17 @@ export class SyncEngine {
         this.resetAutoResumeAttempts(payload.sid)
         this.sessionEndReasons.delete(payload.sid)
     }
+    handleSessionReady(payload: { sid: string; time: number }): void {
+        this.sessionReadyIds.add(payload.sid)
+        this.triggerDedupIfNeeded(payload.sid)
+    }
 
     handleSessionEnd(payload: { sid: string; time: number; reason?: 'completed' | 'terminated' | 'error' }): void {
+        const before = this.sessionCache.getSession(payload.sid)
+        const isCursorAcp = before?.metadata?.flavor === 'cursor'
+            && before.metadata.cursorSessionProtocol === 'acp'
+        const shouldRetryDedup = !isCursorAcp || this.sessionReadyIds.has(payload.sid)
+
         this.sessionCache.handleSessionEnd(payload)
         // Track end reason for auto-resume decisions
         if (payload.reason) {
@@ -437,8 +456,12 @@ export class SyncEngine {
             reason: payload.reason
         })
         // Retry dedup now that this session is inactive — a prior dedup may have
-        // skipped it because it was still active at the time.
-        this.triggerDedupIfNeeded(payload.sid)
+        // skipped it because it was still active at the time. Cursor ACP rows that
+        // never reached session-ready must not dedup-merge the original on failure.
+        if (shouldRetryDedup) {
+            this.triggerDedupIfNeeded(payload.sid)
+        }
+        this.sessionReadyIds.delete(payload.sid)
     }
 
     /**
@@ -688,6 +711,106 @@ export class SyncEngine {
         )
     }
 
+    /**
+     * Revive an archived session so the web UI can reach it again.
+     *
+     * Behaviour:
+     * - Active session: idempotent no-op (`resumed: false`).
+     * - Non-archived inactive session: forwards to `resumeSession` without touching metadata.
+     * - Archived session: validates that the agent has enough metadata to resume (Cursor
+     *   sessions require a `cursorSessionId` once they have any messages), clears the
+     *   archive metadata (`lifecycleState`, `archivedBy`, `archiveReason`), defaults the
+     *   Cursor protocol to `stream-json` for pre-#799 sessions, then forwards to
+     *   `resumeSession`. The CLI's `sessionFactory` will re-stamp `lifecycleState='running'`
+     *   when it boots, so we do not pre-write that here.
+     *
+     * Failure rollback: if `resumeSession` fails (no machine online, spawn timeout, etc.)
+     * the archive snapshot is restored so the operator can retry without losing
+     * `archiveReason`/`archivedBy`/`lifecycleState` and the UI still shows the row as
+     * archived rather than a dangling inactive non-archived ghost.
+     *
+     * Returns `incomplete` (HTTP 422 from the route layer) when the agent metadata
+     * needed to resume is missing.
+     */
+    async reopenSession(sessionId: string, namespace: string): Promise<ReopenSessionResult> {
+        const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
+        if (!access.ok) {
+            return {
+                type: 'error',
+                message: access.reason === 'access-denied' ? 'Session access denied' : 'Session not found',
+                code: access.reason === 'access-denied' ? 'access_denied' : 'session_not_found'
+            }
+        }
+
+        const session = access.session
+        const metadata = session.metadata
+
+        if (session.active) {
+            return { type: 'success', sessionId: access.sessionId, resumed: false }
+        }
+
+        const isArchived = metadata?.lifecycleState === 'archived'
+
+        if (isArchived && metadata) {
+            if (metadata.flavor === 'cursor' && !metadata.cursorSessionId) {
+                const hasMessages = this.db.messages.getMessages(access.sessionId, 1).length > 0
+                if (hasMessages) {
+                    return {
+                        type: 'incomplete',
+                        message: 'Cursor session id is missing from metadata; reopen requires the original cursor chat id',
+                        missing: ['cursorSessionId']
+                    }
+                }
+            }
+
+            const archiveSnapshot = {
+                lifecycleState: metadata.lifecycleState,
+                archivedBy: metadata.archivedBy,
+                archiveReason: metadata.archiveReason,
+                lifecycleStateSince: metadata.lifecycleStateSince
+            }
+
+            let applied: { cursorSessionProtocol?: 'acp' | 'stream-json' }
+            try {
+                applied = await this.sessionCache.clearSessionArchiveMetadata(access.sessionId)
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to clear archive metadata'
+                return { type: 'error', message, code: 'metadata_conflict' }
+            }
+
+            const resumeResult = await this.resumeSession(access.sessionId, namespace)
+            if (resumeResult.type === 'error') {
+                // Resume failed - put the archive flags back so the row stays archived in the UI
+                // and the operator can retry. Best-effort: a concurrent metadata write that
+                // succeeded between clear and restore (e.g. an unrelated rename) wins, in
+                // which case we surface the original resume error rather than masking it.
+                try {
+                    await this.sessionCache.restoreSessionArchiveMetadata(access.sessionId, archiveSnapshot)
+                } catch {
+                    // Swallow restore failures - the resume error is the more important signal.
+                }
+                return resumeResult
+            }
+
+            return {
+                type: 'success',
+                sessionId: resumeResult.sessionId,
+                resumed: true,
+                ...(applied.cursorSessionProtocol ? { cursorSessionProtocol: applied.cursorSessionProtocol } : {})
+            }
+        }
+
+        // Not active and not archived (e.g. brand-new session that has not yet connected,
+        // or one that ended without writing archive metadata). Forward to resume so the
+        // operator still gets one-click revival.
+        const resumeResult = await this.resumeSession(access.sessionId, namespace)
+        if (resumeResult.type === 'error') {
+            return resumeResult
+        }
+
+        return { type: 'success', sessionId: resumeResult.sessionId, resumed: true }
+    }
+
     async resumeSession(sessionId: string, namespace: string, opts?: { permissionMode?: PermissionMode }): Promise<ResumeSessionResult> {
         const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
         if (!access.ok) {
@@ -759,7 +882,9 @@ export class SyncEngine {
               })()
             : undefined
 
-        const effectivePermissionMode = opts?.permissionMode ?? session.permissionMode ?? undefined
+        const preferredPermissionMode = opts?.permissionMode
+            ?? session.permissionMode
+            ?? session.metadata?.preferredPermissionMode
         const spawnResult = await this.rpcGateway.spawnSession(
             targetMachine.id,
             metadata.path,
@@ -771,7 +896,7 @@ export class SyncEngine {
             undefined,
             resumeToken,
             session.effort ?? undefined,
-            effectivePermissionMode,
+            preferredPermissionMode,
             recoveryContext
         )
 
@@ -782,6 +907,22 @@ export class SyncEngine {
         const becameActive = await this.waitForSessionActive(spawnResult.sessionId)
         if (!becameActive) {
             return { type: 'error', message: 'Session failed to become active', code: 'resume_failed' }
+        }
+
+        // permissionMode is passed to spawnSession above; do not call set-session-config here.
+        // session-alive can arrive before the CLI registers that RPC handler, which caused resume_failed.
+
+        const needsReadyBeforeMerge = spawnResult.sessionId !== access.sessionId
+            && flavor === 'cursor'
+            && metadata.cursorSessionProtocol === 'acp'
+        if (needsReadyBeforeMerge) {
+            const readyResult = await this.waitForSessionReady(spawnResult.sessionId)
+            if (readyResult !== 'ready') {
+                const message = readyResult === 'ended'
+                    ? 'Session ended before Cursor ACP load completed'
+                    : 'Session failed to become ready'
+                return { type: 'error', message, code: 'resume_failed' }
+            }
         }
 
         if (spawnResult.sessionId !== access.sessionId) {
@@ -814,14 +955,41 @@ export class SyncEngine {
             && (prev?.cursorSessionId ?? null) === (next.cursorSessionId ?? null)
             && (prev?.piSessionId ?? null) === (next.piSessionId ?? null)
     }
+    private canRunCursorDedup(session: Session): boolean {
+        if (session.metadata?.flavor !== 'cursor') {
+            return true
+        }
+        if (session.metadata?.cursorSessionProtocol !== 'acp') {
+            return true
+        }
+        return this.sessionReadyIds.has(session.id)
+    }
 
     private triggerDedupIfNeeded(sessionId: string): void {
         const session = this.sessionCache.getSession(sessionId)
         if (session?.metadata) {
+            if (!this.canRunCursorDedup(session)) {
+                return
+            }
             void this.sessionCache.deduplicateByAgentSessionId(sessionId).catch(() => {
                 // best-effort: web-side safety net hides remaining duplicates
             })
         }
+    }
+
+    async waitForSessionReady(sessionId: string, timeoutMs: number = 60_000): Promise<'ready' | 'ended' | 'timeout'> {
+        const start = Date.now()
+        while (Date.now() - start < timeoutMs) {
+            if (this.sessionReadyIds.has(sessionId)) {
+                return 'ready'
+            }
+            const session = this.getSession(sessionId)
+            if (!session?.active) {
+                return 'ended'
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250))
+        }
+        return 'timeout'
     }
 
     async waitForSessionActive(sessionId: string, timeoutMs: number = 15_000): Promise<boolean> {

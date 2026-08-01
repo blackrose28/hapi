@@ -76,6 +76,7 @@ export const MetadataSchema = z.object({
     opencodeSessionId: z.string().optional(),
     grokSessionId: z.string().optional(),
     cursorSessionId: z.string().optional(),
+    cursorSessionProtocol: z.enum(['acp', 'stream-json']).optional(),
     kimiSessionId: z.string().optional(),
     piSessionId: z.string().optional(),
     tools: z.array(z.string()).optional(),
@@ -91,6 +92,7 @@ export const MetadataSchema = z.object({
     lifecycleStateSince: z.number().optional(),
     archivedBy: z.string().optional(),
     archiveReason: z.string().optional(),
+    preferredPermissionMode: PermissionModeSchema.optional(),
     flavor: z.string().nullish(),
     worktree: WorktreeMetadataSchema.optional(),
     lastUserRequest: z.string().optional(),
@@ -793,8 +795,22 @@ export type MessagesResponse = {
     }
 }
 
+export type ReopenSessionResponse = {
+    sessionId: string
+    resumed: boolean
+    cursorSessionProtocol?: 'acp' | 'stream-json'
+}
+
 export type MachinesResponse = { machines: Machine[] }
 
 export type SpawnResponse =
     | { type: 'success'; sessionId: string }
     | { type: 'error'; message: string }
+
+export type SqliteStorageUsageResponse = {
+    path: string
+    databaseBytes: number
+    walBytes: number
+    shmBytes: number
+    totalBytes: number
+}
