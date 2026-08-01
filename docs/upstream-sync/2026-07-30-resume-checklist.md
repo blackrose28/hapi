@@ -99,7 +99,7 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `pi-agent-integration` (5 commits)
 
 ### Batch 5: Codex
-- [ ] `codex-subagent-goal` (8 commits)
+- [x] `codex-subagent-goal` (8 commits)
 - [ ] `codex-session-import-resume` (8 commits) — `apiTypes→schemas.ts` fold
 - [ ] `codex-transcript-sync` (6 commits) — `apiTypes→schemas.ts` fold
 - [ ] `codex-fast-tier-ui` (6 commits) — `apiTypes→schemas.ts` fold
