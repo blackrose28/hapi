@@ -798,7 +798,7 @@ export class SyncEngine {
 
     private resolveFlavor(session: Session): AgentFlavor {
         const flavor = session.metadata?.flavor
-        return flavor === 'codex' || flavor === 'gemini' || flavor === 'opencode' || flavor === 'cursor'
+        return flavor === 'codex' || flavor === 'gemini' || flavor === 'opencode' || flavor === 'cursor' || flavor === 'pi' || flavor === 'grok'
             ? flavor
             : 'claude'
     }
@@ -814,6 +814,8 @@ export class SyncEngine {
         if (flavor === 'gemini') return metadata.geminiSessionId ?? null
         if (flavor === 'opencode') return metadata.opencodeSessionId ?? null
         if (flavor === 'cursor') return metadata.cursorSessionId ?? null
+        if (flavor === 'pi') return metadata.piSessionId ?? null
+        if (flavor === 'grok') return metadata.grokSessionId ?? null
 
         return metadata.claudeSessionId ?? this.recoverClaudeSessionIdFromMessages(session.id, namespace)
     }

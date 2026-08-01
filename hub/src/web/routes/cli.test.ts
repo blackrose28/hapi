@@ -11,6 +11,12 @@ const dummyAuthenticator = {
             runnerId: 'runner-1',
             machineId: 'machine-1'
         }
+    }),
+    authenticateAny: () => ({
+        id: 'runner-1',
+        organizationId: 'org-1',
+        runnerId: 'runner-1',
+        machineId: 'machine-1'
     })
 } as any
 

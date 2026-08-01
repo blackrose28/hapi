@@ -774,18 +774,48 @@ export function createSessionsRoutes(
             return sessionResult
         }
 
-        // Get agent type from session metadata, default to 'claude'
-        const agent = sessionResult.session.metadata?.flavor ?? 'claude'
+        const session = sessionResult.session
+        const agent = session.metadata?.flavor ?? 'claude'
+        const rawMetaCommands = session.metadata?.slashCommands
+        const metadataCommands = Array.isArray(rawMetaCommands)
+            ? rawMetaCommands.map((cmd) => typeof cmd === 'string' ? { name: cmd, source: 'builtin' as const } : cmd)
+            : []
+
+        let rpcCommands: Array<{ name: string; description?: string; source: 'builtin' | 'user' | 'plugin' | 'project'; content?: string }> = []
+        let rpcSuccess = false
 
         try {
             const result = await engine.listSlashCommands(sessionResult.sessionId, agent)
-            return c.json(result)
-        } catch (error) {
+            if (result.success && Array.isArray(result.commands)) {
+                rpcCommands = result.commands
+                rpcSuccess = true
+            }
+        } catch {
+            // RPC failed — fall back to metadata slash commands
+        }
+
+        if (!rpcSuccess) {
             return c.json({
-                success: false,
-                error: error instanceof Error ? error.message : 'Failed to list slash commands'
+                success: true,
+                commands: metadataCommands
             })
         }
+
+        // Merge RPC and metadata commands without duplicates (metadata commands first)
+        const seenNames = new Set(rpcCommands.map((cmd) => cmd.name))
+        const mergedCommands = [...rpcCommands]
+        for (let i = metadataCommands.length - 1; i >= 0; i--) {
+            const metaCmd = metadataCommands[i]
+            if (!seenNames.has(metaCmd.name)) {
+                seenNames.add(metaCmd.name)
+                mergedCommands.unshift(metaCmd)
+            }
+        }
+
+        return c.json({
+            success: true,
+            commands: mergedCommands
+        })
     })
 
     app.get('/sessions/:id/skills', async (c) => {

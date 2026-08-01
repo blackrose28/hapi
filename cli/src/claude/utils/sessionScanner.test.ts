@@ -145,7 +145,6 @@ describe('sessionScanner', () => {
       expect(content).toContain('readme.md')
     }
   })
-  })
 
   it('reads only new bytes on a subsequent scan (incremental, no reparse of prior region)', async () => {
     const filePath = join(testDir, 'incremental.jsonl')

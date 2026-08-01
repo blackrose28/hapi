@@ -132,7 +132,6 @@ describe('claudeLocalLauncher message filtering', () => {
         expect(sentMessages).toHaveLength(0)
         expect(getMetadata().summary?.text).toBe('Existing title')
     })
-    })
 
     it('filters out invisible system messages', async () => {
         const { session, sentMessages } = createSessionStub()

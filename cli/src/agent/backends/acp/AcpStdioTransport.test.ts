@@ -67,7 +67,8 @@ describe('AcpStdioTransport', () => {
             args: ['-c', 'exit 0']
         });
 
-        await sleep(50);
+        spawnState.exitHandlers.forEach((handler) => handler(0, null));
+        spawnState.closeHandlers.forEach((handler) => handler(0, null));
 
         const result = await Promise.race([
             transport.sendRequest('session/prompt', {}, { timeoutMs: Infinity })

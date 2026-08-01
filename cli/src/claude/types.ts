@@ -19,7 +19,8 @@ const RawMessageSchema = z.object({
   role: z.string().optional(),
   content: z.unknown(),
   usage: UsageSchema.optional(),
-});
+  model: z.string().optional(),
+}).passthrough();
 
 const RawJSONLinesBaseSchema = z.object({
   uuid: z.string().optional(),
@@ -81,7 +82,8 @@ export const RawJSONLinesSchema = z.discriminatedUnion("type", [
     maxRetries: z.number().optional(),
     error: z.unknown().optional(),
     durationMs: z.number().optional(),
-  }),
+    messageId: z.string().optional(),
+  }).passthrough(),
 ]);
 
 export type RawJSONLines = z.infer<typeof RawJSONLinesSchema>;

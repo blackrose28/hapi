@@ -1423,7 +1423,6 @@ describe('session model', () => {
                 message: 'Resume session ID unavailable. Start a new session in this directory, or retry after the agent has initialized.',
                 code: 'resume_unavailable'
             })
->>>>>>> c58e8cea (fix(cursor): persist resume id early and return 409 for resume_unavailable (#745))
         } finally {
             engine.stop()
         }

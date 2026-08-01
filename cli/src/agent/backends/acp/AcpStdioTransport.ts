@@ -122,7 +122,7 @@ export class AcpStdioTransport {
             }
         });
 
-        this.process.stdin.on('error', (error) => {
+        this.process.stdin?.on?.('error', (error) => {
             const terminalError = new Error(`ACP stdin error: ${error.message}`, { cause: error });
             this.terminalError = terminalError;
             this.rejectAllPending(terminalError);

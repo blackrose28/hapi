@@ -26,7 +26,6 @@ import { join } from 'path';
 import { buildMachineMetadata } from '@/agent/sessionFactory';
 import { resolveWorkspaceRoot } from '@/utils/workspaceRoot';
 import { hashRunnerExtraHeaders } from './runnerIdentity';
-import { scheduleCursorModelsPrewarm } from '@/modules/common/cursorModelsPrewarm';
 
 export async function startRunner(options: { workspaceRoot?: string; profile?:string } = {}): Promise<void> {
   if(!options.profile)throw new Error('Runner profile is required')
@@ -819,7 +818,6 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
 
     // Connect to server
     apiMachine.connect();
-    scheduleCursorModelsPrewarm();
 
     // Visible startup banner. Use console.log so it always appears on stdout,
     // regardless of the verbose/quiet logger setting.

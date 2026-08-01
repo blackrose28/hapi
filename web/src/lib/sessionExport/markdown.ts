@@ -78,6 +78,8 @@ function formatAgentContentBlock(block: NormalizedAgentContent): string | null {
             return `> Summary: ${block.summary}`
         case 'sidechain':
             return null
+        case 'generated-image':
+            return `![${block.fileName ?? 'image'}](image://${block.imageId})`
         default: {
             const _exhaustive: never = block
             return safeStringify(_exhaustive)

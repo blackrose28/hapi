@@ -85,6 +85,14 @@ export type NormalizedAgentContent =
     | ToolResult
     | { type: 'summary'; summary: string }
     | { type: 'sidechain'; uuid: string; parentUUID: string | null; prompt: string }
+    | {
+        type: 'generated-image'
+        imageId: string
+        fileName?: string | null
+        mimeType?: string | null
+        uuid: string
+        parentUUID: string | null
+    }
 
 export type NormalizedMessage = ({
     role: 'user'

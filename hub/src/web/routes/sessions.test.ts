@@ -1349,6 +1349,4 @@ describe('sessions routes', () => {
             ]
         })
     })
-
->>>>>>> c58e8cea (fix(cursor): persist resume id early and return 409 for resume_unavailable (#745))
 })
