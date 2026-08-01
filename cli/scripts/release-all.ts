@@ -42,8 +42,6 @@ function run(cmd: string, cwd = projectRoot): void {
     }
 }
 
-<<<<<<< HEAD
-=======
 function updateBuildInfoVersion(nextVersion: string): void {
     const content = readFileSync(buildInfoPath, 'utf-8');
     const updated = content.replace(
@@ -90,8 +88,6 @@ async function waitForPlatformPackages(platforms: string[], expectedVersion: str
         await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
 }
-
->>>>>>> 909aaca0 (fix(cli): gate main package release on platform packages being live (#1187))
 async function runWithTimeoutRetry(cmd: string, cwd = projectRoot): Promise<void> {
     const timeoutCmd = `timeout 60s ${cmd}`;
     while (true) {

@@ -700,7 +700,6 @@ const en = {
   'misc.percentLeft': '{percent}% left',
   'misc.online': 'online',
 
-<<<<<<< HEAD
   // Dashboard (Mission Control)
   'dashboard.loading': 'Loading session…',
   'dashboard.loadingSessions': 'Loading sessions…',

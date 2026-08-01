@@ -52,7 +52,6 @@ export class MessageStore {
     getMessages(sessionId: string, limit: number = 200, beforeSeq?: number): StoredMessage[] {
         return getMessages(this.db, sessionId, limit, beforeSeq)
     }
-    }
 
     getFirstMessages(sessionId: string, limit: number = 50): StoredMessage[] {
         return getFirstMessages(this.db, sessionId, limit)

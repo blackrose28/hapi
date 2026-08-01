@@ -131,7 +131,6 @@ function SyncIcon(props: { className?: string }) {
     )
 }
 
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
 function TrashIcon(props: { className?: string }) {
     return (
         <svg

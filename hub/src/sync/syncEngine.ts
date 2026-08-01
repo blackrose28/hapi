@@ -1515,7 +1515,7 @@ export class SyncEngine {
             session.effort ?? undefined,
             preferredPermissionMode,
             recoveryContext,
-            session.serviceTier ?? undefined,
+            undefined,
             existingSessionId
         )
 
@@ -2040,14 +2040,14 @@ export class SyncEngine {
 
     resetAutoResumeAttempts(sessionId: string): void {
         this.resumeAttempts.delete(sessionId)
-=======
+    }
+
     async listCodexSessionsForMachine(machineId: string, cwd?: string | null, sessionIds?: string[]) {
         return await this.rpcGateway.listCodexSessionsForMachine(machineId, cwd, sessionIds)
     }
 
     async archiveCodexSessionForMachine(machineId: string, sessionId: string): Promise<RpcArchiveCodexSessionResponse> {
         return await this.rpcGateway.archiveCodexSessionForMachine(machineId, sessionId)
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
     }
 
     async listCursorModelsForSession(sessionId: string): Promise<RpcListCursorModelsResponse> {

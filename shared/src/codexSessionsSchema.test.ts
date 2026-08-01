@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { ListCodexSessionsRpcResponseSchema } from './schemas'
 
 describe('ListCodexSessionsRpcResponseSchema', () => {
@@ -25,7 +25,8 @@ describe('ListCodexSessionsRpcResponseSchema', () => {
 
         expect(parsed.success).toBe(true)
         if (parsed.success) {
-            expect(parsed.sessions[0]?.messages).toHaveLength(1)
+            const firstSession = parsed.sessions[0]
+            expect(firstSession && 'messages' in firstSession ? firstSession.messages : null).toHaveLength(1)
         }
     })
 })

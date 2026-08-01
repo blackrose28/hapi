@@ -704,7 +704,6 @@ export default {
   'misc.percentLeft': '剩余 {percent}%',
   'misc.online': '在线',
 
-<<<<<<< HEAD
   // Dashboard (Mission Control)
   'dashboard.loading': '加载会话…',
   'dashboard.loadingSessions': '加载会话…',

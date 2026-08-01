@@ -152,7 +152,6 @@ export function CodexSessionSyncDialog(props: {
     }, [defaultWorkdirFilter, workdirFilter, workdirOptions])
 
     useEffect(() => {
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
         if (!isOpen || isLoading || hasInitializedSelection) return
 
         // 中文注释：弹窗打开后等本地 Codex 会话列表加载完成，再尝试默认勾选当前 Hapi 会话关联的 Codex thread，避免异步加载时默认值丢失。

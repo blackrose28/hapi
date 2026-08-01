@@ -18,7 +18,9 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatReopenError } from '@/lib/reopenError'
 import { getSessionModelLabel } from '@/lib/sessionModelLabel'
 import { useTranslation } from '@/lib/use-translation'
-<<<<<<< HEAD
+import { useToast } from '@/lib/toast-context'
+import { queryKeys } from '@/lib/query-keys'
+import { markCodexSessionsImported } from '@/lib/codexImportedSessions'
 import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
 
 function getSessionTitle(session: Session): string {
@@ -42,13 +44,7 @@ function normalizeTeamAlias(alias: string): string {
 function isDesktopFocusViewport(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
     return !window.matchMedia('(max-width: 768px)').matches
-import { AgentFlavorIcon } from '@/components/AgentFlavorIcon'
-import { isFastServiceTier } from '@/components/AssistantChat/codexFastMode'
-import { getSessionTitle } from '@/lib/sessionTitle'
-import { useToast } from '@/lib/toast-context'
-import { queryKeys } from '@/lib/query-keys'
-import { getArchiveSessionDescription } from '@/lib/archiveConfirmation'
-import { markCodexSessionsImported } from '@/lib/codexImportedSessions'
+}
 
 function FilesIcon(props: { className?: string }) {
     return (
@@ -193,6 +189,7 @@ export function SessionHeader(props: {
     onGoalCommand?: (command: string) => void
 }) {
     const { t } = useTranslation()
+    const { addToast } = useToast()
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const { session, api, onSessionDeleted, onSessionReopened, compactMode, pinIndex } = props
@@ -221,9 +218,14 @@ export function SessionHeader(props: {
     const [teamMenuOpen, setTeamMenuOpen] = useState(false)
     const [addingTeamChatId, setAddingTeamChatId] = useState<string | null>(null)
     const [teamAlias, setTeamAlias] = useState(title)
+    const [desktopFocusEnabled, setDesktopFocusEnabled] = useState(() => isDesktopFocusViewport())
+    const normalizedTeamAlias = normalizeTeamAlias(teamAlias)
+    const teamAliasError = !normalizedTeamAlias
+        ? 'Alias is required.'
         : normalizedTeamAlias.length > 32
             ? 'Alias must be 32 characters or fewer.'
             : null
+    const [isSyncingCodex, setIsSyncingCodex] = useState(false)
 
     useEffect(() => {
         setTeamAlias(title.length > 32 ? title.slice(0, 32).trim() : title)
@@ -250,9 +252,6 @@ export function SessionHeader(props: {
         if (target?.closest('button,a,input,select,textarea,[role="button"],[data-focus-ignore="true"]')) return
         props.onFocusSession?.()
     }, [canFocusSession, props.onFocusSession])
-=======
-    const [isSyncingCodex, setIsSyncingCodex] = useState(false)
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
 
     const { archiveSession, reopenSession, renameSession, deleteSession, isPending } = useSessionActions(
         api,

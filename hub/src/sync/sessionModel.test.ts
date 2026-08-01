@@ -1757,6 +1757,7 @@ describe('session model', () => {
                 _resumeSessionId?: string,
                 _effort?: string,
                 _permissionMode?: string,
+                _recoveryContext?: string,
                 _serviceTier?: string,
                 existingSessionId?: string
             ) => {
@@ -1835,6 +1836,7 @@ describe('session model', () => {
                 _resumeSessionId?: string,
                 _effort?: string,
                 _permissionMode?: string,
+                _recoveryContext?: string,
                 _serviceTier?: string,
                 existingSessionId?: string
             ) => {

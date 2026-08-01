@@ -258,9 +258,3 @@ export interface ExperimentalFeatureEnablementSetResponse {
     enablement: Record<string, boolean>;
     [key: string]: unknown;
 }
-
-export interface CollaborationModeListResponse {
-    data?: Array<{ name?: string; mode?: string; [key: string]: unknown }>;
-    modes?: Array<{ name?: string; mode?: string; [key: string]: unknown }>;
-    [key: string]: unknown;
-}

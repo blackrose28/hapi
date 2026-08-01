@@ -4,7 +4,6 @@ import {
     type AgentModelCatalogResult,
     RPC_METHODS,
     ArchiveCodexSessionRpcResponseSchema,
-    CursorChatStoreStatusSchema,
     ListCodexSessionsRpcResponseSchema
 } from '@hapi/protocol'
 import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/types'
@@ -199,28 +198,8 @@ export class RpcTargetMissingError extends Error {
     }
 }
 
-<<<<<<< HEAD
-=======
-export type RpcCommandResponse = CommandResponse
-export type RpcReadFileResponse = FileReadResponse
-export type RpcGeneratedImageResponse = GeneratedImageResponse
-export type RpcUploadFileResponse = UploadFileResponse
-export type RpcDeleteUploadResponse = DeleteUploadResponse
-export type RpcDirectoryEntry = DirectoryEntry
-export type RpcListDirectoryResponse = ListDirectoryResponse
-export type RpcPathExistsResponse = PathExistsResponse
-export type RpcCodexModel = CodexModelSummary
-export type RpcListCodexModelsResponse = CodexModelsResponse
 export type RpcListCodexSessionsResponse = ListCodexSessionsRpcResponse
 export type RpcArchiveCodexSessionResponse = ArchiveCodexSessionRpcResponse
-export type RpcCursorModel = CursorModelSummary
-export type RpcListCursorModelsResponse = CursorModelsResponse
-export type RpcCursorChatStoreStatus = CursorChatStoreStatus
-export type RpcOpencodeModel = OpencodeModelSummary
-export type RpcListOpencodeModelsResponse = OpencodeModelsResponse
-export type RpcListGrokModelsResponse = GrokModelsResponse
-export type RpcListGrokReasoningEffortOptionsResponse = GrokReasoningEffortResponse
-export type RpcListOpencodeReasoningEffortOptionsResponse = OpencodeReasoningEffortResponse
 
 export class RpcGateway {
     constructor(
@@ -635,12 +614,12 @@ export class RpcGateway {
     }
 
     async listCodexSessionsForMachine(machineId: string, cwd?: string | null, sessionIds?: string[]): Promise<RpcListCodexSessionsResponse> {
-        const result = await this.machineRpc(machineId, RPC_METHODS.ListCodexSessions, { cwd: cwd ?? null, sessionIds }, MODEL_LIST_RPC_TIMEOUT_MS)
+        const result = await this.machineRpc(machineId, RPC_METHODS.ListCodexSessions, { cwd: cwd ?? null, sessionIds })
         return ListCodexSessionsRpcResponseSchema.parse(result)
     }
 
     async archiveCodexSessionForMachine(machineId: string, sessionId: string): Promise<RpcArchiveCodexSessionResponse> {
-        const result = await this.machineRpc(machineId, RPC_METHODS.ArchiveCodexSession, { sessionId }, MODEL_LIST_RPC_TIMEOUT_MS)
+        const result = await this.machineRpc(machineId, RPC_METHODS.ArchiveCodexSession, { sessionId })
         return ArchiveCodexSessionRpcResponseSchema.parse(result)
     }
 

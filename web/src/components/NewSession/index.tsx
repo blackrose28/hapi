@@ -526,7 +526,6 @@ export function NewSession(props: {
     const handleMachineChange = useCallback((newMachineId: string) => {
         setMachineId(newMachineId)
         setModel('auto')
-        setCursorSelectedBase('auto')
         setSelectedCodexImportSessionId(null)
         setCodexImportSessions([])
         setCodexImportMachineId(null)
@@ -538,65 +537,14 @@ export function NewSession(props: {
         }
     }, [getRecentPaths])
 
-    const handleCursorBaseChange = useCallback((baseKey: string) => {
-        if (baseKey === 'auto') {
-            pendingCursorBaseRef.current = null
-            setCursorSelectedBase('auto')
-            setModel('auto')
-            return
-        }
-        setCursorSelectedBase(baseKey)
-        if (cursorModelsState.isLoading || cursorPicker.catalog.variantsByBase.size === 0) {
-            pendingCursorBaseRef.current = baseKey
-            return
-        }
-        pendingCursorBaseRef.current = null
-        setModel(resolveWireIdForBaseChange(baseKey, cursorPicker.catalog, model) ?? 'auto')
-    }, [cursorModelsState.isLoading, cursorPicker.catalog, model])
-
-    const handleCursorEffortChange = useCallback((wireId: string) => {
-        if (wireId === 'auto') {
-            setModel('auto')
-            return
-        }
-        const baseKey = cursorSelectedBase !== 'auto'
-            ? cursorSelectedBase
-            : cursorPicker.baseKey
-        if (baseKey && !isCursorEffortWireAllowed(wireId, cursorPicker.catalog, baseKey)) {
-            return
-        }
-        setModel(wireId)
-    }, [cursorPicker.catalog, cursorPicker.baseKey, cursorSelectedBase])
-
     const handleChooseFolderClick = useCallback(() => {
         if (!props.onChooseFolder) {
             return
         }
-        saveNewSessionFormDraft({
-            agent,
-            model,
-            cursorSelectedBase,
-            machineId,
-            effort,
-            modelReasoningEffort,
-            yoloMode,
-            grokPermissionMode,
-            sessionType,
-            worktreeName
-        })
         props.onChooseFolder({ machineId, directory: trimmedDirectory })
     }, [
         props.onChooseFolder,
-        agent,
-        model,
-        cursorSelectedBase,
         machineId,
-        effort,
-        modelReasoningEffort,
-        yoloMode,
-        grokPermissionMode,
-        sessionType,
-        worktreeName,
         trimmedDirectory
     ])
 
@@ -719,7 +667,6 @@ export function NewSession(props: {
                     )
                     haptic.notification('success')
                     markCodexSessionsImported([selectedCodexImportSession.id])
-                    clearNewSessionFormDraft()
                     setLastUsedMachineId(machineId)
                     addRecentPath(machineId, trimmedDirectory)
                     props.onSuccess(resumedSessionId)
@@ -731,7 +678,6 @@ export function NewSession(props: {
                 return
             }
 
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
             const result = await spawnSession({
                 machineId,
                 directory: trimmedDirectory,

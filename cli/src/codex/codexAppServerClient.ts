@@ -1,8 +1,8 @@
-import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { logger } from '@/ui/logger';
 import { killProcessByChildProcess } from '@/utils/process';
+import { JsonLineParser } from '@/utils/jsonLineParser';
 import type {
     InitializeParams,
     InitializeResponse,
@@ -152,10 +152,8 @@ function resolveCodexAppServerCommand(): string {
 }
 
 export class CodexAppServerClient extends JsonLineParser {
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
     private process: ChildProcessWithoutNullStreams | null = null;
     private connected = false;
-    private buffer = '';
     private nextId = 1;
     private readonly pending = new Map<number, PendingRequest>();
     private readonly requestHandlers = new Map<string, RequestHandler>();
@@ -394,7 +392,7 @@ export class CodexAppServerClient extends JsonLineParser {
                     clearTimeout(timeout);
                 }
                 if (options?.signal) {
-                    options.signal.removeEventListener(RPC_METHODS.Abort, onAbort);
+                    options.signal.removeEventListener('abort', onAbort);
                 }
             };
 
@@ -411,7 +409,7 @@ export class CodexAppServerClient extends JsonLineParser {
                     onAbort();
                     return;
                 }
-                options.signal.addEventListener(RPC_METHODS.Abort, onAbort, { once: true });
+                options.signal.addEventListener('abort', onAbort, { once: true });
             }
 
             if (Number.isFinite(timeoutMs)) {
@@ -447,22 +445,10 @@ export class CodexAppServerClient extends JsonLineParser {
     }
 
     private handleStdout(chunk: string): void {
-        this.buffer += chunk;
-        let newlineIndex = this.buffer.indexOf('\n');
-
-        while (newlineIndex >= 0) {
-            const line = this.buffer.slice(0, newlineIndex).trim();
-            this.buffer = this.buffer.slice(newlineIndex + 1);
-
-            if (line.length > 0) {
-                this.handleLine(line);
-            }
-
-            newlineIndex = this.buffer.indexOf('\n');
-        }
+        this.feed(chunk);
     }
 
-    private handleLine(line: string): void {
+    protected handleLine(line: string): void {
         if (this.protocolError) {
             return;
         }
@@ -574,7 +560,7 @@ export class CodexAppServerClient extends JsonLineParser {
     }
 
     private resetParserState(): void {
-        this.buffer = '';
+        this.reset();
         this.protocolError = null;
     }
 

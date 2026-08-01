@@ -120,6 +120,23 @@ describe('SessionActionMenu', () => {
     })
 })
 
+function renderMenu(props: Partial<Parameters<typeof SessionActionMenu>[0]> = {}) {
+    return render(
+        <SessionActionMenu
+            isOpen={true}
+            onClose={vi.fn()}
+            sessionActive={false}
+            onRename={vi.fn()}
+            onExport={vi.fn()}
+            onArchive={vi.fn()}
+            onReopen={vi.fn()}
+            onDelete={vi.fn()}
+            anchorPoint={{ x: 0, y: 0 }}
+            {...props}
+        />
+    )
+}
+
 describe('SessionActionMenu - Codex sync action', () => {
     it('renders Sync from Codex only when a handler is provided', () => {
         const { rerender } = renderMenu({ onSyncCodex: undefined })
@@ -127,20 +144,18 @@ describe('SessionActionMenu - Codex sync action', () => {
         expect(screen.queryByRole('menuitem', { name: /Sync from Codex/ })).toBeNull()
 
         rerender(
-            <I18nProvider>
-                <SessionActionMenu
-                    isOpen={true}
-                    onClose={vi.fn()}
-                    sessionActive={false}
-                    onRename={vi.fn()}
-                    onExport={vi.fn()}
-                    onSyncCodex={vi.fn()}
-                    onArchive={vi.fn()}
-                    onReopen={vi.fn()}
-                    onDelete={vi.fn()}
-                    anchorPoint={{ x: 0, y: 0 }}
-                />
-            </I18nProvider>
+            <SessionActionMenu
+                isOpen={true}
+                onClose={vi.fn()}
+                sessionActive={false}
+                onRename={vi.fn()}
+                onExport={vi.fn()}
+                onSyncCodex={vi.fn()}
+                onArchive={vi.fn()}
+                onReopen={vi.fn()}
+                onDelete={vi.fn()}
+                anchorPoint={{ x: 0, y: 0 }}
+            />
         )
 
         expect(screen.getByRole('menuitem', { name: /Sync from Codex/ })).toBeInTheDocument()

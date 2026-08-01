@@ -7,10 +7,13 @@ import { join } from 'node:path'
 const mocks = vi.hoisted(() => ({
     ioMock: vi.fn(),
     listOpencodeModelsForCwdMock: vi.fn(),
-    listGrokModelsForCwdMock: vi.fn()
+    listGrokModelsForCwdMock: vi.fn(),
+    inspectCursorChatStoreMock: vi.fn()
 }))
 
-const { ioMock, listOpencodeModelsForCwdMock, listGrokModelsForCwdMock } = mocks
+const { ioMock, listOpencodeModelsForCwdMock, listGrokModelsForCwdMock, inspectCursorChatStoreMock } = mocks
+
+const AUTH_RUNNER = { kind: 'runner', credential: { credentialId: 'cred', secret: 'x'.repeat(32) }, machineId: 'machine' } as const
 
 vi.mock('socket.io-client', () => ({
     io: mocks.ioMock
@@ -26,6 +29,10 @@ vi.mock('../modules/common/opencodeModels', () => ({
 
 vi.mock('../modules/common/grokModels', () => ({
     listGrokModelsForCwd: mocks.listGrokModelsForCwdMock
+}))
+
+vi.mock('../modules/cursor/cursorChatStore', () => ({
+    inspectCursorChatStore: mocks.inspectCursorChatStoreMock
 }))
 
 import { ApiMachineClient } from './apiMachine'
@@ -139,7 +146,7 @@ describe('ApiMachineClient cursor-chat-store-status handler', () => {
 
     it('inspects stores under the recorded session owner home', async () => {
         const machine = makeMachine('cursor-store-machine')
-        const client = new ApiMachineClient('cli-token', machine)
+        const client = new ApiMachineClient(AUTH_RUNNER, machine)
 
         try {
             await callCursorChatStoreStatus(client, machine.id, {
@@ -160,7 +167,7 @@ describe('ApiMachineClient cursor-chat-store-status handler', () => {
 
     it('falls back to the CLI process home for old or whitespace-only homeDir metadata', async () => {
         const machine = makeMachine('cursor-store-fallback-machine')
-        const client = new ApiMachineClient('cli-token', machine)
+        const client = new ApiMachineClient(AUTH_RUNNER, machine)
 
         try {
             await callCursorChatStoreStatus(client, machine.id, {
@@ -329,21 +336,6 @@ describe('ApiMachineClient listGrokModelsForCwd handler', () => {
     })
 })
 
-<<<<<<< HEAD
-describe('ApiMachineClient terminal legacy boundary', () => {
-    let workspaceRoot: string
-    let socket: FakeSocket
-    let terminalSpies: {
-        create: ReturnType<typeof vi.spyOn>
-        write: ReturnType<typeof vi.spyOn>
-        resize: ReturnType<typeof vi.spyOn>
-        close: ReturnType<typeof vi.spyOn>
-        detach: ReturnType<typeof vi.spyOn>
-        getHistory: ReturnType<typeof vi.spyOn>
-        closeAll: ReturnType<typeof vi.spyOn>
-    }
-
-=======
 describe('ApiMachineClient Codex transcript handlers', () => {
     const originalCodexHome = process.env.CODEX_HOME
     let workspaceRoot: string
@@ -378,7 +370,7 @@ describe('ApiMachineClient Codex transcript handlers', () => {
         }, 'outside prompt')
 
         const machine = makeMachine('codex-machine-1')
-        const client = new ApiMachineClient('cli-token', machine, [workspaceRoot])
+        const client = new ApiMachineClient(AUTH_RUNNER, machine, [workspaceRoot])
 
         try {
             const result = await callListCodexSessions(client, machine.id, {})
@@ -402,7 +394,7 @@ describe('ApiMachineClient Codex transcript handlers', () => {
         }, 'outside prompt')
 
         const machine = makeMachine('codex-machine-2')
-        const client = new ApiMachineClient('cli-token', machine, [workspaceRoot])
+        const client = new ApiMachineClient(AUTH_RUNNER, machine, [workspaceRoot])
 
         try {
             const result = await callListCodexSessions(client, machine.id, {
@@ -425,7 +417,7 @@ describe('ApiMachineClient Codex transcript handlers', () => {
         }, 'outside prompt')
 
         const machine = makeMachine('codex-machine-3')
-        const client = new ApiMachineClient('cli-token', machine, [workspaceRoot])
+        const client = new ApiMachineClient(AUTH_RUNNER, machine, [workspaceRoot])
 
         try {
             const result = await callArchiveCodexSession(client, machine.id, 'outside-session-id')
@@ -438,8 +430,18 @@ describe('ApiMachineClient Codex transcript handlers', () => {
     })
 })
 
-describe('ApiMachineClient keepAlive lifecycle', () => {
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
+describe('ApiMachineClient terminal legacy boundary', () => {
+    let workspaceRoot: string
+    let socket: FakeSocket
+    let terminalSpies: {
+        create: ReturnType<typeof vi.spyOn>
+        write: ReturnType<typeof vi.spyOn>
+        resize: ReturnType<typeof vi.spyOn>
+        close: ReturnType<typeof vi.spyOn>
+        detach: ReturnType<typeof vi.spyOn>
+        getHistory: ReturnType<typeof vi.spyOn>
+        closeAll: ReturnType<typeof vi.spyOn>
+    }
     beforeEach(() => {
         ioMock.mockReset()
         listOpencodeModelsForCwdMock.mockReset()

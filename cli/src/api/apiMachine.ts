@@ -1,4 +1,3 @@
-import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 /**
  * WebSocket client for machine/runner communication with hapi-hub
  */
@@ -21,14 +20,12 @@ import {
     TerminalWritePayloadSchema,
     ArchiveCodexSessionRpcRequestSchema,
     ListCodexSessionsRpcRequestSchema,
+    RPC_METHODS,
     type ArchiveCodexSessionRpcResponse,
     type ListCodexSessionsRpcResponse,
     type MachineDirectoryEntry,
-    type MachineListDirectoryResponse,
-    type PathExistsResponse
-} from '@hapi/protocol/apiTypes'
-import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
->>>>>>> 64834467 (feat(codex): import and resume sessions from runners (#1088))
+    type MachineListDirectoryResponse
+} from '@hapi/protocol'
 import type { RunnerState, Machine, MachineMetadata } from './types'
 import { RunnerStateSchema, MachineMetadataSchema } from './types'
 import { backoff } from '@/utils/time'
@@ -90,26 +87,32 @@ export class ApiMachineClient {
     private rpcHandlerManager: RpcHandlerManager
     private readonly terminalManager: TerminalManager
 
-    private readonly normalizedWorkspaceRoot: string | undefined
+    private readonly workspaceRoots: string[]
+    private readonly normalizedWorkspaceRoots: string[]
+
+    get normalizedWorkspaceRoot(): string | undefined {
+        return this.normalizedWorkspaceRoots[0]
+    }
+
+    get workspaceRoot(): string | undefined {
+        return this.workspaceRoots[0]
+    }
 
     constructor(
         private readonly authentication: ApiAuthentication,
         private readonly machine: Machine,
-        private readonly workspaceRoot?: string
+        workspaceRoots?: string | string[]
     ) {
-        // realpath the root once so all subsequent comparisons are against
-        // the canonical, symlink-resolved path. Falls back to a lexical
-        // resolve if realpath fails (e.g. unusual permission setup) so we
-        // still get *some* protection rather than skipping the check.
-        if (workspaceRoot) {
+        this.workspaceRoots = typeof workspaceRoots === 'string'
+            ? [workspaceRoots]
+            : (workspaceRoots ?? [])
+        this.normalizedWorkspaceRoots = this.workspaceRoots.map((root) => {
             try {
-                this.normalizedWorkspaceRoot = realpathSync(workspaceRoot)
+                return realpathSync(root)
             } catch {
-                this.normalizedWorkspaceRoot = resolvePath(workspaceRoot)
+                return resolvePath(root)
             }
-        } else {
-            this.normalizedWorkspaceRoot = undefined
-        }
+        })
 
         this.rpcHandlerManager = new RpcHandlerManager({
             scopePrefix: this.machine.id,
@@ -302,17 +305,23 @@ export class ApiMachineClient {
     }
 
     private async isCodexSessionWithinWorkspaceRoots(session: { cwd?: string | null }): Promise<boolean> {
-        if (!this.normalizedWorkspaceRoots?.length) return true
+        if (!this.normalizedWorkspaceRoots.length) return true
         const cwd = session.cwd?.trim()
         if (!cwd) return false
         const resolvedCwd = await this.resolveForWorkspaceCheck(cwd)
         return this.isWithinWorkspaceRoots(resolvedCwd)
     }
 
+    private isWithinWorkspaceRoots(absolutePath: string): boolean {
+        if (!this.normalizedWorkspaceRoots.length) return true
+        return this.normalizedWorkspaceRoots.some((root) => {
+            const rel = relative(root, absolutePath)
+            return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+        })
+    }
+
     private isWithinWorkspaceRoot(absolutePath: string): boolean {
-        if (!this.normalizedWorkspaceRoot) return true
-        const rel = relative(this.normalizedWorkspaceRoot, absolutePath)
-        return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+        return this.isWithinWorkspaceRoots(absolutePath)
     }
 
     /**

@@ -1,4 +1,3 @@
-import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { spawnWithTerminalGuardMock } = vi.hoisted(() => ({
@@ -130,7 +129,7 @@ describe('codexLocal', () => {
         await codexLocal({
             abort: controller.signal,
             sessionId: null,
-            path: workspacePath,
+            path: 'C:\\workspace\\project',
             onSessionFound: vi.fn(),
             codexArgs: ['--yolo', 'resume', '--last']
         });
@@ -148,7 +147,7 @@ describe('codexLocal', () => {
         await codexLocal({
             abort: controller.signal,
             sessionId,
-            path: workspacePath,
+            path: 'C:\\workspace\\project',
             onSessionFound: vi.fn(),
             codexArgs: [
                 '--ask-for-approval', 'never',

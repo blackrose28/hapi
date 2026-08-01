@@ -1901,14 +1901,14 @@ function importSingleCodexSession(options: {
         const appendedMessages = messagesToAppend.map((message) => options.store.messages.addMessage(sessionId!, message))
 
         // 中文注释：更新 Hapi 会话的 updatedAt，并在已有会话追加时广播新增消息，让当前打开的聊天页立刻显示客户端新增内容。
-        const latestMessageCreatedAt = appendedMessages[appendedMessages.length - 1]?.createdAt ?? Date.now()
+        const latestMessageCreatedAt = appendedMessages[appendedMessages.length - 1]?.message.createdAt ?? Date.now()
         if (engine) {
             engine.recordSessionActivity(sessionId, latestMessageCreatedAt)
         } else {
             options.store.sessions.touchSessionUpdatedAt(sessionId, latestMessageCreatedAt, options.namespace)
         }
         if (!created) {
-            emitImportedMessageEvents(engine, sessionId, appendedMessages)
+            emitImportedMessageEvents(engine, sessionId, appendedMessages.map((res) => res.message))
         }
 
         const output = [
