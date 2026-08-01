@@ -26,7 +26,7 @@ describe('Store V11→V12 Team Chat ownership migration', () => {
             expect(store.teamChats.getTeamChat('org-1', 'legacy')?.ownerMembershipId).toBeNull()
 
             const migrated = new Database(path)
-            expect((migrated.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+            expect((migrated.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
             expect((migrated.prepare('PRAGMA table_info(team_chats)').all() as Array<{ name: string }>).some((column) => column.name === 'owner_membership_id')).toBe(true)
             migrated.close()
         } finally {

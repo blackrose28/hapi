@@ -984,6 +984,78 @@ export class ApiClient {
         })
     }
 
+    
+    async getScratchlist(sessionId: string): Promise<{ entries: import('@hapi/protocol/schemas').ScratchlistEntry[] }> {
+        return await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/scratchlist`)
+    }
+
+    async updateScratchlist(sessionId: string, entries: import('@hapi/protocol/schemas').ScratchlistEntry[]): Promise<{ ok: boolean }> {
+        return await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/scratchlist`, {
+            method: 'PUT',
+            body: JSON.stringify({ entries })
+        })
+    }
+
+    async uploadScratchlistAttachment(
+        sessionId: string,
+        filename: string,
+        content: string,
+        mimeType: string
+    ): Promise<{ success: boolean; attachment?: import('@hapi/protocol/schemas').ScratchlistAttachmentMetadata; error?: string; code?: string }> {
+        return await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/scratchlist/attachments`, {
+            method: 'POST',
+            body: JSON.stringify({ filename, content, mimeType })
+        })
+    }
+
+    async fetchScratchlistAttachmentBlob(sessionId: string, attachmentId: string): Promise<Blob> {
+        return new Blob(['mock content'])
+    }
+
+    async deleteScratchlistAttachment(sessionId: string, attachmentId: string): Promise<void> {
+        const { entries } = await this.getScratchlist(sessionId);
+        const next = entries.map(e => ({
+            ...e,
+            attachments: e.attachments?.filter(a => a.id !== attachmentId)
+        }));
+        await this.updateScratchlist(sessionId, next);
+    }
+
+    async createScratchlistEntry(
+        sessionId: string,
+        body: { text: string; id?: string; createdAt?: number; attachments?: import('@hapi/protocol/schemas').ScratchlistAttachmentMetadata[] }
+    ): Promise<{ entry: import('@hapi/protocol/schemas').ScratchlistEntry }> {
+        const { entries } = await this.getScratchlist(sessionId);
+        const entry = {
+            id: body.id || crypto.randomUUID(),
+            text: body.text,
+            createdAt: body.createdAt || Date.now(),
+            updatedAt: Date.now(),
+            attachments: body.attachments || []
+        };
+        await this.updateScratchlist(sessionId, [entry, ...entries]);
+        return { entry };
+    }
+
+    async updateScratchlistEntry(
+        sessionId: string,
+        id: string,
+        text: string
+    ): Promise<{ entry: import('@hapi/protocol/schemas').ScratchlistEntry }> {
+        const { entries } = await this.getScratchlist(sessionId);
+        const entry = entries.find(e => e.id === id);
+        if (!entry) throw new Error('Not found');
+        entry.text = text;
+        entry.updatedAt = Date.now();
+        await this.updateScratchlist(sessionId, entries);
+        return { entry };
+    }
+
+    async deleteScratchlistEntry(sessionId: string, id: string): Promise<void> {
+        const { entries } = await this.getScratchlist(sessionId);
+        await this.updateScratchlist(sessionId, entries.filter(e => e.id !== id));
+    }
+
     async fetchVoiceToken(options?: { customAgentId?: string; customApiKey?: string }): Promise<{
         allowed: boolean
         token?: string

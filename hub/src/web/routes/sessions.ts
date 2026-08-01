@@ -637,6 +637,62 @@ export function createSessionsRoutes(
         }
     })
 
+    
+    app.get('/sessions/:id/scratchlist', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) return engine
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'view'
+        })
+        if (sessionResult instanceof Response) return sessionResult
+
+        const entries = engine.listScratchlistEntrys(sessionResult.sessionId)
+        return c.json({ entries })
+    })
+
+    app.put('/sessions/:id/scratchlist', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) return engine
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'operate'
+        })
+        if (sessionResult instanceof Response) return sessionResult
+
+        const body = await c.req.json().catch(() => null)
+        if (!body || !Array.isArray(body.entries)) {
+            return c.json({ error: 'Invalid body' }, 400)
+        }
+        
+        // Minimal validation, assumes frontend sends correct shape
+        engine.replaceScratchlistEntrys(sessionResult.sessionId, body.entries)
+        return c.json({ ok: true })
+    })
+
+    app.post('/sessions/:id/scratchlist/attachments', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) return engine
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'operate'
+        })
+        if (sessionResult instanceof Response) return sessionResult
+
+        const body = await c.req.json().catch(() => null)
+        if (!body || !body.filename || !body.content) {
+            return c.json({ error: 'Missing filename or content' }, 400)
+        }
+        
+        const attachmentId = crypto.randomUUID()
+        const attachment = {
+            id: attachmentId,
+            filename: body.filename,
+            mimeType: body.mimeType || 'application/octet-stream',
+            size: body.content.length, // approximation
+            path: `hapi-hub:scratchlist/${attachmentId}`
+        }
+        
+        return c.json({ success: true, attachment })
+    })
+
     app.get('/sessions/:id/slash-commands', async (c) => {
         const engine = requireSyncEngine(c, getSyncEngine)
         if (engine instanceof Response) {

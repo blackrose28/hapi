@@ -731,6 +731,13 @@ export class SessionCache {
                 namespace
             )
         }
+        const scratchlistTransfer = this.store.scratchlist.transfer(oldSessionId, newSessionId)
+        if (scratchlistTransfer.moved > 0 || scratchlistTransfer.collided > 0) {
+            this.store.sessions.touchSessionUpdatedAt(newSessionId, Date.now(), namespace)
+            const patch = { scratchlistUpdatedAt: Date.now() }
+            this.publisher.emit({ type: 'session-updated', sessionId: newSessionId, data: patch, namespace })
+        }
+
 
         if (options.deleteOldSession) {
             const deleted = this.store.sessions.deleteSession(oldSessionId, namespace)

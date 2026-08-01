@@ -191,7 +191,7 @@ export const TeamStateSchema = z.object({
     members: z.array(TeamMemberSchema).optional(),
     tasks: z.array(TeamTaskSchema).optional(),
     messages: z.array(TeamMessageSchema).optional(),
-    updatedAt: z.number().optional()
+    updatedAt: z.number()
 })
 
 export type TeamState = z.infer<typeof TeamStateSchema>
@@ -367,6 +367,7 @@ export const SessionSchema = z.object({
     thinking: z.boolean(),
     thinkingAt: z.number(),
     backgroundTaskCount: z.number().optional(),
+    scratchlistUpdatedAt: z.number().optional(),
     todos: TodosSchema.optional(),
     teamState: TeamStateSchema.optional(),
     model: z.string().nullable().optional().default(null),
@@ -490,3 +491,40 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
 ])
 
 export type SyncEvent = z.infer<typeof SyncEventSchema>
+
+
+export const ScratchlistAttachmentMetadataSchema = z.object({
+    id: z.string(),
+    filename: z.string(),
+    mimeType: z.string(),
+    size: z.number(),
+    path: z.string(),
+});
+export type ScratchlistAttachmentMetadata = z.infer<typeof ScratchlistAttachmentMetadataSchema>;
+
+export const ScratchlistEntrySchema = z.object({
+    id: z.string().min(1),
+    text: z.string(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    attachments: z.array(ScratchlistAttachmentMetadataSchema).optional()
+});
+export type ScratchlistEntry = z.infer<typeof ScratchlistEntrySchema>;
+
+export const GetScratchlistResponseSchema = z.object({
+    entries: z.array(ScratchlistEntrySchema)
+});
+export type GetScratchlistResponse = z.infer<typeof GetScratchlistResponseSchema>;
+
+export const UpdateScratchlistRequestSchema = z.object({
+    entries: z.array(ScratchlistEntrySchema)
+});
+export type UpdateScratchlistRequest = z.infer<typeof UpdateScratchlistRequestSchema>;
+
+export const UploadScratchlistAttachmentResponseSchema = z.object({
+    success: z.boolean(),
+    attachment: ScratchlistAttachmentMetadataSchema.optional(),
+    error: z.string().optional(),
+    code: z.string().optional()
+});
+export type UploadScratchlistAttachmentResponse = z.infer<typeof UploadScratchlistAttachmentResponseSchema>;

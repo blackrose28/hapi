@@ -10,3 +10,5 @@ export * from './terminalSnippets'
 export * from './utils'
 export * from './version'
 export type * from './types'
+
+export * from './scratchlistAttachments'

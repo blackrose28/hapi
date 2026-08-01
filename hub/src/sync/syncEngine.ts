@@ -96,6 +96,29 @@ function isUpstreamApiCorruptionError(error: string): boolean {
 }
 
 export class SyncEngine {
+    listScratchlistEntrys(sessionId: string): import('@hapi/protocol/schemas').ScratchlistEntry[] {
+        return this.db.scratchlist.list(sessionId)
+    }
+
+    replaceScratchlistEntrys(sessionId: string, items: import('@hapi/protocol/schemas').ScratchlistEntry[]): void {
+        this.db.scratchlist.replace(sessionId, items)
+        
+        const ns = this.db.sessions.getSession(sessionId)?.namespace
+        if (ns) this.eventPublisher.emit({ type: 'session-updated', sessionId, data: { scratchlistUpdatedAt: Date.now() }, namespace: ns })
+
+    }
+    
+    deleteScratchlistAttachmentById(sessionId: string, attachmentId: string): boolean {
+        const deleted = this.db.scratchlist.deleteAttachment(sessionId, attachmentId)
+        if (deleted) {
+            
+        const ns = this.db.sessions.getSession(sessionId)?.namespace
+        if (ns) this.eventPublisher.emit({ type: 'session-updated', sessionId, data: { scratchlistUpdatedAt: Date.now() }, namespace: ns })
+
+        }
+        return deleted
+    }
+
     private readonly eventPublisher: EventPublisher
     private readonly sessionCache: SessionCache
     private readonly machineCache: MachineCache
@@ -105,6 +128,7 @@ export class SyncEngine {
     private inactivityTimer: NodeJS.Timeout | null = null
     private readonly resumeAttempts = new Map<string, number>()
     private readonly resumingSessionIds = new Set<string>()
+    private readonly db: Store;
     private readonly sessionEndReasons = new Map<string, 'completed' | 'terminated' | 'error' | 'timeout'>()
 
     constructor(
@@ -114,6 +138,7 @@ export class SyncEngine {
         sseManager: SSEManager,
         private readonly closeSessionTerminals?: CloseSessionTerminals
     ) {
+        this.db = store;
         this.eventPublisher = new EventPublisher(sseManager, (event) => this.resolveNamespace(event))
         this.sessionCache = new SessionCache(store, this.eventPublisher)
         this.machineCache = new MachineCache(store, this.eventPublisher)

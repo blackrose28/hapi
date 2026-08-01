@@ -135,3 +135,12 @@ export type VersionedUpdateResult<T> =
     | { result: 'success'; version: number; value: T }
     | { result: 'version-mismatch'; version: number; value: T }
     | { result: 'error' }
+
+export type DbScratchlistRow = {
+    session_id: string
+    id: string
+    text: string
+    created_at: number
+    updated_at: number
+    attachments: string | null
+}

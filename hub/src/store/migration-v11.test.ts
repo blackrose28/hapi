@@ -17,7 +17,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
         expect(getSchemaObject(db, 'index', TERMINAL_SNIPPET_INDEX)?.sql).toContain(
             'namespace, created_at DESC, id DESC'
         )
-        expect(getUserVersion(db)).toBe(13)
+        expect(getUserVersion(db)).toBe(14)
     })
 
     it('migrates a real on-disk user_version 10 database forward', () => {
@@ -39,7 +39,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
             const store = new Store(dbPath)
             const migratedDb = getDatabase(store)
 
-            expect(getUserVersion(migratedDb)).toBe(13)
+            expect(getUserVersion(migratedDb)).toBe(14)
             expect(getSchemaObject(migratedDb, 'table', 'terminal_snippets')).not.toBeNull()
             expect(getSchemaObject(migratedDb, 'index', TERMINAL_SNIPPET_INDEX)).not.toBeNull()
 
@@ -55,7 +55,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
             // Reopening exercises the required-table guard, which a fake
             // one-table fixture would fail even if the migration itself passed.
             const reopenedStore = new Store(dbPath)
-            expect(getUserVersion(getDatabase(reopenedStore))).toBe(13)
+            expect(getUserVersion(getDatabase(reopenedStore))).toBe(14)
             expect(reopenedStore.terminalSnippets.list('default')).toEqual([created])
         } finally {
             rmSync(dir, { recursive: true, force: true })
@@ -77,7 +77,7 @@ describe('Store V10→V11 migration: terminal snippets', () => {
             })
 
             const reopenedStore = new Store(dbPath)
-            expect(getUserVersion(getDatabase(reopenedStore))).toBe(13)
+            expect(getUserVersion(getDatabase(reopenedStore))).toBe(14)
             expect(reopenedStore.terminalSnippets.list('default')).toEqual([created])
         } finally {
             rmSync(dir, { recursive: true, force: true })

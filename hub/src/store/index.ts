@@ -9,6 +9,7 @@ import { SessionStore } from './sessionStore'
 import { TeamChatStore } from './teamChatStore'
 import { TerminalSnippetStore } from './terminalSnippetStore'
 import { UserStore } from './userStore'
+import { ScratchlistStore } from './scratchlistStore'
 
 export type {
     StoredMachine,
@@ -30,8 +31,9 @@ export { SessionStore } from './sessionStore'
 export { TeamChatStore } from './teamChatStore'
 export { TerminalSnippetStore } from './terminalSnippetStore'
 export { UserStore } from './userStore'
+export { ScratchlistStore } from './scratchlistStore'
 
-const SCHEMA_VERSION: number = 13
+const SCHEMA_VERSION: number = 14
 const REQUIRED_TABLES = [
     'sessions',
     'machines',
@@ -42,6 +44,7 @@ const REQUIRED_TABLES = [
     'team_participants',
     'team_messages',
     'team_mention_requests',
+    'scratchlist_items',
     'terminal_snippets'
 ] as const
 
@@ -53,6 +56,7 @@ export class Store {
     readonly machines: MachineStore
     readonly messages: MessageStore
     readonly users: UserStore
+    readonly scratchlist: ScratchlistStore
     readonly push: PushStore
     readonly teamChats: TeamChatStore
     readonly terminalSnippets: TerminalSnippetStore
@@ -96,6 +100,7 @@ export class Store {
         this.machines = new MachineStore(this.db)
         this.messages = new MessageStore(this.db)
         this.users = new UserStore(this.db)
+        this.scratchlist = new ScratchlistStore(this.db)
         this.push = new PushStore(this.db)
         this.teamChats = new TeamChatStore(this.db)
         this.terminalSnippets = new TerminalSnippetStore(this.db)
@@ -120,6 +125,7 @@ export class Store {
             10: () => this.migrateFromV10ToV11(),
             11: () => this.migrateFromV11ToV12(),
             12: () => this.migrateFromV12ToV13(),
+            13: () => this.migrateFromV13ToV14(),
         })
 
         if (currentVersion === 0) {
@@ -306,6 +312,16 @@ export class Store {
             CREATE INDEX IF NOT EXISTS idx_team_messages_chat_seq
                 ON team_messages(team_chat_id, seq DESC);
 
+            CREATE TABLE IF NOT EXISTS scratchlist_items (
+                session_id TEXT NOT NULL,
+                id TEXT NOT NULL,
+                text TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                attachments TEXT,
+                PRIMARY KEY (session_id, id),
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            );
             CREATE TABLE IF NOT EXISTS team_mention_requests (
                 id TEXT PRIMARY KEY,
                 namespace TEXT NOT NULL,
@@ -522,6 +538,21 @@ export class Store {
                 ELSE NULL
             END
             WHERE machine_id IS NULL
+        `)
+    }
+
+    private migrateFromV13ToV14(): void {
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS scratchlist_items (
+                session_id TEXT NOT NULL,
+                id TEXT NOT NULL,
+                text TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                attachments TEXT,
+                PRIMARY KEY (session_id, id),
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            )
         `)
     }
 
