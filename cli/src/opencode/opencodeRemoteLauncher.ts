@@ -32,12 +32,18 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
     private currentBackendModel: string | null = null;
     private defaultBackendModel: string | null = null;
     private currentBackendEffort: string | null = null;
+    private defaultBackendEffort: string | null = null;
     private setModelSupported: boolean | undefined = undefined;
+    private options: { recoveryContext?: string; onReasoningEffortRollback?: (effort: string | null) => void };
 
-    constructor(session: OpencodeSession, recoveryContext?: string) {
+    constructor(
+        session: OpencodeSession,
+        options?: string | { recoveryContext?: string; onReasoningEffortRollback?: (effort: string | null) => void }
+    ) {
         super(process.env.DEBUG ? session.logPath : undefined);
         this.session = session;
-        this.recoveryContext = recoveryContext ?? null;
+        this.options = typeof options === 'string' ? { recoveryContext: options } : (options ?? {});
+        this.recoveryContext = this.options.recoveryContext ?? null;
     }
 
     public async launch(): Promise<RemoteLauncherExitReason> {
@@ -249,8 +255,11 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
                         logger.warn('[opencode-remote] Inline effort switch failed', error);
                         session.sendSessionEvent({
                             type: 'message',
-                            message: `Failed to switch effort to ${requestedEffort ?? 'default'}. Continuing with ${this.currentBackendEffort ?? '(default)'}.`
+                            message: `Failed to switch reasoning effort to ${requestedEffort ?? 'default'}. Continuing with ${this.currentBackendEffort ?? '(default)'}.`
                         });
+                        session.setModelReasoningEffort(this.currentBackendEffort);
+                        session.pushKeepAlive();
+                        this.options.onReasoningEffortRollback?.(this.currentBackendEffort);
                         batch.mode.modelReasoningEffort = this.currentBackendEffort;
                     }
                 }
@@ -410,8 +419,8 @@ function toAcpMcpServers(config: Record<string, { command: string; args: string[
 
 export async function opencodeRemoteLauncher(
     session: OpencodeSession,
-    recoveryContext?: string
+    options?: string | { recoveryContext?: string; onReasoningEffortRollback?: (effort: string | null) => void }
 ): Promise<'switch' | 'exit'> {
-    const launcher = new OpencodeRemoteLauncher(session, recoveryContext);
+    const launcher = new OpencodeRemoteLauncher(session, options);
     return launcher.launch();
 }

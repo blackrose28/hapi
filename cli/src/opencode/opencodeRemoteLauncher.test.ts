@@ -7,8 +7,10 @@ const harness = {
     setModelArgs: [] as Array<{ sessionId: string; modelId: string; flavor?: string }>,
     setConfigOptionArgs: [] as Array<{ sessionId: string; configId: string; value: string; flavor?: string }>,
     promptCount: 0,
+    promptContents: [] as unknown[],
     events: [] as string[],
     setModelImpl: null as null | ((sessionId: string, modelId: string) => Promise<void>),
+    setConfigOptionImpl: null as null | ((sessionId: string, configId: string, value: string) => Promise<void>),
     onAvailableCommandsHandler: null as null | ((commands: Array<{ name: string; description?: string }>) => void),
     onAvailableCommandsCalls: [] as unknown[],
     availableCommandUpdates: [] as Array<Array<{ name: string; description?: string }>>,
@@ -43,10 +45,14 @@ vi.mock('./utils/opencodeBackend', () => ({
         setConfigOption: vi.fn(async (sessionId: string, configId: string, value: string, opts?: { flavor?: string }) => {
             harness.events.push(`setConfigOption:${configId}:${value}`);
             harness.setConfigOptionArgs.push({ sessionId, configId, value, flavor: opts?.flavor });
+            if (harness.setConfigOptionImpl) {
+                await harness.setConfigOptionImpl(sessionId, configId, value);
+            }
         }),
-        prompt: vi.fn(async () => {
+        prompt: vi.fn(async (sessionId: string, content: unknown) => {
             harness.events.push('prompt:start');
             harness.promptCount++;
+            harness.promptContents.push(content);
             await new Promise<void>((resolve) => setImmediate(resolve));
             harness.events.push('prompt:end');
         }),
@@ -122,6 +128,12 @@ function createResetMode(): OpencodeMode {
     };
 }
 
+function createPlanMode(): OpencodeMode {
+    return {
+        permissionMode: 'plan' as PermissionMode
+    };
+}
+
 function createSessionStub(items: Array<{ message: string; mode: OpencodeMode }>) {
     const queue = new MessageQueue2<OpencodeMode>((mode) => JSON.stringify(mode));
     items.forEach(({ message, mode }, index) => {
@@ -136,6 +148,8 @@ function createSessionStub(items: Array<{ message: string; mode: OpencodeMode }>
     const sessionEvents: Array<{ type: string; [key: string]: unknown }> = [];
     const rpcHandlers = new Map<string, (params: unknown) => unknown>();
     const metadataUpdates: Array<Record<string, unknown>> = [];
+    const setModelReasoningEffort = vi.fn();
+    const pushKeepAlive = vi.fn();
 
     const client = {
         rpcHandlerManager: {
@@ -166,6 +180,8 @@ function createSessionStub(items: Array<{ message: string; mode: OpencodeMode }>
             return 'default' as const;
         },
         setModel(_model: string | null) {},
+        setModelReasoningEffort,
+        pushKeepAlive,
         onThinkingChange(thinking: boolean) {
             session.thinking = thinking;
         },
@@ -179,7 +195,7 @@ function createSessionStub(items: Array<{ message: string; mode: OpencodeMode }>
         sendUserMessage(_text: string) {}
     };
 
-    return { session, sessionEvents, rpcHandlers, metadataUpdates };
+    return { session, sessionEvents, rpcHandlers, metadataUpdates, setModelReasoningEffort, pushKeepAlive };
 }
 
 describe('opencodeRemoteLauncher inline model switch', () => {
@@ -448,7 +464,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         const rollbacks: Array<string | null> = [];
 
         await opencodeRemoteLauncher(session as never, {
-            onReasoningEffortRollback: (effort) => rollbacks.push(effort)
+            onReasoningEffortRollback: (effort: string | null) => rollbacks.push(effort)
         });
 
         expect(harness.setConfigOptionArgs).toEqual([

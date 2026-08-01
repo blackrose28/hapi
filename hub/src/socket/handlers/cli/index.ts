@@ -96,14 +96,7 @@ export function broadcastLostTerminalLists(
 }
 
 export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlersDeps): void {
-    const { io, store, rpcRegistry, terminalRegistry, terminalHistoryRequests, terminalSessionState, onSessionAlive, onSessionReady, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, onSweepImmediateQueued, resolveCapability } = deps
-=======
-    onMessagesConsumed?: (sessionId: string) => void
-}
-
-export function registerCliHandlers(socket: CliSocketWithData, deps: CliHandlersDeps): void {
-    const { io, store, rpcRegistry, terminalRegistry, onSessionAlive, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSweepImmediateQueued, onMessagesConsumed } = deps
->>>>>>> 5b797bb9 (feat(opencode): slash command support (#671) (#753))
+    const { io, store, rpcRegistry, terminalRegistry, terminalHistoryRequests, terminalSessionState, onSessionAlive, onSessionReady, onSessionEnd, onMachineAlive, onWebappEvent, onBackgroundTaskDelta, onSessionActivity, onSessionCrashed, onAgentTextMessage, onSweepImmediateQueued, onMessagesConsumed, resolveCapability } = deps
     const terminalNamespace = io.of('/terminal')
     const namespace = typeof socket.data.namespace === 'string' ? socket.data.namespace : null
 

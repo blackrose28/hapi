@@ -85,7 +85,7 @@ export type SessionHandlersDeps = {
     onSweepImmediateQueued?: (sessionId: string, now: number) => void
     /** Drops the queued-thinking grace so synchronous CLI handlers (e.g. slash
      *  commands) don't leave the spinner stuck for the full grace window. */
-    onMessagesConsumed?: (sessionId: string) => void
+    onMessagesConsumed?: (sessionId: string, localIds: string[], options?: { clearQueuedThinkingGrace?: boolean }) => void
 }
 
 function getTeamMentionRequestId(content: unknown): string | null {
@@ -454,7 +454,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
             // need the grace so the spinner doesn't flicker between the queue
             // shift and `backend.prompt` start.
             if (data.clearQueuedThinkingGrace === true) {
-                onMessagesConsumed?.(data.sid)
+                onMessagesConsumed?.(data.sid, localIds, { clearQueuedThinkingGrace: true })
             }
             // Emit only after the DB write succeeds. Otherwise a transient SQLite
             // failure would broadcast an `invokedAt` that was never persisted —
