@@ -8,7 +8,8 @@
  */
 
 import { isKnownFlavor, type AgentFlavor, type AgentModelCatalogResult, type LocalResumeTarget, type ResumableSession } from '@hapi/protocol'
-import type { CodexCollaborationMode, CursorMigrateOutcome, CursorMigrateToAcpRequest, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
+import type { CursorMigrateOutcome, CursorMigrateToAcpRequest } from '@hapi/protocol/schemas'
+import type { CodexCollaborationMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
 import { unwrapRoleWrappedRecordEnvelope } from '@hapi/protocol/messages'
 import type { Server } from 'socket.io'
 import type { Store, StoredTeamMessage, StoredTeamParticipant, CancelQueuedMessageResult } from '../store'
@@ -781,7 +782,7 @@ export class SyncEngine {
             if (carriedMigrationState !== undefined) {
                 delete nextMetadata.cursorMigrationState
             }
-            const result = this.store.sessions.updateSessionMetadata(
+            const result = this.db.sessions.updateSessionMetadata(
                 sessionId,
                 nextMetadata,
                 latest.metadataVersion,
@@ -797,7 +798,7 @@ export class SyncEngine {
             }
             this.sessionCache.refreshSession(sessionId)
             if (lastUsedModel && lastUsedModel.trim().length > 0) {
-                this.store.sessions.setSessionModel(sessionId, lastUsedModel.trim(), namespace, { touchUpdatedAt: false })
+                this.db.sessions.setSessionModel(sessionId, lastUsedModel.trim(), namespace, { touchUpdatedAt: false })
                 this.sessionCache.refreshSession(sessionId)
             }
             return { result: 'success' }
@@ -862,7 +863,7 @@ export class SyncEngine {
             // hub.Store dependency.
             getHapiMessageCount: (sessionId, _namespace) => {
                 try {
-                    return this.store.messages.countMessages(sessionId)
+                    return this.db.messages.countMessages(sessionId)
                 } catch (err) {
                     // tiann/hapi#873 cold review: a silent 0 here trips
                     // the migrator's "skip sanity" branch and chronically
@@ -1319,7 +1320,7 @@ export class SyncEngine {
             if (!latest?.metadata) return false
             if (latest.metadata.cursorMigrationState === 'ambiguous') return true
             const nextMetadata = { ...latest.metadata, cursorMigrationState: 'ambiguous' as const }
-            const result = this.store.sessions.updateSessionMetadata(
+            const result = this.db.sessions.updateSessionMetadata(
                 sessionId,
                 nextMetadata,
                 latest.metadataVersion,
@@ -1354,7 +1355,7 @@ export class SyncEngine {
             if (!latest?.metadata) return false
             if (latest.metadata.cursorMigrationState === 'in_progress') return true
             const nextMetadata = { ...latest.metadata, cursorMigrationState: 'in_progress' as const }
-            const result = this.store.sessions.updateSessionMetadata(
+            const result = this.db.sessions.updateSessionMetadata(
                 sessionId,
                 nextMetadata,
                 latest.metadataVersion,
@@ -1386,7 +1387,7 @@ export class SyncEngine {
             if (latest.metadata.cursorMigrationState === undefined) return
             const nextMetadata: typeof latest.metadata = { ...latest.metadata }
             delete nextMetadata.cursorMigrationState
-            const result = this.store.sessions.updateSessionMetadata(
+            const result = this.db.sessions.updateSessionMetadata(
                 sessionId,
                 nextMetadata,
                 latest.metadataVersion,
@@ -1414,7 +1415,7 @@ export class SyncEngine {
         if (this.resolveAgentResumeId(session, namespace)) {
             return false
         }
-        return this.store.messages.getFirstMessages(sessionId, 1).length === 0
+        return this.db.messages.getFirstMessages(sessionId, 1).length === 0
     }
     async resumeSession(sessionId: string, namespace: string, opts?: { permissionMode?: PermissionMode }): Promise<ResumeSessionResult> {
         const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)

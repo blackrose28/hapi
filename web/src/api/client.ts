@@ -581,38 +581,24 @@ export class ApiClient {
      */
     async migrateCursorSessionToAcp(sessionId: string, body: CursorMigrateToAcpRequest = {}): Promise<CursorMigrateOutcome> {
         const path = `/api/sessions/${encodeURIComponent(sessionId)}/migrate-to-acp`
-        const tryOnce = async (overrideToken: string | null): Promise<Response> => {
-            const headers = new Headers({ 'content-type': 'application/json' })
-            const liveToken = this.getToken ? this.getToken() : null
-            const authToken = overrideToken ?? liveToken ?? this.token
-            if (authToken) {
-                headers.set('authorization', `Bearer ${authToken}`)
-            }
-            return fetch(this.buildUrl(path), { method: 'POST', headers, body: JSON.stringify(body) })
-        }
-
-        let res = await tryOnce(null)
-        if (res.status === 401 && this.onUnauthorized) {
-            const refreshed = await this.onUnauthorized()
-            if (refreshed) {
-                this.token = refreshed
-                res = await tryOnce(refreshed)
-            }
-        }
-        if (res.status === 401) {
-            throw new Error('Session expired. Please sign in again.')
-        }
-        const text = await res.text()
-        let parsed: CursorMigrateOutcome | null = null
         try {
-            parsed = text ? JSON.parse(text) as CursorMigrateOutcome : null
-        } catch {
-            parsed = null
+            return await this.request<CursorMigrateOutcome>(path, {
+                method: 'POST',
+                body: JSON.stringify(body)
+            })
+        } catch (err) {
+            if (err instanceof ApiError && err.body) {
+                try {
+                    const parsed = JSON.parse(err.body)
+                    if (typeof parsed === 'object' && parsed !== null && 'ok' in parsed) {
+                        return parsed as CursorMigrateOutcome
+                    }
+                } catch {
+                    // Fallthrough
+                }
+            }
+            throw err
         }
-        if (parsed && typeof parsed === 'object' && 'ok' in parsed) {
-            return parsed
-        }
-        throw new Error(`HTTP ${res.status} ${res.statusText}: ${text}`)
     }
 
     async switchSession(sessionId: string): Promise<void> {

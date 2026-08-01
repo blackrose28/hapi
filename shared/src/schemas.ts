@@ -859,6 +859,8 @@ export type CursorMigrateRefusalReason =
     | 'running_refused'
     | 'no_cursor_session_id'
     | 'no_legacy_store_on_disk'
+    | 'ambiguous_legacy_store'
+    | 'size_mismatch'
     | 'target_already_exists'
     | 'verify_load_failed'
     | 'verify_prompt_failed'

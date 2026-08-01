@@ -41,8 +41,6 @@ function requireHttpsUrl(value: string, name: string): string {
     } catch {
         throw new Error(`${name} must be an HTTPS URL.`)
     }
-    if (url.protocol !== 'https:' && url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') {
-        throw new Error(`${name} must be an HTTPS URL.`)
-    }
+    if (url.protocol !== 'https:') throw new Error(`${name} must be an HTTPS URL.`)
     return url.toString()
 }

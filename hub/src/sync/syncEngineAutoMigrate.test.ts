@@ -212,7 +212,7 @@ describe('SyncEngine.maybeAutoMigrateLegacyCursorSession', () => {
             return persisted
         }
         function getStoredMetadata(sessionId: string): Record<string, unknown> | undefined {
-            const store = (engine as unknown as { store: Store }).store
+            const store = (engine as any).db
             const row = store.sessions.getSession(sessionId)
             if (!row) return undefined
             return row.metadata as unknown as Record<string, unknown>
@@ -309,7 +309,7 @@ describe('SyncEngine.maybeAutoMigrateLegacyCursorSession', () => {
 
         it('flipCursorSessionProtocolToAcp clears cursorMigrationState in the same metadata write that flips protocol', () => {
             const session = insertLegacy('session-flip-clears-flag')
-            const store = (engine as unknown as { store: Store }).store
+            const store = (engine as any).db
             const cache = (engine as unknown as { sessionCache: import('./sessionCache').SessionCache }).sessionCache
 
             // Manually plant the flag (simulating the helper having run earlier).

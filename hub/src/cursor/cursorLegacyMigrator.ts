@@ -47,7 +47,7 @@ import { mkdtempSync, copyFileSync, writeFileSync, existsSync, mkdirSync, rmSync
 import { createHash } from 'node:crypto'
 import { Database } from 'bun:sqlite'
 
-import type { CursorMigrateOutcome, CursorMigrateRefusalReason } from '@hapi/protocol/apiTypes'
+import type { CursorMigrateOutcome, CursorMigrateRefusalReason } from '@hapi/protocol/schemas'
 import type { Metadata } from '@hapi/protocol/schemas'
 import type { Session } from '@hapi/protocol/types'
 import { AcpVerifyProbe, tryAcquireAcpActiveLock, type AcpActiveLockHandle } from './acpVerifyProbe'
