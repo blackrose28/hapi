@@ -3,6 +3,7 @@ import type { AgentAvailableCommand, AgentBackend, AgentMessage, AgentSessionCon
 import { asString, isObject } from '@hapi/protocol';
 import { AcpStdioTransport, type AcpStderrError } from './AcpStdioTransport';
 import { AcpMessageHandler } from './AcpMessageHandler';
+import { ACP_SESSION_UPDATE_TYPES } from './constants';
 import { logger } from '@/ui/logger';
 import { withRetry } from '@/utils/time';
 import packageJson from '../../../../package.json';
@@ -14,6 +15,7 @@ type PendingPermission = {
 export type AcpModelDescriptor = {
     modelId: string;
     name?: string;
+    reasoningEfforts?: Array<{ value: string; name?: string; isDefault?: boolean }>;
 };
 
 export type AcpAvailableCommand = AgentAvailableCommand;
@@ -30,13 +32,34 @@ export type AcpSessionModelsMetadata = {
     currentEffortId?: string | null;
 };
 
+export type AcpSessionInfoUpdate = {
+    sessionId: string | null;
+    title: string | null;
+};
+
+export type AcpThoughtLevelOption = {
+    value: string;
+    name?: string;
+};
+
+export type AcpThoughtLevelConfig = {
+    currentValue: string | null;
+    options: AcpThoughtLevelOption[];
+};
+
 export class AcpSdkBackend implements AgentBackend {
     private transport: AcpStdioTransport | null = null;
     private permissionHandler: ((request: PermissionRequest) => void) | null = null;
     private stderrErrorHandler: ((error: AcpStderrError) => void) | null = null;
     private availableCommandsHandler: ((commands: AcpAvailableCommand[]) => void) | null = null;
+    private sessionInfoUpdateListener: ((update: AcpSessionInfoUpdate) => void) | null = null;
     private readonly pendingPermissions = new Map<string, PendingPermission>();
     private readonly sessionModelsMetadata = new Map<string, AcpSessionModelsMetadata>();
+    private readonly sessionThoughtLevelOptions = new Map<string, AcpThoughtLevelConfig>();
+    private readonly initialAvailableCommands = new Set<string>();
+    private readonly sessionAvailableCommands = new Map<string, Set<string>>();
+    private autoPermissionModeEnabled: boolean | null = null;
+    private readonly sessionInfoRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private messageHandler: AcpMessageHandler | null = null;
     private activeSessionId: string | null = null;
     private isProcessingMessage = false;
@@ -53,6 +76,26 @@ export class AcpSdkBackend implements AgentBackend {
     private static readonly UPDATE_DRAIN_TIMEOUT_MS = 2000;
     private static readonly PRE_PROMPT_UPDATE_QUIET_PERIOD_MS = 200;
     private static readonly PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS = 1200;
+    private static readonly SESSION_TITLE_REFRESH_DELAYS_MS = [1000, 3000];
+    // After the initial post-prompt drain, slow-tailing models (DeepSeek,
+    // GPT-5.5, etc.) can keep sending agentMessageChunk notifications. We poll
+    // flushText()/flushReasoning() on a short interval so the UI keeps
+    // streaming smoothly, and block prompt() from resolving until the model is
+    // truly quiet — that way turn_complete only fires after every straggler
+    // has been emitted to the current turn's onUpdate. Bounded by
+    // LATE_FLUSH_WINDOW_MS so a stuck stream never wedges the session.
+    //
+    // 6000ms covers tails up to ~5s observed against GPT-5.5 / DeepSeek V4 Pro
+    // with 1s headroom. The 250ms quiet check is anchored to drainLateBuffers
+    // entry time, so every turn pays at least one quiet period before
+    // resolving — that minimum is what catches stragglers arriving just after
+    // session/prompt resolves when the model paused mid-turn. 50ms polling
+    // keeps the UI responsive without measurable CPU cost (flush is a no-op on
+    // empty buffers). All three can be tightened once we have telemetry on
+    // real-world tail distributions.
+    private static readonly LATE_FLUSH_INTERVAL_MS = 50;
+    private static readonly LATE_FLUSH_QUIET_PERIOD_MS = 250;
+    private static readonly LATE_FLUSH_WINDOW_MS = 6000;
 
     constructor(private readonly options: { command: string; args?: string[]; env?: Record<string, string> }) {}
 
@@ -68,6 +111,8 @@ export class AcpSdkBackend implements AgentBackend {
         this.transport.onNotification((method, params) => {
             if (method === 'session/update') {
                 this.handleSessionUpdate(params);
+            } else if (method === '_x.ai/settings/update') {
+                this.handleSettingsUpdate(params);
             }
         });
 
@@ -103,7 +148,32 @@ export class AcpSdkBackend implements AgentBackend {
             throw new Error('Invalid initialize response from ACP agent');
         }
 
+        this.captureAvailableCommands(null, response);
+
         logger.debug(`[ACP] Initialized with protocol version ${response.protocolVersion}`);
+    }
+
+    /**
+     * Sends Grok's `session/set_mode` RPC (ACP's mode/thought-level switch,
+     * distinct from `session/set_config_option`) and, on success, updates the
+     * cached currentValue for the session's thought_level config option so
+     * getThoughtLevelConfigOption() reflects the switch immediately.
+     */
+    async setMode(sessionId: string, modeId: string): Promise<void> {
+        if (!this.transport) {
+            throw new Error('ACP transport not initialized');
+        }
+
+        await this.waitForResponseComplete();
+
+        const response = await this.transport.sendRequest('session/set_mode', {
+            sessionId,
+            modeId
+        });
+
+        this.updateThoughtLevelCurrentValue(sessionId, modeId);
+        this.captureSessionModelsMetadata(sessionId, response);
+        this.captureThoughtLevelConfigOption(sessionId, response);
     }
 
     async newSession(config: AgentSessionConfig): Promise<string> {
@@ -131,6 +201,8 @@ export class AcpSdkBackend implements AgentBackend {
 
         this.activeSessionId = sessionId;
         this.captureSessionModelsMetadata(sessionId, response);
+        this.captureThoughtLevelConfigOption(sessionId, response);
+        this.captureAvailableCommands(sessionId, response);
         return sessionId;
     }
 
@@ -157,6 +229,8 @@ export class AcpSdkBackend implements AgentBackend {
         const sessionId = loadedSessionId ?? config.sessionId;
         this.activeSessionId = sessionId;
         this.captureSessionModelsMetadata(sessionId, response);
+        this.captureThoughtLevelConfigOption(sessionId, response);
+        this.captureAvailableCommands(sessionId, response);
         return sessionId;
     }
 
@@ -184,8 +258,8 @@ export class AcpSdkBackend implements AgentBackend {
             modelId
         });
 
-        if (opts?.flavor === 'opencode') {
-            // Some OpenCode builds return only an opaque `_meta`; newer builds may
+        if (opts?.flavor === 'opencode' || opts?.flavor === 'grok') {
+            // Some OpenCode/Grok builds return only an opaque `_meta`; newer builds may
             // also return configOptions. Capture what is present, then preserve an
             // optimistic current model when the response omits normalized models.
             this.captureSessionModelsMetadata(sessionId, response);
@@ -226,6 +300,89 @@ export class AcpSdkBackend implements AgentBackend {
         return this.sessionModelsMetadata.get(sessionId);
     }
 
+    /**
+     * Returns Grok's thought-level (reasoning effort) config option for a
+     * session, synthesized from the `_meta['x.ai/sessionConfig']` block that
+     * Grok returns on session/new, session/load, and session/set_mode
+     * responses (see captureThoughtLevelConfigOption).
+     */
+    getThoughtLevelConfigOption(sessionId: string): AcpThoughtLevelConfig | undefined {
+        return this.sessionThoughtLevelOptions.get(sessionId);
+    }
+
+    /**
+     * Returns true if the ACP agent has advertised `command` as an available
+     * slash command, either for this specific session or in the initial
+     * (pre-session) available-commands snapshot captured at initialize().
+     * `command === 'auto'` additionally checks the `_x.ai/settings/update`
+     * notification's `auto_permission_mode_enabled` flag — this fork has no
+     * 'auto' GrokPermissionMode (see GROK_PERMISSION_MODES), so that branch
+     * is currently inert but harmless, kept for ACP protocol parity.
+     */
+    hasAvailableCommand(sessionId: string, command: string): boolean {
+        if (command === 'auto' && this.autoPermissionModeEnabled === true) {
+            return true;
+        }
+        return this.sessionAvailableCommands.get(sessionId)?.has(command)
+            ?? this.initialAvailableCommands.has(command);
+    }
+
+    /** Forwards stable ACP session metadata updates independently of prompt streaming. */
+    setSessionInfoUpdateListener(listener: ((update: AcpSessionInfoUpdate) => void) | null): void {
+        this.sessionInfoUpdateListener = listener;
+    }
+
+    /** Reads the agent's persisted native title through stable ACP session/list. */
+    async refreshSessionInfo(sessionId: string, cwd: string): Promise<void> {
+        const existingTimer = this.sessionInfoRefreshTimers.get(sessionId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            this.sessionInfoRefreshTimers.delete(sessionId);
+        }
+        await this.refreshSessionInfoAttempt(sessionId, cwd, 0);
+    }
+
+    private async refreshSessionInfoAttempt(sessionId: string, cwd: string, retryIndex: number): Promise<void> {
+        if (!this.transport) {
+            return;
+        }
+        try {
+            const response = await this.transport.sendRequest('session/list', { cwd }, { timeoutMs: 5000 });
+            if (!isObject(response) || !Array.isArray(response.sessions)) {
+                return;
+            }
+            const match = response.sessions.find((entry) =>
+                isObject(entry) && asString(entry.sessionId) === sessionId
+            );
+            if (!isObject(match) || (typeof match.title !== 'string' && match.title !== null)) {
+                return;
+            }
+            this.sessionInfoUpdateListener?.({ sessionId, title: match.title });
+            if (match.title === null || !this.isPlaceholderSessionTitle(match.title)) {
+                return;
+            }
+            const delayMs = AcpSdkBackend.SESSION_TITLE_REFRESH_DELAYS_MS[retryIndex];
+            if (delayMs === undefined) {
+                return;
+            }
+            const timer = setTimeout(() => {
+                this.sessionInfoRefreshTimers.delete(sessionId);
+                void this.refreshSessionInfoAttempt(sessionId, cwd, retryIndex + 1);
+            }, delayMs);
+            timer.unref();
+            this.sessionInfoRefreshTimers.set(sessionId, timer);
+        } catch (error) {
+            logger.debug('[ACP] session/list title refresh unavailable', error);
+        }
+    }
+
+    private isPlaceholderSessionTitle(title: string): boolean {
+        const normalizedTitle = title.trim();
+        return normalizedTitle.length === 0
+            || normalizedTitle === 'Untitled'
+            || /^(?:New|Child) session - \d{4}-\d{2}-\d{2}T/.test(normalizedTitle);
+    }
+
     async prompt(
         sessionId: string,
         content: PromptContent[],
@@ -236,17 +393,18 @@ export class AcpSdkBackend implements AgentBackend {
         }
 
         this.activeSessionId = sessionId;
+        // Single-phase handler swap: drain any chunks still buffered in the
+        // previous turn's handler so they emit via that turn's onUpdate, then
+        // immediately install the new handler. The post-prompt drainLateBuffers
+        // means by this point the previous turn should already be quiet; this
+        // wait is a cheap safety net for the rare case where a chunk arrived
+        // between prompt() resolving and the next turn starting.
         await this.waitForSessionUpdateQuiet(
             AcpSdkBackend.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS,
             AcpSdkBackend.PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS
         );
         this.messageHandler?.flushReasoning();
         this.messageHandler?.flushText();
-        this.messageHandler = null;
-        await this.waitForSessionUpdateQuiet(
-            AcpSdkBackend.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS,
-            AcpSdkBackend.PRE_PROMPT_UPDATE_DRAIN_TIMEOUT_MS
-        );
         this.messageHandler = new AcpMessageHandler(onUpdate);
         this.isProcessingMessage = true;
         this.lastSessionUpdateAt = Date.now();
@@ -274,6 +432,10 @@ export class AcpSdkBackend implements AgentBackend {
             );
             this.messageHandler?.flushReasoning();
             this.messageHandler?.flushText();
+            // Block here until the model truly stops streaming straggler
+            // chunks (or LATE_FLUSH_WINDOW_MS elapses), so turn_complete only
+            // fires once every chunk has been emitted to this turn's onUpdate.
+            await this.drainLateBuffers();
             try {
                 if (stopReason) {
                     onUpdate({ type: 'turn_complete', stopReason });
@@ -282,6 +444,37 @@ export class AcpSdkBackend implements AgentBackend {
                 this.isProcessingMessage = false;
                 this.notifyResponseComplete();
             }
+        }
+    }
+
+    /**
+     * Poll flushText()/flushReasoning() on a short interval until the model
+     * has been quiet for LATE_FLUSH_QUIET_PERIOD_MS or LATE_FLUSH_WINDOW_MS
+     * elapses. Polling keeps the UI streaming smoothly while we wait; the
+     * quiet-window check lets fast models exit almost immediately (Claude
+     * tail typically < 100ms) while still bounding slow-tailing models
+     * (GPT-5.5, DeepSeek V4 Pro).
+     *
+     * The quiet measurement is anchored to entry time, not just
+     * lastSessionUpdateAt: if session/prompt paused mid-turn (chunks → pause
+     * → stopReason), lastSessionUpdateAt is already stale on entry and we
+     * would otherwise exit immediately, missing any straggler that arrives
+     * just after session/prompt resolves.
+     */
+    private async drainLateBuffers(): Promise<void> {
+        const quietBaseline = Date.now();
+        const deadline = quietBaseline + AcpSdkBackend.LATE_FLUSH_WINDOW_MS;
+        while (Date.now() < deadline) {
+            const latestActivityAt = Math.max(this.lastSessionUpdateAt, quietBaseline);
+            const elapsedSinceUpdate = Date.now() - latestActivityAt;
+            if (elapsedSinceUpdate >= AcpSdkBackend.LATE_FLUSH_QUIET_PERIOD_MS) {
+                return;
+            }
+            const remainingBudget = deadline - Date.now();
+            const waitMs = Math.max(1, Math.min(AcpSdkBackend.LATE_FLUSH_INTERVAL_MS, remainingBudget));
+            await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+            this.messageHandler?.flushReasoning();
+            this.messageHandler?.flushText();
         }
     }
 
@@ -360,12 +553,20 @@ export class AcpSdkBackend implements AgentBackend {
 
     async disconnect(): Promise<void> {
         if (!this.transport) return;
+        for (const timer of this.sessionInfoRefreshTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.sessionInfoRefreshTimers.clear();
         this.messageHandler?.flushReasoning();
         this.messageHandler?.flushText();
         this.messageHandler = null;
         this.activeSessionId = null;
         this.isProcessingMessage = false;
         this.sessionModelsMetadata.clear();
+        this.sessionThoughtLevelOptions.clear();
+        this.initialAvailableCommands.clear();
+        this.sessionAvailableCommands.clear();
+        this.autoPermissionModeEnabled = null;
         this.notifyResponseComplete();
         await this.transport.close();
         this.transport = null;
@@ -380,7 +581,34 @@ export class AcpSdkBackend implements AgentBackend {
         this.lastSessionUpdateAt = Date.now();
         const update = params.update;
         this.emitAvailableCommands(update);
+        if (sessionId) {
+            this.captureAvailableCommands(sessionId, update);
+        }
+        this.forwardSessionInfoUpdate(sessionId, update);
         this.messageHandler?.handleUpdate(update);
+    }
+
+    /**
+     * Grok's `_x.ai/settings/update` notification (distinct from
+     * `session/update`) reports whether the account/CLI build has Auto
+     * permission mode enabled. Cached for hasAvailableCommand('auto') — this
+     * fork has no 'auto' GrokPermissionMode (see GROK_PERMISSION_MODES), so
+     * the cached flag is currently inert but harmless, kept for ACP protocol
+     * parity.
+     */
+    private handleSettingsUpdate(params: unknown): void {
+        if (!isObject(params) || !('auto_permission_mode_enabled' in params)) return;
+        this.autoPermissionModeEnabled = params.auto_permission_mode_enabled === true;
+    }
+
+    private forwardSessionInfoUpdate(sessionId: string | null, update: unknown): void {
+        if (!isObject(update) || update.sessionUpdate !== ACP_SESSION_UPDATE_TYPES.sessionInfoUpdate) {
+            return;
+        }
+        if (typeof update.title !== 'string' && update.title !== null) {
+            return;
+        }
+        this.sessionInfoUpdateListener?.({ sessionId, title: update.title });
     }
 
     private emitAvailableCommands(update: unknown): void {
@@ -548,7 +776,22 @@ export class AcpSdkBackend implements AgentBackend {
                 const modelId = asString(entry.modelId);
                 if (!modelId) continue;
                 const name = asString(entry.name) ?? undefined;
-                availableModels.push(name ? { modelId, name } : { modelId });
+                const entryMeta = isObject(entry._meta) ? entry._meta : null;
+                const reasoningEfforts = entryMeta && Array.isArray(entryMeta.reasoningEfforts)
+                    ? entryMeta.reasoningEfforts
+                        .filter((effort): effort is Record<string, unknown> => isObject(effort))
+                        .map((effort) => ({
+                            value: asString(effort.value) ?? asString(effort.id) ?? '',
+                            name: asString(effort.label) ?? undefined,
+                            isDefault: effort.default === true
+                        }))
+                        .filter((effort) => effort.value.length > 0)
+                    : undefined;
+                const descriptor: AcpModelDescriptor = name ? { modelId, name } : { modelId };
+                if (reasoningEfforts && reasoningEfforts.length > 0) {
+                    descriptor.reasoningEfforts = reasoningEfforts;
+                }
+                availableModels.push(descriptor);
             }
         } else {
             // Preserve previously-captured availableModels when the response only
@@ -644,6 +887,85 @@ export class AcpSdkBackend implements AgentBackend {
             currentEffortId: variant ?? null,
             availableEfforts: availableEfforts.length > 0 ? availableEfforts : undefined
         };
+    }
+
+    /** Updates the cached thought-level currentValue after a successful session/set_mode call. */
+    private updateThoughtLevelCurrentValue(sessionId: string, value: string): void {
+        const existing = this.sessionThoughtLevelOptions.get(sessionId);
+        if (!existing) return;
+        this.sessionThoughtLevelOptions.set(sessionId, { ...existing, currentValue: value });
+    }
+
+    /**
+     * Grok exposes its reasoning-effort ("thought level") options through
+     * `_meta['x.ai/sessionConfig'].options` (category 'mode') on session/new,
+     * session/load, and session/set_mode responses — a different convention
+     * from OpenCode's generic `configOptions[].id === 'effort'` (handled by
+     * extractConfigOptionsMetadata above). Synthesized as its own
+     * `thought_level` option set, kept separate from
+     * AcpSessionModelsMetadata.availableEfforts so OpenCode/Kimi behavior is
+     * unaffected.
+     */
+    private captureThoughtLevelConfigOption(sessionId: string, response: unknown): void {
+        if (!isObject(response)) return;
+        const meta = isObject(response._meta) ? response._meta : null;
+        const xaiConfig = meta && isObject(meta['x.ai/sessionConfig']) ? meta['x.ai/sessionConfig'] : null;
+        const xaiOptions = xaiConfig && Array.isArray(xaiConfig.options)
+            ? xaiConfig.options.filter((entry): entry is Record<string, unknown> => isObject(entry))
+            : [];
+        const modeOptions = xaiOptions.filter((entry) => asString(entry.category) === 'mode');
+        if (modeOptions.length === 0) return;
+
+        const options = modeOptions
+            .map((entry) => ({
+                value: asString(entry.id) ?? '',
+                name: asString(entry.label) ?? undefined,
+                selected: entry.selected === true
+            }))
+            .filter((entry) => entry.value.length > 0);
+        if (options.length === 0) return;
+
+        this.sessionThoughtLevelOptions.set(sessionId, {
+            currentValue: options.find((entry) => entry.selected)?.value ?? null,
+            options: options.map(({ value, name }) => (name ? { value, name } : { value }))
+        });
+    }
+
+    /**
+     * Captures the ACP agent's advertised slash commands, either scoped to a
+     * session (from session/update's available_commands_update, or a
+     * session/new|load|set_mode response) or globally (sessionId === null,
+     * from the initialize response) — read from either a top-level
+     * `availableCommands` array or a nested `_meta.availableCommands` array.
+     */
+    private captureAvailableCommands(sessionId: string | null, source: unknown): void {
+        if (!isObject(source)) return;
+
+        const meta = isObject(source._meta) ? source._meta : null;
+        const rawCommands = Array.isArray(source.availableCommands)
+            ? source.availableCommands
+            : meta && Array.isArray(meta.availableCommands)
+                ? meta.availableCommands
+                : null;
+        if (!rawCommands) return;
+
+        const commands = new Set(
+            rawCommands
+                .filter((entry): entry is Record<string, unknown> => isObject(entry))
+                .map((entry) => asString(entry.name) ?? '')
+                .filter((name) => name.length > 0)
+        );
+        if (commands.size === 0) return;
+
+        if (sessionId) {
+            this.sessionAvailableCommands.set(sessionId, commands);
+            return;
+        }
+
+        this.initialAvailableCommands.clear();
+        for (const command of commands) {
+            this.initialAvailableCommands.add(command);
+        }
     }
 }
 

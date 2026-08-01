@@ -36,6 +36,21 @@ const CachedOpencodeModelsSchema = z.object({
     cachedAt: z.number()
 })
 
+const CachedGrokModelsSchema = z.object({
+    availableModels: z.array(z.object({
+        modelId: z.string(),
+        name: z.string().optional(),
+        reasoningEfforts: z.array(z.object({
+            value: z.string(),
+            name: z.string().optional(),
+            isDefault: z.boolean().optional()
+        })).optional()
+    })),
+    currentModelId: z.string().nullable().optional(),
+    autoPermissionModeSupported: z.boolean().optional(),
+    cachedAt: z.number()
+})
+
 export const WorktreeMetadataSchema = z.object({
     basePath: z.string(),
     branch: z.string(),
@@ -58,7 +73,10 @@ export const MetadataSchema = z.object({
     codexSessionId: z.string().optional(),
     geminiSessionId: z.string().optional(),
     opencodeSessionId: z.string().optional(),
+    grokSessionId: z.string().optional(),
     cursorSessionId: z.string().optional(),
+    kimiSessionId: z.string().optional(),
+    piSessionId: z.string().optional(),
     tools: z.array(z.string()).optional(),
     slashCommands: z.array(z.string()).optional(),
     homeDir: z.string().optional(),
@@ -77,7 +95,16 @@ export const MetadataSchema = z.object({
     lastUserRequest: z.string().optional(),
     cachedAgentModels: CachedAgentModelCatalogSchema.optional(),
     cachedCodexModels: CachedCodexModelsSchema.optional(),
-    cachedOpencodeModels: CachedOpencodeModelsSchema.optional()
+    cachedOpencodeModels: CachedOpencodeModelsSchema.optional(),
+    cachedGrokModels: CachedGrokModelsSchema.optional(),
+    // Cached Pi model list — written by CLI, read by web (inactive session fallback).
+    // Minimal shape: each entry must have modelId; other fields (provider, name, etc.) pass through.
+    piAvailableModels: z.array(z.object({ modelId: z.string() }).passthrough()).optional(),
+    // Pi-selected model with provider identity. The legacy `session.model`
+    // field stores only modelId (shared across all flavors); this preserves
+    // the provider so web can resolve the exact model when two providers
+    // share a modelId.
+    piSelectedModel: z.object({ provider: z.string(), modelId: z.string() }).nullable().optional()
 })
 
 export type Metadata = z.infer<typeof MetadataSchema>

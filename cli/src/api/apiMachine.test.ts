@@ -5,10 +5,11 @@ import { join } from 'node:path'
 
 const mocks = vi.hoisted(() => ({
     ioMock: vi.fn(),
-    listOpencodeModelsForCwdMock: vi.fn()
+    listOpencodeModelsForCwdMock: vi.fn(),
+    listGrokModelsForCwdMock: vi.fn()
 }))
 
-const { ioMock, listOpencodeModelsForCwdMock } = mocks
+const { ioMock, listOpencodeModelsForCwdMock, listGrokModelsForCwdMock } = mocks
 
 vi.mock('socket.io-client', () => ({
     io: mocks.ioMock
@@ -20,6 +21,10 @@ vi.mock('@/api/auth', () => ({
 
 vi.mock('../modules/common/opencodeModels', () => ({
     listOpencodeModelsForCwd: mocks.listOpencodeModelsForCwdMock
+}))
+
+vi.mock('../modules/common/grokModels', () => ({
+    listGrokModelsForCwd: mocks.listGrokModelsForCwdMock
 }))
 
 import { ApiMachineClient } from './apiMachine'
@@ -68,6 +73,15 @@ async function callListOpencodeModels(client: ApiMachineClient, machineId: strin
     const manager = (client as unknown as { rpcHandlerManager: { handleRequest: (req: { method: string; params: string }) => Promise<string> } }).rpcHandlerManager
     const raw = await manager.handleRequest({
         method: `${machineId}:listOpencodeModelsForCwd`,
+        params: JSON.stringify({ cwd })
+    })
+    return JSON.parse(raw) as unknown
+}
+
+async function callListGrokModels(client: ApiMachineClient, machineId: string, cwd: string): Promise<unknown> {
+    const manager = (client as unknown as { rpcHandlerManager: { handleRequest: (req: { method: string; params: string }) => Promise<string> } }).rpcHandlerManager
+    const raw = await manager.handleRequest({
+        method: `${machineId}:listGrokModelsForCwd`,
         params: JSON.stringify({ cwd })
     })
     return JSON.parse(raw) as unknown
@@ -137,6 +151,76 @@ describe('ApiMachineClient listOpencodeModelsForCwd handler', () => {
             expect(listOpencodeModelsForCwdMock).toHaveBeenCalledTimes(1)
             // The handler should pass the resolved (realpath'd) cwd to the lower layer.
             expect(listOpencodeModelsForCwdMock).toHaveBeenCalledWith(expect.stringContaining('inner-project'))
+        } finally {
+            client.shutdown()
+        }
+    })
+})
+
+describe('ApiMachineClient listGrokModelsForCwd handler', () => {
+    let workspaceRoot: string
+
+    beforeEach(() => {
+        ioMock.mockReset()
+        listGrokModelsForCwdMock.mockReset()
+        workspaceRoot = mkdtempSync(join(tmpdir(), 'hapi-machine-ws-'))
+    })
+
+    afterEach(() => {
+        rmSync(workspaceRoot, { recursive: true, force: true })
+    })
+
+    it('rejects cwd outside the workspace root with the standard error shape', async () => {
+        const machine = makeMachine('machine-1')
+        const client = new ApiMachineClient({ kind: 'runner', credential: { credentialId: 'cred', secret: 'x'.repeat(32) }, machineId: 'machine' }, machine, workspaceRoot)
+
+        const outsideCwd = mkdtempSync(join(tmpdir(), 'hapi-outside-'))
+        try {
+            const result = await callListGrokModels(client, machine.id, outsideCwd)
+            expect(result).toEqual({ success: false, error: 'Path is outside workspace root' })
+            expect(listGrokModelsForCwdMock).not.toHaveBeenCalled()
+        } finally {
+            rmSync(outsideCwd, { recursive: true, force: true })
+            client.shutdown()
+        }
+    })
+
+    it('rejects empty cwd with cwd-required error', async () => {
+        const machine = makeMachine('machine-2')
+        const client = new ApiMachineClient({ kind: 'runner', credential: { credentialId: 'cred', secret: 'x'.repeat(32) }, machineId: 'machine' }, machine, workspaceRoot)
+
+        try {
+            const result = await callListGrokModels(client, machine.id, '')
+            expect(result).toEqual({ success: false, error: 'cwd is required' })
+            expect(listGrokModelsForCwdMock).not.toHaveBeenCalled()
+        } finally {
+            client.shutdown()
+        }
+    })
+
+    it('forwards a workspace-internal cwd to listGrokModelsForCwd', async () => {
+        const machine = makeMachine('machine-3')
+        const client = new ApiMachineClient({ kind: 'runner', credential: { credentialId: 'cred', secret: 'x'.repeat(32) }, machineId: 'machine' }, machine, workspaceRoot)
+
+        const innerDir = join(workspaceRoot, 'inner-project')
+        mkdirSync(innerDir)
+
+        listGrokModelsForCwdMock.mockResolvedValueOnce({
+            success: true,
+            availableModels: [{ modelId: 'grok-4.5' }],
+            currentModelId: 'grok-4.5'
+        })
+
+        try {
+            const result = await callListGrokModels(client, machine.id, innerDir)
+            expect(result).toEqual({
+                success: true,
+                availableModels: [{ modelId: 'grok-4.5' }],
+                currentModelId: 'grok-4.5'
+            })
+            expect(listGrokModelsForCwdMock).toHaveBeenCalledTimes(1)
+            // The handler should pass the resolved (realpath'd) cwd to the lower layer.
+            expect(listGrokModelsForCwdMock).toHaveBeenCalledWith(expect.stringContaining('inner-project'))
         } finally {
             client.shutdown()
         }

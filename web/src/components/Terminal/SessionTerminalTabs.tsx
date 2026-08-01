@@ -482,6 +482,7 @@ export function SessionTerminalTabs(props: SessionTerminalTabsProps) {
                 terminal.write(buffered)
             }
         }
+        terminal.focus()
     }, [activeTerminalId])
 
     const closeTarget = pendingCloseTerminalId

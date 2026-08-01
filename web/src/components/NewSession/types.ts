@@ -2,23 +2,30 @@ import {
     CLAUDE_MODEL_PRESETS,
     GEMINI_MODEL_PRESETS,
     GEMINI_MODEL_LABELS,
-    getClaudeModelLabel
+    getClaudeModelLabel,
+    type GrokPermissionMode
 } from '@hapi/protocol'
 
-export type AgentType = 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode'
+export type AgentType = 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi'
 export type SessionType = 'simple' | 'worktree'
 export type CodexReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhigh'
 export type ReasoningEffort = CodexReasoningEffort | string
 export type ClaudeEffort = 'auto' | 'medium' | 'high' | 'max'
+// Grok reports effort values dynamically via ACP; keep this open like
+// CodexReasoningEffort so newly-reported values don't need a type change.
+export type GrokEffort = 'auto' | 'low' | 'medium' | 'high' | string
+// Shared by the LaunchEffortSelector (Claude + Grok both use it).
+export type LaunchEffort = ClaudeEffort | GrokEffort
 
 export type NewSessionDraft = {
     machineId: string | null
     directory: string
     agent: AgentType
     model: string
-    effort: ClaudeEffort
+    effort: LaunchEffort
     modelReasoningEffort: ReasoningEffort
     yoloMode: boolean
+    grokPermissionMode: GrokPermissionMode
     sessionType: SessionType
     worktreeName: string
     resumeCodex: boolean
@@ -38,11 +45,16 @@ export const MODEL_OPTIONS: Record<AgentType, { value: string; label: string }[]
         { value: 'auto', label: 'Default' },
     ],
     cursor: [],
+    kimi: [
+        { value: 'auto', label: 'Default' },
+    ],
     gemini: [
         { value: 'auto', label: 'Default' },
         ...GEMINI_MODEL_PRESETS.map(m => ({ value: m, label: GEMINI_MODEL_LABELS[m] })),
     ],
     opencode: [],
+    grok: [],
+    pi: [],
 }
 
 export const CODEX_REASONING_EFFORT_OPTIONS: { value: CodexReasoningEffort; label: string }[] = [
@@ -53,9 +65,16 @@ export const CODEX_REASONING_EFFORT_OPTIONS: { value: CodexReasoningEffort; labe
     { value: 'xhigh', label: 'XHigh' },
 ]
 
-export const CLAUDE_EFFORT_OPTIONS: { value: ClaudeEffort; label: string }[] = [
+export const CLAUDE_EFFORT_OPTIONS: { value: LaunchEffort; label: string }[] = [
     { value: 'auto', label: 'Auto' },
     { value: 'medium', label: 'Medium' },
     { value: 'high', label: 'High' },
     { value: 'max', label: 'Max' },
+]
+
+export const GROK_EFFORT_OPTIONS: { value: LaunchEffort; label: string }[] = [
+    { value: 'auto', label: 'Default' },
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
 ]

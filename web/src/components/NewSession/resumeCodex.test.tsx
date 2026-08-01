@@ -71,6 +71,16 @@ vi.mock('@/hooks/queries/useOpencodeModelsForCwd', () => ({
     })
 }))
 
+vi.mock('@/hooks/queries/useGrokModelsForCwd', () => ({
+    useGrokModelsForCwd: () => ({
+        availableModels: [],
+        currentModelId: null,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn()
+    })
+}))
+
 function makeMachine(): Machine {
     return {
         id: 'machine-1',
@@ -115,7 +125,7 @@ describe('NewSession Codex resume', () => {
             />
         )
 
-        fireEvent.click(screen.getByLabelText('codex'))
+        fireEvent.click(screen.getByLabelText('Codex'))
         fireEvent.click(screen.getByRole('checkbox', { name: /newSession.codexResume.title/ }))
         fireEvent.change(screen.getByLabelText('newSession.codexResume.sessionId'), {
             target: { value: ' 019ed35e-db26-7770-abb3-1c7ee3c92f52 ' }
@@ -159,7 +169,7 @@ describe('NewSession Codex resume', () => {
             />
         )
 
-        fireEvent.click(screen.getByLabelText('codex'))
+        fireEvent.click(screen.getByLabelText('Codex'))
         fireEvent.click(screen.getByRole('checkbox', { name: /newSession.codexResume.title/ }))
 
         expect(screen.getByRole('button', { name: 'newSession.create' })).toBeDisabled()
@@ -233,7 +243,7 @@ describe('NewSession Codex resume', () => {
         )
 
         expect(screen.getByPlaceholderText('newSession.placeholder')).toHaveValue('/repo')
-        expect(screen.getByLabelText('codex')).toBeChecked()
+        expect(screen.getByLabelText('Codex')).toBeChecked()
         expect(document.getElementById('session-type-worktree')).toBeChecked()
         expect(screen.getByPlaceholderText('newSession.type.worktree.placeholder'))
             .toHaveValue('mobile-dialogs')

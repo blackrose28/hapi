@@ -52,6 +52,14 @@ const BUILTIN_COMMANDS: Record<string, SlashCommand[]> = {
         { name: 'clear', description: 'Clear conversation', source: 'builtin' },
         { name: 'compress', description: 'Compress context', source: 'builtin' },
     ],
+    grok: [
+        { name: 'compact', description: 'Compress conversation history to save context', source: 'builtin' },
+        { name: 'context', description: 'Show context window usage and session stats', source: 'builtin' },
+        { name: 'session-info', description: 'Show Grok session model, turns, and context usage', source: 'builtin' },
+        { name: 'goal', description: 'Set, manage, or inspect an autonomous goal', source: 'builtin' },
+        { name: 'always-approve', description: 'Toggle automatic tool approval', source: 'builtin' },
+        { name: 'auto', description: 'Let Grok classify safe tool calls for automatic approval', source: 'builtin' },
+    ],
     opencode: [],
 };
 
@@ -107,6 +115,8 @@ function getUserCommandsDir(agent: string): string | null {
             const codexHome = process.env.CODEX_HOME ?? join(homedir(), '.codex');
             return join(codexHome, 'prompts');
         }
+        case 'grok':
+            return join(homedir(), '.agents', 'commands');
         default:
             // Gemini and other agents don't have user commands
             return null;
@@ -123,6 +133,8 @@ function getProjectCommandsDir(agent: string, projectDir: string): string | null
             return join(projectDir, '.claude', 'commands');
         case 'codex':
             return join(projectDir, '.codex', 'prompts');
+        case 'grok':
+            return join(projectDir, '.grok', 'commands');
         default:
             // Gemini and other agents don't have project commands
             return null;

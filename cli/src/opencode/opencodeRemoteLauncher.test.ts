@@ -10,7 +10,10 @@ const harness = {
     setModelImpl: null as null | ((sessionId: string, modelId: string) => Promise<void>),
     onAvailableCommandsHandler: null as null | ((commands: Array<{ name: string; description?: string }>) => void),
     onAvailableCommandsCalls: [] as unknown[],
-    availableCommandUpdates: [] as Array<Array<{ name: string; description?: string }>>
+    availableCommandUpdates: [] as Array<Array<{ name: string; description?: string }>>,
+    sessionInfoUpdateListener: null as null | ((update: { sessionId: string | null; title: string | null }) => void),
+    refreshSessionInfoCalls: [] as Array<{ sessionId: string; cwd: string }>,
+    bridgeOptions: null as { enableChangeTitle?: boolean } | null
 };
 
 vi.mock('./utils/opencodeBackend', () => ({
@@ -53,16 +56,25 @@ vi.mock('./utils/opencodeBackend', () => ({
             harness.onAvailableCommandsCalls.push(handler);
             harness.onAvailableCommandsHandler = handler;
         }),
+        setSessionInfoUpdateListener: vi.fn((listener: ((update: { sessionId: string | null; title: string | null }) => void) | null) => {
+            harness.sessionInfoUpdateListener = listener;
+        }),
+        refreshSessionInfo: vi.fn(async (sessionId: string, cwd: string) => {
+            harness.refreshSessionInfoCalls.push({ sessionId, cwd });
+        }),
         disconnect: vi.fn(async () => {}),
         getSessionModelsMetadata: vi.fn(() => undefined)
     }))
 }));
 
 vi.mock('@/codex/utils/buildHapiMcpBridge', () => ({
-    buildHapiMcpBridge: async () => ({
-        server: { stop: () => {} },
-        mcpServers: {}
-    })
+    buildHapiMcpBridge: async (_client: unknown, options?: { enableChangeTitle?: boolean }) => {
+        harness.bridgeOptions = options ?? null;
+        return {
+            server: { stop: () => {} },
+            mcpServers: {}
+        };
+    }
 }));
 
 vi.mock('./utils/permissionHandler', () => ({
@@ -126,6 +138,7 @@ function createSessionStub(items: Array<{ message: string; mode: OpencodeMode }>
             metadataUpdates.push(next);
         },
         sendAgentMessage(_message: unknown) {},
+        sendClaudeSessionMessage(_message: unknown) {},
         sendUserMessage(_text: string) {},
         sendSessionEvent(event: { type: string; [key: string]: unknown }) {
             sessionEvents.push(event);
@@ -169,6 +182,45 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         harness.onAvailableCommandsHandler = null;
         harness.onAvailableCommandsCalls = [];
         harness.availableCommandUpdates = [];
+        harness.sessionInfoUpdateListener = null;
+        harness.refreshSessionInfoCalls = [];
+        harness.bridgeOptions = null;
+    });
+
+    it('disables the change_title MCP tool and syncs native OpenCode session titles', async () => {
+        const { session } = createSessionStub([
+            { message: 'hello', mode: createMode() },
+            { message: 'again', mode: createMode() }
+        ]);
+
+        const sentMessages: unknown[] = [];
+        session.client.sendClaudeSessionMessage = (message: unknown) => {
+            sentMessages.push(message);
+        };
+
+        await opencodeRemoteLauncher(session as never);
+
+        // Native ACP titles replace the change_title MCP tool for OpenCode.
+        expect(harness.bridgeOptions).toEqual({ enableChangeTitle: false });
+
+        // refreshSessionInfo is polled once per completed prompt.
+        expect(harness.refreshSessionInfoCalls).toEqual([
+            { sessionId: 'acp-session-1', cwd: '/tmp/hapi-opencode-test' },
+            { sessionId: 'acp-session-1', cwd: '/tmp/hapi-opencode-test' }
+        ]);
+
+        // registerAcpSessionTitleSync wired the backend's session-info listener
+        // through to the session client as a HAPI summary message.
+        expect(harness.sessionInfoUpdateListener).not.toBeNull();
+        harness.sessionInfoUpdateListener?.({ sessionId: 'acp-session-1', title: 'Fix flaky ACP test' });
+
+        expect(sentMessages).toEqual([
+            {
+                type: 'summary',
+                summary: 'Fix flaky ACP test',
+                leafUuid: expect.any(String)
+            }
+        ]);
     });
 
     it('records available OpenCode commands in slash command metadata', async () => {
@@ -334,6 +386,8 @@ describe('opencodeRemoteLauncher inline model switch', () => {
             respondToPermission: vi.fn(async () => {}),
             onStderrError: vi.fn(),
             onPermissionRequest: vi.fn(),
+            setSessionInfoUpdateListener: vi.fn(),
+            refreshSessionInfo: vi.fn(async () => {}),
             disconnect: vi.fn(async () => {}),
             getSessionModelsMetadata: vi.fn((sessionId: string) => {
                 if (sessionId === 'acp-session-1') {

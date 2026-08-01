@@ -56,10 +56,12 @@ export function getModelOptionsForFlavor(
     if (flavor === 'gemini') {
         return getGeminiModelOptions(currentModel)
     }
-    // Codex/OpenCode discover models dynamically via RPC. Until those options
-    // arrive, avoid falling through to Claude presets; show only the current
-    // persisted model when one exists.
-    if (flavor === 'codex' || flavor === 'opencode') {
+    // Codex/OpenCode/Pi discover models dynamically via RPC. Until those
+    // options arrive, avoid falling through to Claude presets; show only the
+    // current persisted model when one exists. Pi's real model list is
+    // provided separately via the piModels prop (SessionChat -> HappyComposer
+    // -> PiModelPanel), not through this function.
+    if (flavor === 'codex' || flavor === 'opencode' || flavor === 'kimi' || flavor === 'grok' || flavor === 'pi') {
         return withCurrentModelOption([], currentModel)
     }
     return getClaudeComposerModelOptions(currentModel)
@@ -81,11 +83,13 @@ export function getNextModelForFlavor(
     if (flavor === 'gemini') {
         return getNextGeminiModel(currentModel)
     }
-    // Codex/OpenCode discover models dynamically via RPC. Until those options
-    // arrive, pressing Ctrl/Cmd+M must not fall through to the Claude preset
-    // cycler — that would post a Claude model into a non-Claude session. Keep the
-    // current model unchanged instead.
-    if (flavor === 'codex' || flavor === 'opencode') {
+    // Codex/OpenCode/Pi discover models dynamically via RPC. Until those
+    // options arrive, pressing Ctrl/Cmd+M must not fall through to the Claude
+    // preset cycler — that would post a Claude model into a non-Claude
+    // session. Keep the current model unchanged instead. (Pi additionally
+    // short-circuits this shortcut entirely in HappyComposer since its model
+    // changes require a provider, which this generic cycler cannot supply.)
+    if (flavor === 'codex' || flavor === 'opencode' || flavor === 'kimi' || flavor === 'grok' || flavor === 'pi') {
         return normalizeCurrentModel(currentModel)
     }
     return getNextClaudeComposerModel(currentModel)

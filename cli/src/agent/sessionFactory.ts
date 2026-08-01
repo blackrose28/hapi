@@ -12,7 +12,10 @@ import { logger } from '@/ui/logger'
 import { runtimePath } from '@/projectPath'
 import { getInvokedCwd } from '@/utils/invokedCwd'
 import { readWorktreeEnv } from '@/utils/worktreeEnv'
+import { exportHapiSessionEnv } from '@/agent/hapiSessionEnv'
 import packageJson from '../../package.json'
+
+export { HAPI_SESSION_ID_ENV, exportHapiSessionEnv } from '@/agent/hapiSessionEnv'
 
 export type SessionStartedBy = 'runner' | 'terminal'
 
@@ -140,6 +143,8 @@ export async function bootstrapSession(options: SessionBootstrapOptions): Promis
     })
 
     const session = api.sessionSyncClient(sessionInfo)
+
+    exportHapiSessionEnv(sessionInfo.id)
 
     await reportSessionStarted(sessionInfo.id, metadata)
 

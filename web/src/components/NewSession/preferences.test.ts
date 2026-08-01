@@ -30,6 +30,15 @@ describe('NewSession preferences', () => {
         expect(loadPreferredAgent()).toBe('claude')
     })
 
+    it('falls back to default agent when the stored value is the sunset Gemini flavor', () => {
+        // Regression: a pre-removal 'gemini' preference is a *valid* AgentType
+        // (gemini stays a member for read-path reasons) but is no longer
+        // creatable, so it must not be restored as a launchable default.
+        localStorage.setItem('hapi:newSession:agent', 'gemini')
+
+        expect(loadPreferredAgent()).toBe('claude')
+    })
+
     it('persists new values to storage', () => {
         savePreferredAgent('gemini')
         savePreferredYoloMode(true)

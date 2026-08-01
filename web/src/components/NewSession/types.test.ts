@@ -1,6 +1,6 @@
 import { CLAUDE_MODEL_PRESETS, getClaudeModelLabel } from '@hapi/protocol'
 import { describe, expect, it } from 'vitest'
-import { CLAUDE_EFFORT_OPTIONS, MODEL_OPTIONS } from './types'
+import { CLAUDE_EFFORT_OPTIONS, GROK_EFFORT_OPTIONS, MODEL_OPTIONS } from './types'
 
 describe('Claude model options', () => {
     it('derives Claude fallback options from shared presets', () => {
@@ -27,6 +27,17 @@ describe('Claude effort options', () => {
             { value: 'medium', label: 'Medium' },
             { value: 'high', label: 'High' },
             { value: 'max', label: 'Max' },
+        ])
+    })
+})
+
+describe('Grok effort options', () => {
+    it('offers only the effort levels supported by grok-4.5', () => {
+        expect(GROK_EFFORT_OPTIONS).toEqual([
+            { value: 'auto', label: 'Default' },
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' },
         ])
     })
 })

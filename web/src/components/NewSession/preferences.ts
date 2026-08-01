@@ -1,9 +1,13 @@
+import { CREATABLE_AGENT_FLAVORS } from '@hapi/protocol'
 import type { AgentType } from './types'
 
 const AGENT_STORAGE_KEY = 'hapi:newSession:agent'
 const YOLO_STORAGE_KEY = 'hapi:newSession:yolo'
 
-const VALID_AGENTS: AgentType[] = ['claude', 'codex', 'cursor', 'gemini', 'opencode']
+// Only launchable flavors are valid restored defaults. A stale 'gemini'
+// preference (no longer creatable — Google sunset the consumer Gemini CLI on
+// 2026-06-18) falls back to 'claude' below.
+const VALID_AGENTS: readonly AgentType[] = CREATABLE_AGENT_FLAVORS
 
 export function loadPreferredAgent(): AgentType {
     try {

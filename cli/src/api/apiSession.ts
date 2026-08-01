@@ -633,6 +633,10 @@ export class ApiSessionClient extends EventEmitter {
         this.socket.emit('session-end', { sid: this.sessionId, time: Date.now(), reason })
     }
 
+    getMetadata(): Readonly<Metadata> | null {
+        return this.metadata
+    }
+
     updateMetadata(handler: (metadata: Metadata) => Metadata): void {
         this.metadataLock.inLock(async () => {
             await backoff(async () => {

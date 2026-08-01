@@ -137,6 +137,41 @@ describe('reduceTimeline', () => {
         expect(textBlocks).toHaveLength(1)
     })
 
+    it('recognizes Kimi-style "Agent: <name>" tool-call titles as subagent spawns', () => {
+        // Claude/Codex spawn subagents via a tool named exactly 'Task'. Kimi
+        // (and other ACP agents) label the same concept with a titled variant
+        // like 'Agent: Researcher'. The subagent-prompt suppression logic
+        // must recognize both so the duplicated prompt text is not shown
+        // twice for Kimi sessions.
+        const kimiAgentMsg: TracedMessage = {
+            id: 'msg-kimi-agent',
+            localId: null,
+            createdAt: 1_700_000_000_000,
+            role: 'agent',
+            content: [
+                { type: 'text', text: 'Look into the failing test', uuid: 'u-1', parentUUID: null },
+                {
+                    type: 'tool-call',
+                    id: 'tc-kimi-1',
+                    name: 'Agent: Researcher',
+                    input: { prompt: 'Look into the failing test' },
+                    description: null,
+                    uuid: 'u-1',
+                    parentUUID: null
+                }
+            ],
+            isSidechain: false
+        } as TracedMessage
+
+        const { blocks } = reduceTimeline([kimiAgentMsg], makeContext())
+        const textBlocks = blocks.filter(b => b.kind === 'agent-text')
+        // The prompt-echo text preceding the "Agent: Researcher" tool call is
+        // suppressed, same as it would be for a Claude 'Task' tool call.
+        expect(textBlocks).toHaveLength(0)
+        const toolBlocks = blocks.filter(b => b.kind === 'tool-call')
+        expect(toolBlocks).toHaveLength(1)
+    })
+
     it('keeps normal assistant text blocks', () => {
         const { blocks } = reduceTimeline([makeAgentMessage('Here is the answer.')], makeContext())
 

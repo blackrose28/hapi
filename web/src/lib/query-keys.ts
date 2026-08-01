@@ -39,6 +39,10 @@ export const queryKeys = {
     sessionAgentModelsBase: (sessionId: string) => ['session-agent-models', sessionId] as const,
     sessionAgentModels: (sessionId: string, agent: string) => ['session-agent-models', sessionId, agent] as const,
     sessionOpencodeModels: (sessionId: string) => ['session-opencode-models', sessionId] as const,
+    sessionPiModels: (sessionId: string) => ['session-pi-models', sessionId] as const,
     machineOpencodeModelsForCwd: (machineId: string, cwd: string) => ['machine-opencode-models', machineId, cwd] as const,
+    sessionGrokModels: (sessionId: string) => ['session-grok-models', sessionId] as const,
+    sessionGrokReasoningEffortOptions: (sessionId: string) => ['session-grok-reasoning-effort-options', sessionId] as const,
+    machineGrokModelsForCwd: (machineId: string, cwd: string) => ['machine-grok-models', machineId, cwd] as const,
     skills: (sessionId: string) => ['skills', sessionId] as const,
 }

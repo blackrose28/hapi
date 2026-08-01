@@ -5,6 +5,7 @@ import {
     type ClipboardEvent as ReactClipboardEvent,
     type FormEvent as ReactFormEvent,
     type KeyboardEvent as ReactKeyboardEvent,
+    type ReactNode,
     type SyntheticEvent as ReactSyntheticEvent,
     useCallback,
     useEffect,
@@ -12,7 +13,7 @@ import {
     useRef,
     useState
 } from 'react'
-import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types/api'
+import type { AgentState, CodexCollaborationMode, PermissionMode, PiModelSummary } from '@/types/api'
 import type { QuotaWindow } from '@/chat/reducer'
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import type { ConversationStatus } from '@/realtime/types'
@@ -22,7 +23,8 @@ import { applySuggestion } from '@/utils/applySuggestion'
 import { usePlatform } from '@/hooks/usePlatform'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePWAInstall } from '@/hooks/usePWAInstall'
-import { supportsEffort, supportsModelChange } from '@hapi/protocol'
+import { supportsEffort, supportsModelChange, PI_THINKING_LEVEL_LABELS } from '@hapi/protocol'
+import type { PiThinkingLevel } from '@hapi/protocol'
 import { markSkillUsed } from '@/lib/recent-skills'
 import { useComposerDraft } from '@/hooks/useComposerDraft'
 import type { SendStatus } from '@/hooks/mutations/useSendMessage'
@@ -43,6 +45,10 @@ import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
 import { getClaudeComposerEffortOptions } from './claudeEffortOptions'
 import { getCodexComposerReasoningEffortOptions } from './codexReasoningEffortOptions'
 import { shouldSendComposerOnEnter } from './composerKeyboard'
+import { getPiThinkingLevelOptions, getHighestThinkingLevel, isThinkingLevelSupported } from './piThinkingLevelOptions'
+import { groupModelsByProvider } from './piModelGroups'
+import { PiModelPanel } from './PiModelPanel'
+import { PiThinkingLevelPanel } from './PiThinkingLevelPanel'
 
 export interface TextInputState {
     text: string
@@ -118,10 +124,17 @@ export function HappyComposer(props: {
     controlledByUser?: boolean
     agentFlavor?: string | null
     availableModelOptions?: Array<{ value: string | null; label: string }>
+    /** Full Pi model data with thinkingLevelMap for provider grouping + thinking level filtering */
+    piModels?: PiModelSummary[]
+    /** Pi: provider-qualified selected model from metadata (survives reload;
+     *  disambiguates when two providers share a modelId). */
+    piSelectedModel?: { provider: string; modelId: string } | null
     availableModelReasoningEffortOptions?: Array<{ value: string | null; label: string }>
+    /** Grok: ACP-reported reasoning effort options for the current/selected model. */
+    availableEffortOptions?: Array<{ value: string; name?: string }>
     onCollaborationModeChange?: (mode: CodexCollaborationMode) => void
     onPermissionModeChange?: (mode: PermissionMode) => void
-    onModelChange?: (model: string | null) => void
+    onModelChange?: (model: { provider: string; modelId: string } | string | null) => void
     onModelReasoningEffortChange?: (modelReasoningEffort: string | null) => void
     onEffortChange?: (effort: string | null) => void
     onCompactRuntimeChange?: (change: CompactRuntimeChange) => Promise<void>
@@ -163,7 +176,10 @@ export function HappyComposer(props: {
         controlledByUser = false,
         agentFlavor,
         availableModelOptions,
+        piModels,
+        piSelectedModel,
         availableModelReasoningEffortOptions,
+        availableEffortOptions,
         onCollaborationModeChange,
         onPermissionModeChange,
         onModelChange,
@@ -221,6 +237,8 @@ export function HappyComposer(props: {
         selection: { start: 0, end: 0 }
     })
     const [showSettings, setShowSettings] = useState(false)
+    const [showPiModelPanel, setShowPiModelPanel] = useState(false)
+    const [showPiThinkingPanel, setShowPiThinkingPanel] = useState(false)
     const [isAborting, setIsAborting] = useState(false)
     const [isSwitching, setIsSwitching] = useState(false)
     const [isRuntimeChanging, setIsRuntimeChanging] = useState(false)
@@ -487,9 +505,48 @@ export function HappyComposer(props: {
             : availableModelReasoningEffortOptions ?? [],
         [agentFlavor, modelReasoningEffort, availableModelReasoningEffortOptions]
     )
+    // Pi: group models by provider for hierarchical display
+    const piModelGroups = useMemo(
+        () => piModels && piModels.length > 0 ? groupModelsByProvider(piModels) : null,
+        [piModels]
+    )
+    // Pi: find the currently selected model's thinkingLevelMap for effort filtering.
+    // Prefer provider-qualified match (metadata.piSelectedModel) when available —
+    // two providers may share a modelId, and a modelId-only match would pick the
+    // wrong one, sending the wrong provider on the next model/effort change.
+    const selectedPiModel = useMemo(
+        () => piSelectedModel
+            ? piModels?.find((m) => m.provider === piSelectedModel.provider && m.modelId === piSelectedModel.modelId)
+            : piModels?.find((m) => m.modelId === model),
+        [piModels, piSelectedModel, model]
+    )
+
+    // Pi: reset effort to highest supported level when model changes and current level is unsupported
+    useEffect(() => {
+        if (!effort || !selectedPiModel || !onEffortChange) return
+        // Non-reasoning model: clear stale effort so the hub does not forward
+        // a set_thinking_level the user can no longer see or change.
+        if (selectedPiModel.reasoning === false) {
+            onEffortChange(null)
+            return
+        }
+        if (!isThinkingLevelSupported(effort, selectedPiModel.thinkingLevelMap)) {
+            onEffortChange(getHighestThinkingLevel(selectedPiModel.thinkingLevelMap))
+        }
+    }, [selectedPiModel, effort, onEffortChange])
     const claudeEffortOptions = useMemo(
-        () => getClaudeComposerEffortOptions(effort),
-        [effort]
+        () => agentFlavor === 'pi'
+            ? getPiThinkingLevelOptions(effort, selectedPiModel?.thinkingLevelMap)
+            : agentFlavor === 'grok' && availableEffortOptions && availableEffortOptions.length > 0
+                ? [
+                    { value: null, label: 'Default' },
+                    ...availableEffortOptions.map((option) => ({
+                        value: option.value,
+                        label: option.name ?? option.value
+                    }))
+                ]
+                : getClaudeComposerEffortOptions(effort),
+        [agentFlavor, effort, selectedPiModel, availableEffortOptions]
     )
     const permissionModes = useMemo(
         () => permissionModeOptions.map((option) => option.mode),
@@ -610,6 +667,11 @@ export function HappyComposer(props: {
 
     useEffect(() => {
         const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+            // Pi needs { provider, modelId } to disambiguate duplicate model IDs,
+            // but this generic cycler only emits a bare modelId (or null), which
+            // would lose the provider and can pick the wrong cached match or clear
+            // the model. Pi model changes go only through the dedicated PiModelPanel.
+            if (agentFlavor === 'pi') return
             if (e.key === 'm' && (e.metaKey || e.ctrlKey) && onModelChange && supportsModelChange(agentFlavor)) {
                 e.preventDefault()
                 onModelChange(getNextModelForFlavor(agentFlavor, model, availableModelOptions))
@@ -690,7 +752,7 @@ export function HappyComposer(props: {
         haptic('light')
     }, [onCollaborationModeChange, controlsDisabled, haptic])
 
-    const handleModelChange = useCallback((nextModel: string | null) => {
+    const handleModelChange = useCallback((nextModel: { provider: string; modelId: string } | string | null) => {
         if (!onModelChange || controlsDisabled) return
         onModelChange(nextModel)
         setShowSettings(false)
@@ -713,9 +775,11 @@ export function HappyComposer(props: {
 
     const showCollaborationSettings = Boolean(onCollaborationModeChange && collaborationModeOptions.length > 0)
     const showPermissionSettings = Boolean(onPermissionModeChange && permissionModeOptions.length > 0)
-    const showModelSettings = Boolean(onModelChange && supportsModelChange(agentFlavor) && modelOptions.length > 0)
+    const showModelSettings = Boolean(onModelChange && supportsModelChange(agentFlavor) && (piModels && piModels.length > 0 || modelOptions.length > 0))
     const showModelReasoningEffortSettings = Boolean(onModelReasoningEffortChange && modelReasoningEffortOptions.length > 0)
-    const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor))
+    // For Pi: hide effort when the selected model explicitly has reasoning: false
+    const piEffortHidden = piModels && selectedPiModel && selectedPiModel.reasoning === false
+    const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor) && !piEffortHidden)
     const showSettingsButton = Boolean(
         showCollaborationSettings
         || showPermissionSettings
@@ -740,7 +804,89 @@ export function HappyComposer(props: {
         api.composer().send()
     }, [api, beginCompactSend, canSend])
 
+    // Pi: selected model info for UI labels and thinking level filtering
+    const piModelLabel = agentFlavor === 'pi'
+        ? (selectedPiModel?.name ?? selectedPiModel?.modelId ?? 'Model')
+        : undefined
+    const piThinkingLabel = agentFlavor === 'pi'
+        ? (() => {
+            if (!selectedPiModel) return 'Thinking'
+            const effectiveLevel = effort && isThinkingLevelSupported(effort, selectedPiModel.thinkingLevelMap)
+                ? effort
+                : getHighestThinkingLevel(selectedPiModel.thinkingLevelMap)
+            return effectiveLevel
+                ? (PI_THINKING_LEVEL_LABELS[effectiveLevel as PiThinkingLevel] ?? effectiveLevel)
+                : 'Thinking'
+        })()
+        : undefined
+    const piHasModels = piModels && piModels.length > 0
+
+    const closeAllPanels = useCallback(() => {
+        setShowSettings(false)
+        setShowPiModelPanel(false)
+        setShowPiThinkingPanel(false)
+    }, [])
+
+    const handlePiModelToggle = useCallback(() => {
+        if (controlsDisabled) return
+        setShowPiModelPanel((v) => !v)
+        setShowSettings(false)
+        setShowPiThinkingPanel(false)
+        haptic('light')
+    }, [controlsDisabled, haptic])
+
+    const handlePiThinkingToggle = useCallback(() => {
+        if (controlsDisabled) return
+        setShowPiThinkingPanel((v) => !v)
+        setShowSettings(false)
+        setShowPiModelPanel(false)
+        haptic('light')
+    }, [controlsDisabled, haptic])
+
     const overlays = useMemo(() => {
+        // Pi flavor: separate floating panels for model and thinking level.
+        // (Pi RPC mode has no runtime permission switching → no permission panel.)
+        if (agentFlavor === 'pi') {
+            const panels: ReactNode[] = []
+
+            // Model selection panel
+            if (showPiModelPanel && piModels && piModels.length > 0) {
+                const currentPiModel = selectedPiModel ?? null
+                panels.push(
+                    <div key="model" className="absolute bottom-[100%] mb-2 left-2 w-64">
+                        <PiModelPanel
+                            models={piModels}
+                            currentModel={currentPiModel ? { provider: currentPiModel.provider, modelId: currentPiModel.modelId } : null}
+                            controlsDisabled={controlsDisabled}
+                            onSelect={(piModel) => {
+                                handleModelChange({ provider: piModel.provider, modelId: piModel.modelId })
+                            }}
+                            onClose={closeAllPanels}
+                        />
+                    </div>
+                )
+            }
+
+            // Thinking level panel
+            if (showPiThinkingPanel && selectedPiModel?.reasoning !== false) {
+                panels.push(
+                    <div key="thinking" className="absolute bottom-[100%] mb-2 left-2 w-48">
+                        <PiThinkingLevelPanel
+                            currentLevel={effort}
+                            reasoning={selectedPiModel?.reasoning}
+                            thinkingLevelMap={selectedPiModel?.thinkingLevelMap}
+                            controlsDisabled={controlsDisabled}
+                            onSelect={(level) => handleEffortChange(level)}
+                            onClose={closeAllPanels}
+                        />
+                    </div>
+                )
+            }
+
+            if (panels.length > 0) return <>{panels}</>
+        }
+
+        // Non-Pi flavors: original unified gear menu
         if (showSettings && (showCollaborationSettings || showPermissionSettings || showModelSettings || showModelReasoningEffortSettings || showEffortSettings)) {
             return (
                 <div className="absolute bottom-[100%] mb-2 w-full">
@@ -790,6 +936,12 @@ export function HappyComposer(props: {
         return null
     }, [
         showSettings,
+        showPiModelPanel,
+        showPiThinkingPanel,
+        agentFlavor,
+        piModels,
+        selectedPiModel,
+        closeAllPanels,
         showCollaborationSettings,
         showPermissionSettings,
         showModelSettings,
@@ -958,6 +1110,14 @@ export function HappyComposer(props: {
                                 onVoiceToggle={onVoiceToggle ?? (() => {})}
                                 onVoiceMicToggle={onVoiceMicToggle}
                                 onSend={handleSend}
+                                piModelLabel={piModelLabel}
+                                piModelDisabled={controlsDisabled || !piHasModels}
+                                piModelOpen={showPiModelPanel}
+                                onPiModelToggle={handlePiModelToggle}
+                                piThinkingLabel={piThinkingLabel}
+                                piThinkingDisabled={controlsDisabled || !piHasModels || !selectedPiModel || selectedPiModel.reasoning === false}
+                                piThinkingOpen={showPiThinkingPanel}
+                                onPiThinkingToggle={handlePiThinkingToggle}
                             />
                         </div>
                     )}

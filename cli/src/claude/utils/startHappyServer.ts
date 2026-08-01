@@ -12,7 +12,19 @@ import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
 import { getHapiSessionToolDefinition, HAPI_SESSION_TOOL_NAMES } from "@/mcp/hapiSessionTools";
 
-export async function startHappyServer(client: ApiSessionClient) {
+export interface StartHappyServerOptions {
+    /**
+     * Whether to register the `change_title` MCP tool. Defaults to true.
+     * Flavors whose native ACP session already syncs its own title (see
+     * `registerAcpSessionTitleSync`) should pass false so the model is not
+     * told to call a tool that would fight with the native title stream.
+     */
+    enableChangeTitle?: boolean;
+}
+
+export async function startHappyServer(client: ApiSessionClient, options: StartHappyServerOptions = {}) {
+    const enableChangeTitle = options.enableChangeTitle ?? true;
+
     // Handler that sends title updates via the client
     const handler = async (title: string) => {
         logger.debug('[hapiMCP] Changing title to:', title);
@@ -39,38 +51,40 @@ export async function startHappyServer(client: ApiSessionClient) {
         version: "1.0.0",
     });
 
-    const changeTitleTool = getHapiSessionToolDefinition('change_title');
+    if (enableChangeTitle) {
+        const changeTitleTool = getHapiSessionToolDefinition('change_title');
 
-    mcp.registerTool<any, any>('change_title', {
-        description: changeTitleTool.description,
-        title: changeTitleTool.title,
-        inputSchema: changeTitleTool.inputSchema,
-    }, async (args: { title: string }) => {
-        const response = await handler(args.title);
-        logger.debug('[hapiMCP] Response:', response);
-        
-        if (response.success) {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: `Successfully changed chat title to: "${args.title}"`,
-                    },
-                ],
-                isError: false,
-            };
-        } else {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: `Failed to change chat title: ${response.error || 'Unknown error'}`,
-                    },
-                ],
-                isError: true,
-            };
-        }
-    });
+        mcp.registerTool<any, any>('change_title', {
+            description: changeTitleTool.description,
+            title: changeTitleTool.title,
+            inputSchema: changeTitleTool.inputSchema,
+        }, async (args: { title: string }) => {
+            const response = await handler(args.title);
+            logger.debug('[hapiMCP] Response:', response);
+
+            if (response.success) {
+                return {
+                    content: [
+                        {
+                            type: 'text' as const,
+                            text: `Successfully changed chat title to: "${args.title}"`,
+                        },
+                    ],
+                    isError: false,
+                };
+            } else {
+                return {
+                    content: [
+                        {
+                            type: 'text' as const,
+                            text: `Failed to change chat title: ${response.error || 'Unknown error'}`,
+                        },
+                    ],
+                    isError: true,
+                };
+            }
+        });
+    }
 
     const reportToTeamTool = getHapiSessionToolDefinition('report_to_team');
     mcp.registerTool<any, any>('report_to_team', {
@@ -163,7 +177,9 @@ export async function startHappyServer(client: ApiSessionClient) {
 
     return {
         url: baseUrl.toString(),
-        toolNames: [...HAPI_SESSION_TOOL_NAMES],
+        toolNames: enableChangeTitle
+            ? [...HAPI_SESSION_TOOL_NAMES]
+            : HAPI_SESSION_TOOL_NAMES.filter((name) => name !== 'change_title'),
         stop: () => {
             logger.debug('[hapiMCP] Stopping server');
             mcp.close();

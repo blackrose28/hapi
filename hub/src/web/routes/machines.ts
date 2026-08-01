@@ -1,17 +1,19 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { isKnownFlavor } from '@hapi/protocol'
+import { PermissionModeSchema } from '@hapi/protocol/schemas'
 import type { SyncEngine } from '../../sync/syncEngine'
 import type { WebAppEnv } from '../middleware/auth'
 import { requireMachine, requireCapability, type RestCapabilityResolver } from './guards'
 
 const spawnBodySchema = z.object({
     directory: z.string().min(1),
-    agent: z.enum(['claude', 'codex', 'cursor', 'gemini', 'opencode']).optional(),
+    agent: z.enum(['claude', 'codex', 'cursor', 'gemini', 'grok', 'opencode']).optional(),
     model: z.string().optional(),
     effort: z.string().optional(),
     modelReasoningEffort: z.string().optional(),
     yolo: z.boolean().optional(),
+    permissionMode: PermissionModeSchema.optional(),
     sessionType: z.enum(['simple', 'worktree']).optional(),
     worktreeName: z.string().optional(),
     resumeSessionId: z.string().trim().min(1).optional()
@@ -67,7 +69,8 @@ export function createMachinesRoutes(
             parsed.data.sessionType,
             parsed.data.worktreeName,
             parsed.data.resumeSessionId,
-            parsed.data.effort
+            parsed.data.effort,
+            parsed.data.permissionMode
         )
         return c.json(result)
     })
@@ -201,6 +204,34 @@ export function createMachinesRoutes(
             return c.json({
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to list OpenCode models'
+            }, 500)
+        }
+    })
+
+    app.get('/machines/:id/grok-models', async (c) => {
+        const engine = getSyncEngine()
+        if (!engine) {
+            return c.json({ success: false, error: 'Not connected' }, 503)
+        }
+
+        const machineId = c.req.param('id')
+        const machine = requireMachine(c, engine, machineId, { capabilityResolver, requiredCapability: 'view' })
+        if (machine instanceof Response) {
+            return machine
+        }
+
+        const cwd = (c.req.query('cwd') ?? '').trim()
+        if (!cwd) {
+            return c.json({ success: false, error: 'cwd query parameter is required' }, 400)
+        }
+
+        try {
+            const result = await engine.listGrokModelsForCwd(machineId, cwd)
+            return c.json(result)
+        } catch (error) {
+            return c.json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list Grok models'
             }, 500)
         }
     })

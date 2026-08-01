@@ -169,6 +169,55 @@ export type RpcListOpencodeModelsResponse = {
     error?: string
 }
 
+// Note: this fork has no shared `apiTypes.ts` module (deliberately not adopted
+// — see docs/upstream-sync), so RpcPiModel/RpcListPiModelsResponse are kept
+// local to this file, matching the existing RpcOpencodeModel/RpcCodexModel
+// convention rather than a parallel shared type file.
+export type RpcPiModel = {
+    provider: string
+    modelId: string
+    name?: string
+    contextWindow?: number
+    reasoning?: boolean
+    thinkingLevelMap?: Partial<Record<string, string | null>>
+}
+
+export type RpcListPiModelsResponse = {
+    success: boolean
+    availableModels?: RpcPiModel[]
+    currentModelId?: string | null
+    error?: string
+}
+
+// Same rationale as RpcPiModel above — no shared apiTypes.ts, so Grok's
+// model/effort response shapes are kept local to this file too.
+export type RpcGrokReasoningEffortOption = {
+    value: string
+    name?: string
+    isDefault?: boolean
+}
+
+export type RpcGrokModel = {
+    modelId: string
+    name?: string
+    reasoningEfforts?: RpcGrokReasoningEffortOption[]
+}
+
+export type RpcListGrokModelsResponse = {
+    success: boolean
+    availableModels?: RpcGrokModel[]
+    currentModelId?: string | null
+    autoPermissionModeSupported?: boolean
+    error?: string
+}
+
+export type RpcListGrokReasoningEffortOptionsResponse = {
+    success: boolean
+    options?: RpcGrokReasoningEffortOption[]
+    currentValue?: string | null
+    error?: string
+}
+
 export class RpcGateway {
     constructor(
         private readonly io: Server,
@@ -219,7 +268,10 @@ export class RpcGateway {
         config: {
             permissionMode?: PermissionMode,
         recoveryContext?: string
-            model?: string | null
+            // Pi requires { provider, modelId } to uniquely identify a model
+            // (two providers can share a modelId); every other flavor still
+            // sends/receives a plain string.
+            model?: { provider: string; modelId: string } | string | null
             modelReasoningEffort?: string | null
             effort?: string | null
             collaborationMode?: CodexCollaborationMode
@@ -235,7 +287,7 @@ export class RpcGateway {
     async spawnSession(
         machineId: string,
         directory: string,
-        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode' = 'claude',
+        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi' = 'claude',
         model?: string,
         modelReasoningEffort?: string,
         yolo?: boolean,
@@ -578,6 +630,22 @@ export class RpcGateway {
 
     async listOpencodeModelsForCwd(machineId: string, cwd: string): Promise<RpcListOpencodeModelsResponse> {
         return await this.machineRpc(machineId, 'listOpencodeModelsForCwd', { cwd }) as RpcListOpencodeModelsResponse
+    }
+
+    async listPiModelsForSession(sessionId: string): Promise<RpcListPiModelsResponse> {
+        return await this.sessionRpc(sessionId, 'listPiModels', {}) as RpcListPiModelsResponse
+    }
+
+    async listGrokModelsForSession(sessionId: string): Promise<RpcListGrokModelsResponse> {
+        return await this.sessionRpc(sessionId, 'listGrokModels', {}) as RpcListGrokModelsResponse
+    }
+
+    async listGrokModelsForCwd(machineId: string, cwd: string): Promise<RpcListGrokModelsResponse> {
+        return await this.machineRpc(machineId, 'listGrokModelsForCwd', { cwd }) as RpcListGrokModelsResponse
+    }
+
+    async listGrokReasoningEffortOptionsForSession(sessionId: string): Promise<RpcListGrokReasoningEffortOptionsResponse> {
+        return await this.sessionRpc(sessionId, 'listGrokReasoningEffortOptions', {}) as RpcListGrokReasoningEffortOptionsResponse
     }
 
     private parseAgentModelCatalog(value: unknown): AgentModelCatalogResult {

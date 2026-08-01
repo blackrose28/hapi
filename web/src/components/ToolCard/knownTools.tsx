@@ -567,10 +567,24 @@ export function getToolPresentation(opts: ToolOpts): ToolPresentation {
 
     const subtitle = filePath ?? command ?? pattern ?? url ?? query
 
+    // Some ACP agents emit `tool_call.title` as a verbatim argument (the shell
+    // command or the file path itself). When it equals the input field,
+    // promote a semantic label to the title slot and let the verbatim arg
+    // become the subtitle, so the card reads like a sentence instead of
+    // showing the same string twice.
+    let title = opts.toolName
+    if (subtitle && subtitle === title) {
+        if (filePath) title = toolText(opts, 'tool.semanticTitle.readFile', 'Read file')
+        else if (command) title = toolText(opts, 'tool.semanticTitle.runShell', 'Run shell')
+        else if (pattern) title = toolText(opts, 'tool.semanticTitle.search', 'Search')
+        else if (url) title = toolText(opts, 'tool.semanticTitle.openUrl', 'Open URL')
+        else if (query) title = toolText(opts, 'tool.semanticTitle.query', 'Query')
+    }
+
     return {
         icon: <WrenchIcon className={DEFAULT_ICON_CLASS} />,
-        title: opts.toolName,
-        subtitle: subtitle ? truncate(subtitle, 80) : null,
+        title,
+        subtitle: subtitle && subtitle !== title ? truncate(subtitle, 80) : null,
         minimal: true,
         tone: getToolSurfaceTone(opts.toolName)
     }

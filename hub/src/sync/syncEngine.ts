@@ -27,7 +27,12 @@ import {
     type RpcListDirectoryResponse,
     type RpcListCodexModelsResponse,
     type RpcListOpencodeModelsResponse,
+    type RpcListPiModelsResponse,
+    type RpcListGrokModelsResponse,
+    type RpcListGrokReasoningEffortOptionsResponse,
     type RpcOpencodeModel,
+    type RpcPiModel,
+    type RpcGrokModel,
     type RpcPathExistsResponse,
     type RpcReadFileResponse,
     type RpcReadFileRawResponse,
@@ -51,7 +56,12 @@ export type {
     RpcListDirectoryResponse,
     RpcListCodexModelsResponse,
     RpcListOpencodeModelsResponse,
+    RpcListPiModelsResponse,
+    RpcListGrokModelsResponse,
+    RpcListGrokReasoningEffortOptionsResponse,
     RpcOpencodeModel,
+    RpcPiModel,
+    RpcGrokModel,
     RpcPathExistsResponse,
     RpcReadFileResponse,
     RpcReadFileRawResponse,
@@ -581,7 +591,10 @@ export class SyncEngine {
         sessionId: string,
         config: {
             permissionMode?: PermissionMode,
-            model?: string | null
+            // Pi requires { provider, modelId } to uniquely identify a model
+            // (two providers can share a modelId); every other flavor still
+            // sends/receives a plain string.
+            model?: { provider: string; modelId: string } | string | null
             modelReasoningEffort?: string | null
             effort?: string | null
             collaborationMode?: CodexCollaborationMode
@@ -603,7 +616,10 @@ export class SyncEngine {
         const obj = result as {
             applied?: {
                 permissionMode?: Session['permissionMode']
-                model?: Session['model']
+                // Pi's set-session-config RPC returns a provider-qualified
+                // { provider, modelId } object (not the plain-string
+                // Session['model']) so the hub can persist piSelectedModel.
+                model?: Session['model'] | { provider: string; modelId: string }
                 modelReasoningEffort?: Session['modelReasoningEffort']
                 effort?: Session['effort']
                 collaborationMode?: Session['collaborationMode']
@@ -620,7 +636,7 @@ export class SyncEngine {
     async spawnSession(
         machineId: string,
         directory: string,
-        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode' = 'claude',
+        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi' = 'claude',
         model?: string,
         modelReasoningEffort?: string,
         yolo?: boolean,
@@ -667,18 +683,24 @@ export class SyncEngine {
             return { type: 'error', message: 'Session metadata missing path', code: 'resume_unavailable' }
         }
 
-        const flavor = metadata.flavor === 'codex' || metadata.flavor === 'gemini' || metadata.flavor === 'opencode' || metadata.flavor === 'cursor'
+        const flavor = metadata.flavor === 'codex' || metadata.flavor === 'gemini' || metadata.flavor === 'kimi' || metadata.flavor === 'grok' || metadata.flavor === 'opencode' || metadata.flavor === 'cursor' || metadata.flavor === 'pi'
             ? metadata.flavor
             : 'claude'
         const resumeToken = flavor === 'codex'
             ? metadata.codexSessionId
             : flavor === 'gemini'
                 ? metadata.geminiSessionId
-                : flavor === 'opencode'
-                    ? metadata.opencodeSessionId
-                    : flavor === 'cursor'
-                        ? metadata.cursorSessionId
-                        : metadata.claudeSessionId
+                : flavor === 'kimi'
+                    ? metadata.kimiSessionId
+                    : flavor === 'grok'
+                        ? metadata.grokSessionId
+                        : flavor === 'opencode'
+                            ? metadata.opencodeSessionId
+                            : flavor === 'cursor'
+                                ? metadata.cursorSessionId
+                                : flavor === 'pi'
+                                    ? metadata.piSessionId
+                                    : metadata.claudeSessionId
 
         if (!resumeToken) {
             return { type: 'error', message: 'Resume session ID unavailable', code: 'resume_unavailable' }
@@ -765,7 +787,9 @@ export class SyncEngine {
             && (prev?.claudeSessionId ?? null) === (next.claudeSessionId ?? null)
             && (prev?.geminiSessionId ?? null) === (next.geminiSessionId ?? null)
             && (prev?.opencodeSessionId ?? null) === (next.opencodeSessionId ?? null)
+            && (prev?.grokSessionId ?? null) === (next.grokSessionId ?? null)
             && (prev?.cursorSessionId ?? null) === (next.cursorSessionId ?? null)
+            && (prev?.piSessionId ?? null) === (next.piSessionId ?? null)
     }
 
     private triggerDedupIfNeeded(sessionId: string): void {
@@ -1096,7 +1120,45 @@ export class SyncEngine {
         })
     }
 
+    async listPiModelsForSession(sessionId: string): Promise<RpcListPiModelsResponse> {
+        return await this.rpcGateway.listPiModelsForSession(sessionId)
+    }
+
+    cachePiModelsForSession(sessionId: string, result: RpcListPiModelsResponse): void {
+        if (!result.success || !result.availableModels) return
+        // Stored directly on metadata.piAvailableModels (not a nested
+        // cachedXModels wrapper like Opencode/Codex) — matches the simpler
+        // shape shared/src/schemas.ts#MetadataSchema declares for Pi.
+        this.sessionCache.cacheSessionMetadata(sessionId, {
+            piAvailableModels: result.availableModels satisfies RpcPiModel[]
+        })
+    }
+
     async listOpencodeModelsForCwd(machineId: string, cwd: string): Promise<RpcListOpencodeModelsResponse> {
         return await this.rpcGateway.listOpencodeModelsForCwd(machineId, cwd)
+    }
+
+    async listGrokModelsForSession(sessionId: string): Promise<RpcListGrokModelsResponse> {
+        return await this.rpcGateway.listGrokModelsForSession(sessionId)
+    }
+
+    cacheGrokModelsForSession(sessionId: string, result: RpcListGrokModelsResponse): void {
+        if (!result.success || !result.availableModels) return
+        this.sessionCache.cacheSessionMetadata(sessionId, {
+            cachedGrokModels: {
+                availableModels: result.availableModels,
+                currentModelId: result.currentModelId ?? null,
+                autoPermissionModeSupported: result.autoPermissionModeSupported,
+                cachedAt: Date.now()
+            }
+        })
+    }
+
+    async listGrokModelsForCwd(machineId: string, cwd: string): Promise<RpcListGrokModelsResponse> {
+        return await this.rpcGateway.listGrokModelsForCwd(machineId, cwd)
+    }
+
+    async listGrokReasoningEffortOptionsForSession(sessionId: string): Promise<RpcListGrokReasoningEffortOptionsResponse> {
+        return await this.rpcGateway.listGrokReasoningEffortOptionsForSession(sessionId)
     }
 }

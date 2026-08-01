@@ -77,8 +77,20 @@ vi.mock('@/hooks/queries/useAgentModels', () => ({
     useAgentModels: useAgentModelsMock
 }))
 
+vi.mock('@/hooks/queries/usePiModels', () => ({
+    usePiModels: () => ({ availableModels: [], currentModelId: null, isLoading: false, error: null })
+}))
+
 vi.mock('@/hooks/queries/useOpencodeModels', () => ({
     useOpencodeModels: () => ({ availableModels: [], availableEfforts: [] })
+}))
+
+vi.mock('@/hooks/queries/useGrokModels', () => ({
+    useGrokModels: () => ({ availableModels: [], currentModelId: null, isLoading: false, error: null })
+}))
+
+vi.mock('@/hooks/queries/useGrokReasoningEffortOptions', () => ({
+    useGrokReasoningEffortOptions: () => ({ options: [], currentValue: null, isLoading: false, error: null })
 }))
 
 vi.mock('@/hooks/mutations/useSessionActions', () => ({

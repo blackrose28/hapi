@@ -4,6 +4,17 @@ import { createCliOutputBlock, isCliOutputText, mergeCliOutputBlocks } from '@/c
 import { parseMessageAsEvent } from '@/chat/reducerEvents'
 import { ensureToolBlock, extractTitleFromChangeTitleInput, isChangeTitleToolName, type PermissionEntry } from '@/chat/reducerTools'
 
+/**
+ * Recognizes subagent-spawning tool calls across agent flavors. Claude/Codex
+ * use the bare name `Task`; some ACP agents label the tool itself `Agent`, and
+ * Kimi emits titled variants like `Agent: <subagent name>` / `Task: <name>`
+ * for the same concept. Keeping this permissive (name or prefix) lets the
+ * sidechain-grouping logic below attach children regardless of flavor.
+ */
+function isSubagentToolName(name: string): boolean {
+    return name === 'Task' || name === 'Agent' || name.startsWith('Agent:') || name.startsWith('Task:')
+}
+
 function getTeamMentionMeta(meta: unknown): { requestId: string; teamChatId: string; sourceMessageId: string } | null {
     if (!meta || typeof meta !== 'object') return null
     const candidate = meta as Record<string, unknown>
@@ -139,7 +150,7 @@ export function reduceTimeline(
             // prompt as a text block before the tool_use block.  We only want to
             // suppress that exact prompt text — not every text block in the message.
             const taskToolCall = msg.content.find(
-                (c) => c.type === 'tool-call' && c.name === 'Task'
+                (c) => c.type === 'tool-call' && isSubagentToolName(c.name)
             )
             const taskPromptText: string | null = (() => {
                 if (!taskToolCall || taskToolCall.type !== 'tool-call') return null
@@ -254,7 +265,7 @@ export function reduceTimeline(
                         block.tool.startedAt = msg.createdAt
                     }
 
-                    if (c.name === 'Task' && !context.consumedGroupIds.has(msg.id)) {
+                    if (isSubagentToolName(c.name) && !context.consumedGroupIds.has(msg.id)) {
                         const sidechain = context.groups.get(msg.id) ?? null
                         if (sidechain && sidechain.length > 0) {
                             context.consumedGroupIds.add(msg.id)

@@ -313,6 +313,53 @@ export type OpencodeModelsResponse = {
     error?: string
 }
 
+/** Maps thinking levels to provider-specific values. null = unsupported. */
+export type PiThinkingLevelMap = Partial<Record<string, string | null>>
+
+export type PiModelSummary = {
+    provider: string
+    modelId: string
+    name?: string
+    contextWindow?: number
+    /** Whether the model supports reasoning/thinking */
+    reasoning?: boolean
+    /** Maps Pi thinking levels to provider values; null = unsupported level */
+    thinkingLevelMap?: PiThinkingLevelMap
+}
+
+export type PiModelsResponse = {
+    success: boolean
+    availableModels?: PiModelSummary[]
+    currentModelId?: string | null
+    error?: string
+}
+
+export type GrokReasoningEffortOption = {
+    value: string
+    name?: string
+    isDefault?: boolean
+}
+
+export type GrokModelSummary = {
+    modelId: string
+    name?: string
+    reasoningEfforts?: GrokReasoningEffortOption[]
+}
+
+export type GrokModelsResponse = {
+    success: boolean
+    availableModels?: GrokModelSummary[]
+    currentModelId?: string | null
+    error?: string
+}
+
+export type GrokReasoningEffortResponse = {
+    success: boolean
+    options?: GrokReasoningEffortOption[]
+    currentValue?: string | null
+    error?: string
+}
+
 export type PushSubscriptionKeys = {
     p256dh: string
     auth: string

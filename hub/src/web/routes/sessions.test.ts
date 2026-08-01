@@ -79,6 +79,29 @@ function createApp(session: Session, opts?: {
         ],
         currentModelId: 'ollama/exaone:4.5-33b-q8'
     })
+    const listPiModelsForSession = async () => ({
+        success: true,
+        availableModels: [
+            { provider: 'openai', modelId: 'gpt-4o', name: 'GPT-4o' },
+            { provider: 'anthropic', modelId: 'claude-3' }
+        ],
+        currentModelId: 'gpt-4o'
+    })
+    const listGrokModelsForSession = async () => ({
+        success: true,
+        availableModels: [
+            { modelId: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
+        ],
+        currentModelId: 'grok-code-fast-1'
+    })
+    const listGrokReasoningEffortOptionsForSession = async () => ({
+        success: true,
+        options: [
+            { value: 'low', name: 'Low' },
+            { value: 'high', name: 'High', isDefault: true }
+        ],
+        currentValue: 'high'
+    })
     const listAgentModelsForSession = opts?.listAgentModelsForSession ?? (async () => ({
         status: 'dynamic' as const,
         models: [{ id: 'claude-custom', displayName: 'Claude Custom' }],
@@ -93,6 +116,14 @@ function createApp(session: Session, opts?: {
     const cacheOpencodeModelsForSession = (sessionId: string, result: unknown) => {
         cacheOpencodeModelsForSessionCalls.push([sessionId, result])
     }
+    const cachePiModelsForSessionCalls: Array<[string, unknown]> = []
+    const cachePiModelsForSession = (sessionId: string, result: unknown) => {
+        cachePiModelsForSessionCalls.push([sessionId, result])
+    }
+    const cacheGrokModelsForSessionCalls: Array<[string, unknown]> = []
+    const cacheGrokModelsForSession = (sessionId: string, result: unknown) => {
+        cacheGrokModelsForSessionCalls.push([sessionId, result])
+    }
     const cacheAgentModelsForSession = (sessionId: string, agent: string, result: unknown) => {
         cacheAgentModelsForSessionCalls.push([sessionId, agent, result])
     }
@@ -103,9 +134,14 @@ function createApp(session: Session, opts?: {
         applySessionConfig,
         listCodexModelsForSession,
         listOpencodeModelsForSession,
+        listPiModelsForSession,
+        listGrokModelsForSession,
+        listGrokReasoningEffortOptionsForSession,
         listAgentModelsForSession,
         cacheCodexModelsForSession,
         cacheOpencodeModelsForSession,
+        cachePiModelsForSession,
+        cacheGrokModelsForSession,
         cacheAgentModelsForSession,
         resumeSession
     } as Partial<SyncEngine>
@@ -129,6 +165,8 @@ function createApp(session: Session, opts?: {
         applySessionConfigCalls,
         cacheCodexModelsForSessionCalls,
         cacheOpencodeModelsForSessionCalls,
+        cachePiModelsForSessionCalls,
+        cacheGrokModelsForSessionCalls,
         cacheAgentModelsForSessionCalls
     }
 }
@@ -524,6 +562,49 @@ describe('sessions routes', () => {
         expect(applySessionConfigCalls).toEqual([])
     })
 
+    it('rejects model changes for local Grok sessions', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'grok' },
+            agentState: {
+                controlledByUser: true,
+                requests: {},
+                completedRequests: {}
+            }
+        })
+        const { app, applySessionConfigCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/model', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ model: 'grok-code-fast-1' })
+        })
+
+        expect(response.status).toBe(409)
+        expect(await response.json()).toEqual({
+            error: 'Model selection can only be changed for remote Grok sessions'
+        })
+        expect(applySessionConfigCalls).toEqual([])
+    })
+
+    it('applies model changes for remote Grok sessions', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'grok' }
+        })
+        const { app, applySessionConfigCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/model', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ model: 'grok-code-fast-1' })
+        })
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({ ok: true })
+        expect(applySessionConfigCalls).toEqual([
+            ['session-1', { model: 'grok-code-fast-1' }]
+        ])
+    })
+
     it('applies model changes for OpenCode sessions', async () => {
         const session = createSession({
             metadata: {
@@ -589,7 +670,7 @@ describe('sessions routes', () => {
         expect(applySessionConfigCalls).toEqual([])
     })
 
-    it('rejects effort changes for non-Claude sessions', async () => {
+    it('rejects effort changes for sessions whose flavor does not support effort', async () => {
         const { app, applySessionConfigCalls } = createApp(createSession())
 
         const response = await app.request('/api/sessions/session-1/effort', {
@@ -600,7 +681,7 @@ describe('sessions routes', () => {
 
         expect(response.status).toBe(400)
         expect(await response.json()).toEqual({
-            error: 'Effort selection is only supported for Claude sessions'
+            error: 'Effort selection is not supported for this session type'
         })
         expect(applySessionConfigCalls).toEqual([])
     })
@@ -625,6 +706,80 @@ describe('sessions routes', () => {
         expect(await response.json()).toEqual({ ok: true })
         expect(applySessionConfigCalls).toEqual([
             ['session-1', { effort: 'max' }]
+        ])
+    })
+
+    it('applies effort changes for remote Grok sessions', async () => {
+        const session = createSession({
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'grok'
+            }
+        })
+        const { app, applySessionConfigCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/effort', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ effort: 'high' })
+        })
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({ ok: true })
+        expect(applySessionConfigCalls).toEqual([
+            ['session-1', { effort: 'high' }]
+        ])
+    })
+
+    it('rejects effort changes for local Grok sessions', async () => {
+        const session = createSession({
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'grok'
+            },
+            agentState: {
+                controlledByUser: true,
+                requests: {},
+                completedRequests: {}
+            }
+        })
+        const { app, applySessionConfigCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/effort', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ effort: 'high' })
+        })
+
+        expect(response.status).toBe(409)
+        expect(await response.json()).toEqual({
+            error: 'Effort can only be changed for remote Grok sessions'
+        })
+        expect(applySessionConfigCalls).toEqual([])
+    })
+
+    it('applies effort (thinking level) changes for Pi sessions', async () => {
+        const session = createSession({
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'pi'
+            }
+        })
+        const { app, applySessionConfigCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/effort', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ effort: 'high' })
+        })
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({ ok: true })
+        expect(applySessionConfigCalls).toEqual([
+            ['session-1', { effort: 'high' }]
         ])
     })
 
@@ -769,6 +924,187 @@ describe('sessions routes', () => {
         const { app } = createApp(createSession())
 
         const response = await app.request('/api/sessions/session-1/opencode-models')
+
+        expect(response.status).toBe(400)
+    })
+
+    it('returns Pi models for active Pi sessions and caches them', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'pi' }
+        })
+        const { app, cachePiModelsForSessionCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/pi-models')
+
+        const expected = {
+            success: true,
+            availableModels: [
+                { provider: 'openai', modelId: 'gpt-4o', name: 'GPT-4o' },
+                { provider: 'anthropic', modelId: 'claude-3' }
+            ],
+            currentModelId: 'gpt-4o'
+        }
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual(expected)
+        expect(cachePiModelsForSessionCalls).toEqual([
+            ['session-1', expected]
+        ])
+    })
+
+    it('returns cached Pi models for inactive Pi sessions', async () => {
+        const session = createSession({
+            active: false,
+            model: 'claude-3',
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'pi',
+                piAvailableModels: [
+                    { provider: 'anthropic', modelId: 'claude-3', name: 'Claude 3' }
+                ]
+            }
+        })
+        const { app, cachePiModelsForSessionCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/pi-models')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            availableModels: [
+                { provider: 'anthropic', modelId: 'claude-3', name: 'Claude 3' }
+            ],
+            currentModelId: 'claude-3'
+        })
+        expect(cachePiModelsForSessionCalls).toEqual([])
+    })
+
+    it('returns a cache miss for inactive Pi sessions without cached models', async () => {
+        const session = createSession({
+            active: false,
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'pi' }
+        })
+        const { app } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/pi-models')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: false,
+            error: 'No cached Pi models available for this session'
+        })
+    })
+
+    it('rejects pi-models for non-Pi sessions', async () => {
+        const { app } = createApp(createSession())
+
+        const response = await app.request('/api/sessions/session-1/pi-models')
+
+        expect(response.status).toBe(400)
+    })
+
+    it('returns Grok models for active Grok sessions and caches them', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'grok' }
+        })
+        const { app, cacheGrokModelsForSessionCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/grok-models')
+
+        const expected = {
+            success: true,
+            availableModels: [
+                { modelId: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
+            ],
+            currentModelId: 'grok-code-fast-1'
+        }
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual(expected)
+        expect(cacheGrokModelsForSessionCalls).toEqual([
+            ['session-1', expected]
+        ])
+    })
+
+    it('returns cached Grok models for inactive Grok sessions', async () => {
+        const session = createSession({
+            active: false,
+            metadata: {
+                path: '/tmp/project',
+                host: 'localhost',
+                flavor: 'grok',
+                cachedGrokModels: {
+                    cachedAt: 123,
+                    availableModels: [
+                        { modelId: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
+                    ],
+                    currentModelId: 'grok-code-fast-1',
+                    autoPermissionModeSupported: true
+                }
+            }
+        })
+        const { app, cacheGrokModelsForSessionCalls } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/grok-models')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            availableModels: [
+                { modelId: 'grok-code-fast-1', name: 'Grok Code Fast 1' }
+            ],
+            currentModelId: 'grok-code-fast-1',
+            autoPermissionModeSupported: true
+        })
+        expect(cacheGrokModelsForSessionCalls).toEqual([])
+    })
+
+    it('returns a cache miss for inactive Grok sessions without cached models', async () => {
+        const session = createSession({
+            active: false,
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'grok' }
+        })
+        const { app } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/grok-models')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: false,
+            error: 'No cached Grok models available for this session'
+        })
+    })
+
+    it('rejects grok-models for non-Grok sessions', async () => {
+        const { app } = createApp(createSession())
+
+        const response = await app.request('/api/sessions/session-1/grok-models')
+
+        expect(response.status).toBe(400)
+    })
+
+    it('returns Grok reasoning effort options for Grok sessions', async () => {
+        const session = createSession({
+            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'grok' }
+        })
+        const { app } = createApp(session)
+
+        const response = await app.request('/api/sessions/session-1/grok-reasoning-effort-options')
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({
+            success: true,
+            options: [
+                { value: 'low', name: 'Low' },
+                { value: 'high', name: 'High', isDefault: true }
+            ],
+            currentValue: 'high'
+        })
+    })
+
+    it('rejects grok-reasoning-effort-options for non-Grok sessions', async () => {
+        const { app } = createApp(createSession())
+
+        const response = await app.request('/api/sessions/session-1/grok-reasoning-effort-options')
 
         expect(response.status).toBe(400)
     })

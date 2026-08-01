@@ -401,7 +401,10 @@ export class SessionCache {
         sessionId: string,
         config: {
             permissionMode?: PermissionMode
-            model?: string | null
+            // Pi requires { provider, modelId } to uniquely identify a model
+            // (two providers can share a modelId); every other flavor still
+            // sends/receives a plain string.
+            model?: { provider: string; modelId: string } | string | null
             modelReasoningEffort?: string | null
             effort?: string | null
             collaborationMode?: CodexCollaborationMode
@@ -416,15 +419,30 @@ export class SessionCache {
             session.permissionMode = config.permissionMode
         }
         if (config.model !== undefined) {
-            if (config.model !== session.model) {
-                const updated = this.store.sessions.setSessionModel(sessionId, config.model, session.namespace, {
+            const modelValue = config.model
+            // Normalize the object form { provider, modelId } to a plain
+            // string for the legacy `session.model` column (shared across
+            // all flavors) — the provider-qualified identity is preserved
+            // separately in metadata.piSelectedModel below.
+            const piModelObject = modelValue !== null && typeof modelValue === 'object'
+                ? modelValue
+                : null
+            const normalizedModel: string | null = piModelObject ? piModelObject.modelId : modelValue as string | null
+            if (normalizedModel !== session.model) {
+                const updated = this.store.sessions.setSessionModel(sessionId, normalizedModel, session.namespace, {
                     touchUpdatedAt: false
                 })
                 if (!updated) {
                     throw new Error('Failed to update session model')
                 }
             }
-            session.model = config.model
+            session.model = normalizedModel
+            // Pi requires provider + modelId to uniquely identify a model.
+            // Persist the provider-qualified form in metadata so web can
+            // resolve the exact model even when two providers share a modelId.
+            if (session.metadata?.flavor === 'pi') {
+                this.persistPiSelectedModel(session, piModelObject)
+            }
         }
         if (config.modelReasoningEffort !== undefined) {
             if (config.modelReasoningEffort !== session.modelReasoningEffort) {
@@ -473,6 +491,41 @@ export class SessionCache {
         if (result.result === 'success') {
             this.refreshSession(sessionId)
         }
+    }
+
+    // Mutates `session.metadata`/`session.metadataVersion` in place rather than
+    // going through cacheSessionMetadata (which calls refreshSession() and
+    // replaces the Map entry with a brand-new Session object). applySessionConfig
+    // holds a `session` local variable it keeps mutating after this call
+    // (modelReasoningEffort/effort/collaborationMode) and emits a single
+    // 'session-updated' event at the end — replacing the Map entry mid-flight
+    // would detach that local reference and silently drop those later writes.
+    private persistPiSelectedModel(session: Session, piSelected: { provider: string; modelId: string } | null): void {
+        const currentMetadata = session.metadata
+        if (!currentMetadata || currentMetadata.piSelectedModel === piSelected) {
+            return
+        }
+
+        const nextMetadata = { ...currentMetadata, piSelectedModel: piSelected }
+        const result = this.store.sessions.updateSessionMetadata(
+            session.id,
+            nextMetadata,
+            session.metadataVersion,
+            session.namespace,
+            { touchUpdatedAt: false }
+        )
+
+        if (result.result !== 'success') {
+            return
+        }
+
+        const parsed = MetadataSchema.safeParse(result.value)
+        if (!parsed.success) {
+            return
+        }
+
+        session.metadata = parsed.data
+        session.metadataVersion = result.version
     }
 
     async renameSession(sessionId: string, name: string): Promise<void> {
@@ -770,12 +823,14 @@ export class SessionCache {
 
     private extractAgentSessionId(
         metadata: NonNullable<Session['metadata']>
-    ): { field: 'codexSessionId' | 'claudeSessionId' | 'geminiSessionId' | 'opencodeSessionId' | 'cursorSessionId'; value: string } | null {
+    ): { field: 'codexSessionId' | 'claudeSessionId' | 'geminiSessionId' | 'opencodeSessionId' | 'grokSessionId' | 'cursorSessionId' | 'piSessionId'; value: string } | null {
         if (metadata.codexSessionId) return { field: 'codexSessionId', value: metadata.codexSessionId }
         if (metadata.claudeSessionId) return { field: 'claudeSessionId', value: metadata.claudeSessionId }
         if (metadata.geminiSessionId) return { field: 'geminiSessionId', value: metadata.geminiSessionId }
         if (metadata.opencodeSessionId) return { field: 'opencodeSessionId', value: metadata.opencodeSessionId }
+        if (metadata.grokSessionId) return { field: 'grokSessionId', value: metadata.grokSessionId }
         if (metadata.cursorSessionId) return { field: 'cursorSessionId', value: metadata.cursorSessionId }
+        if (metadata.piSessionId) return { field: 'piSessionId', value: metadata.piSessionId }
         return null
     }
 

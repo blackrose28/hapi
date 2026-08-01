@@ -19,10 +19,12 @@
             "directAccessGrantsEnabled": false,
             "serviceAccountsEnabled": false,
             "redirectUris": [
-                "https://hapi.localhost/api/auth/callback"
+                "https://hapi.localhost/api/auth/callback",
+                "https://chuonglvubuntu.local/api/auth/callback"
             ],
             "webOrigins": [
-                "https://hapi.localhost"
+                "https://hapi.localhost",
+                "https://chuonglvubuntu.local"
             ],
             "attributes": {
                 "pkce.code.challenge.method": "S256"

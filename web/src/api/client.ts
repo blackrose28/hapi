@@ -20,6 +20,9 @@ import type {
     MessagesResponse,
     CodexModelsResponse,
     OpencodeModelsResponse,
+    PiModelsResponse,
+    GrokModelsResponse,
+    GrokReasoningEffortResponse,
     PermissionMode,
     PushSubscriptionPayload,
     PushUnsubscribePayload,
@@ -552,11 +555,17 @@ export class ApiClient {
         })
     }
 
-    async setModel(sessionId: string, model: string | null): Promise<void> {
+    async setModel(sessionId: string, model: { provider: string; modelId: string } | string | null): Promise<void> {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/model`, {
             method: 'POST',
             body: JSON.stringify({ model })
         })
+    }
+
+    async getSessionPiModels(sessionId: string): Promise<PiModelsResponse> {
+        return await this.request<PiModelsResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/pi-models`
+        )
     }
 
     async setModelReasoningEffort(sessionId: string, modelReasoningEffort: string | null): Promise<void> {
@@ -638,18 +647,19 @@ export class ApiClient {
     async spawnSession(
         machineId: string,
         directory: string,
-        agent?: 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode',
+        agent?: 'claude' | 'codex' | 'cursor' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'pi',
         model?: string,
         modelReasoningEffort?: string,
         yolo?: boolean,
         sessionType?: 'simple' | 'worktree',
         worktreeName?: string,
         effort?: string,
-        resumeSessionId?: string
+        resumeSessionId?: string,
+        permissionMode?: PermissionMode
     ): Promise<SpawnResponse> {
         return await this.request<SpawnResponse>(`/api/machines/${encodeURIComponent(machineId)}/spawn`, {
             method: 'POST',
-            body: JSON.stringify({ directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, effort, resumeSessionId })
+            body: JSON.stringify({ directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, effort, resumeSessionId, permissionMode })
         })
     }
 
@@ -697,6 +707,24 @@ export class ApiClient {
     async getMachineOpencodeModelsForCwd(machineId: string, cwd: string): Promise<OpencodeModelsResponse> {
         return await this.request<OpencodeModelsResponse>(
             `/api/machines/${encodeURIComponent(machineId)}/opencode-models?cwd=${encodeURIComponent(cwd)}`
+        )
+    }
+
+    async getSessionGrokModels(sessionId: string): Promise<GrokModelsResponse> {
+        return await this.request<GrokModelsResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/grok-models`
+        )
+    }
+
+    async getMachineGrokModelsForCwd(machineId: string, cwd: string): Promise<GrokModelsResponse> {
+        return await this.request<GrokModelsResponse>(
+            `/api/machines/${encodeURIComponent(machineId)}/grok-models?cwd=${encodeURIComponent(cwd)}`
+        )
+    }
+
+    async getSessionGrokReasoningEffortOptions(sessionId: string): Promise<GrokReasoningEffortResponse> {
+        return await this.request<GrokReasoningEffortResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/grok-reasoning-effort-options`
         )
     }
 

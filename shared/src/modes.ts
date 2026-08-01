@@ -17,6 +17,18 @@ export type CodexCollaborationMode = typeof CODEX_COLLABORATION_MODES[number]
 export const GEMINI_PERMISSION_MODES = ['default', 'read-only', 'safe-yolo', 'yolo'] as const
 export type GeminiPermissionMode = typeof GEMINI_PERMISSION_MODES[number]
 
+export const KIMI_PERMISSION_MODES = ['default', 'read-only', 'safe-yolo', 'yolo'] as const
+export type KimiPermissionMode = typeof KIMI_PERMISSION_MODES[number]
+
+// NOTE: upstream also includes 'auto' here (Grok Auto permission mode). Our
+// master PERMISSION_MODES enum below doesn't have 'auto' yet — that's
+// introduced by the separate, still-pending `claude-permission-mode-auto`
+// cart. Omitted for now; add 'auto' back here once that cart lands and
+// extends PERMISSION_MODES, so PermissionModeSchema (z.enum(PERMISSION_MODES))
+// doesn't reject it.
+export const GROK_PERMISSION_MODES = ['default', 'plan', 'bypassPermissions'] as const
+export type GrokPermissionMode = typeof GROK_PERMISSION_MODES[number]
+
 export const OPENCODE_PERMISSION_MODES = ['default', 'yolo'] as const
 export type OpencodePermissionMode = typeof OPENCODE_PERMISSION_MODES[number]
 
@@ -35,7 +47,20 @@ export const PERMISSION_MODES = [
 ] as const
 export type PermissionMode = typeof PERMISSION_MODES[number]
 
-export type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor'
+export type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'kimi' | 'grok' | 'opencode' | 'cursor' | 'pi'
+
+// Canonical list of every known agent flavor, including ones (like gemini)
+// that are no longer launchable but must remain valid for reading/rendering
+// existing stored sessions.
+export const AGENT_FLAVORS: readonly AgentFlavor[] = ['claude', 'codex', 'cursor', 'gemini', 'grok', 'kimi', 'opencode', 'pi']
+
+// Flavors offered when CREATING a new session. Gemini CLI is intentionally
+// excluded: Google sunset the consumer Gemini CLI (2026-06-18) so it can no
+// longer be launched. It remains in AgentFlavor / AGENT_FLAVORS above so
+// existing stored Gemini sessions still validate and remain viewable.
+export const CREATABLE_AGENT_FLAVORS: readonly AgentFlavor[] = AGENT_FLAVORS.filter(
+    (flavor) => flavor !== 'gemini'
+)
 
 export const PERMISSION_MODE_LABELS: Record<PermissionMode, string> = {
     default: 'Default',
@@ -96,11 +121,22 @@ export function getPermissionModesForFlavor(flavor?: string | null): readonly Pe
     if (flavor === 'gemini') {
         return GEMINI_PERMISSION_MODES
     }
+    if (flavor === 'kimi') {
+        return KIMI_PERMISSION_MODES
+    }
+    if (flavor === 'grok') {
+        return GROK_PERMISSION_MODES
+    }
     if (flavor === 'opencode') {
         return OPENCODE_PERMISSION_MODES
     }
     if (flavor === 'cursor') {
         return CURSOR_PERMISSION_MODES
+    }
+    if (flavor === 'pi') {
+        // Pi RPC mode has no runtime permission switching (always auto-approve);
+        // no permission modes are offered.
+        return []
     }
     return CLAUDE_PERMISSION_MODES
 }

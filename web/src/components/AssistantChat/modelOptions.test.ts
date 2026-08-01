@@ -94,6 +94,25 @@ describe('getModelOptionsForFlavor', () => {
             { value: 'ollama/exaone:4.5-33b-q8', label: 'Ollama EXAONE' }
         ])
     })
+
+    it('returns an empty list for pi flavor (real list comes via the piModels prop, not this function)', () => {
+        const options = getModelOptionsForFlavor('pi', null)
+        expect(options).toEqual([])
+    })
+
+    it('returns only the current pi model before the piModels prop resolves (no claude fallback)', () => {
+        const options = getModelOptionsForFlavor('pi', 'gpt-4o')
+        expect(options).toEqual([
+            { value: 'gpt-4o', label: 'gpt-4o' }
+        ])
+    })
+
+    it('returns only default/current for grok without falling back to Claude models', () => {
+        expect(getModelOptionsForFlavor('grok')).toEqual([])
+        expect(getModelOptionsForFlavor('grok', 'grok-4.5')).toEqual([
+            { value: 'grok-4.5', label: 'grok-4.5' }
+        ])
+    })
 })
 
 describe('getNextModelForFlavor', () => {
@@ -141,5 +160,19 @@ describe('getNextModelForFlavor', () => {
     it('returns null for opencode without a current model and without dynamic options (no Claude fallback)', () => {
         const next = getNextModelForFlavor('opencode', null, [])
         expect(next).toBeNull()
+    })
+
+    it('keeps the current pi model unchanged (Ctrl/Cmd+M is a no-op for pi — model changes need a provider)', () => {
+        const next = getNextModelForFlavor('pi', 'gpt-4o')
+        expect(next).toBe('gpt-4o')
+    })
+
+    it('returns null for pi without a current model', () => {
+        const next = getNextModelForFlavor('pi', null)
+        expect(next).toBeNull()
+    })
+
+    it('keeps the current grok model on cycle (no Claude fallback)', () => {
+        expect(getNextModelForFlavor('grok', 'grok-4.5')).toBe('grok-4.5')
     })
 })

@@ -234,6 +234,19 @@ export async function startRunner(options: { workspaceRoot?: string; profile?:st
     const spawnSession = async (options: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       logger.debugLargeJson('[RUNNER RUN] Spawning session', options);
 
+      // Gemini CLI is no longer launchable (Google sunset the consumer Gemini
+      // CLI on 2026-06-18). Reject BEFORE the spawn guard below, which kills
+      // any existing live process tracked under the same resumeSessionId —
+      // otherwise a resume attempt for an active Gemini session would kill
+      // the live/readable process and only then fail, instead of leaving it
+      // running untouched. Check-then-act, not act-then-check.
+      if (options.agent === 'gemini') {
+        return {
+          type: 'error',
+          errorMessage: 'Gemini CLI is no longer supported and cannot be launched (Google sunset the consumer Gemini CLI on 2026-06-18). Existing Gemini sessions remain viewable in the web UI.'
+        };
+      }
+
       // Spawn guard: if a process with the same resume session is still alive,
       // kill it before spawning the new one. This handles the case where the
       // agent crashed (e.g. 429 rate limit) but the CLI wrapper did not exit
@@ -956,21 +969,31 @@ export function buildCliArgs(
   options: SpawnSessionOptions,
   yolo?: boolean
 ): string[] {
+  if (agent === 'gemini') {
+    throw new Error('Gemini CLI is no longer supported and cannot be launched (Google sunset the consumer Gemini CLI on 2026-06-18).');
+  }
   const agentCommand = agent === 'codex'
     ? 'codex'
     : agent === 'cursor'
       ? 'cursor'
-      : agent === 'gemini'
-        ? 'gemini'
-        : agent === 'opencode'
-          ? 'opencode'
-          : 'claude';
+      : agent === 'grok'
+        ? 'grok'
+        : agent === 'kimi'
+          ? 'kimi'
+          : agent === 'opencode'
+            ? 'opencode'
+            : agent === 'pi'
+              ? 'pi'
+              : 'claude';
   const args = [agentCommand];
   if (options.resumeSessionId) {
     if (agent === 'codex') {
       args.push('resume', options.resumeSessionId);
     } else if (agent === 'cursor') {
       args.push('--resume', options.resumeSessionId);
+    } else if (agent === 'pi') {
+      // Pi uses --session-id for exact session resume (RPC mode)
+      args.push('--session-id', options.resumeSessionId);
     } else {
       args.push('--resume', options.resumeSessionId);
     }
@@ -979,16 +1002,20 @@ export function buildCliArgs(
   if (options.model) {
     args.push('--model', options.model);
   }
-  if (options.effort && agent === 'claude') {
+  if (options.effort && (agent === 'claude' || agent === 'grok' || agent === 'pi')) {
     args.push('--effort', options.effort);
   }
   if (options.modelReasoningEffort && (agent === 'codex' || agent === 'opencode')) {
     args.push('--model-reasoning-effort', options.modelReasoningEffort);
   }
-  if (options.permissionMode && (PERMISSION_MODES as readonly string[]).includes(options.permissionMode)) {
-    args.push('--permission-mode', options.permissionMode);
-  } else if (yolo) {
-    args.push('--yolo');
+  // Pi RPC mode has no permission switching; never pass these flags to it
+  // (the Pi command parser does not recognize --permission-mode/--yolo).
+  if (agent !== 'pi') {
+    if (options.permissionMode && (PERMISSION_MODES as readonly string[]).includes(options.permissionMode)) {
+      args.push('--permission-mode', options.permissionMode);
+    } else if (yolo) {
+      args.push('--yolo');
+    }
   }
   if (options.recoveryContext) {
     const encoded = Buffer.from(options.recoveryContext).toString("base64")

@@ -31,7 +31,7 @@ describe('buildCliArgs', () => {
     })
 
     it('prefers --permission-mode over --yolo when both present', () => {
-        const args = buildCliArgs('gemini', {
+        const args = buildCliArgs('cursor', {
             directory: '/tmp',
             permissionMode: 'yolo',
         }, true)
@@ -41,6 +41,10 @@ describe('buildCliArgs', () => {
         const permIdx = args.indexOf('--permission-mode')
         const yoloIdx = args.indexOf('--yolo')
         expect(yoloIdx).toBe(-1)
+    })
+
+    it('throws for the removed gemini agent (no longer launchable)', () => {
+        expect(() => buildCliArgs('gemini', { directory: '/tmp' })).toThrow(/no longer supported/)
     })
 
     it('adds --yolo when no permissionMode and yolo is true', () => {
@@ -69,5 +73,62 @@ describe('buildCliArgs', () => {
             expect(args).toContain('--permission-mode')
             expect(args).toContain(mode)
         }
+    })
+
+    it('uses --session-id (not --resume) for pi resume', () => {
+        const args = buildCliArgs('pi', {
+            directory: '/tmp',
+            resumeSessionId: 'pi-session-123',
+        })
+        expect(args[0]).toBe('pi')
+        expect(args).toContain('--session-id')
+        expect(args).toContain('pi-session-123')
+        expect(args).not.toContain('--resume')
+    })
+
+    it('never adds --permission-mode or --yolo for pi even when requested', () => {
+        const args = buildCliArgs('pi', {
+            directory: '/tmp',
+            permissionMode: 'yolo',
+        }, true)
+        expect(args).not.toContain('--permission-mode')
+        expect(args).not.toContain('--yolo')
+    })
+
+    it('passes --effort through for pi (thinking level)', () => {
+        const args = buildCliArgs('pi', {
+            directory: '/tmp',
+            effort: 'high',
+        })
+        expect(args).toContain('--effort')
+        expect(args).toContain('high')
+    })
+
+    it('does not pass --effort for flavors other than claude/pi', () => {
+        const args = buildCliArgs('opencode', {
+            directory: '/tmp',
+            effort: 'high',
+        })
+        expect(args).not.toContain('--effort')
+    })
+
+    it('builds Grok runner resume, model, effort, and permission arguments', () => {
+        const args = buildCliArgs('grok', {
+            directory: '/tmp',
+            resumeSessionId: 'grok-session-1',
+            model: 'grok-4.5',
+            effort: 'low',
+            permissionMode: 'plan',
+        })
+
+        expect(args).toEqual([
+            'grok',
+            '--resume', 'grok-session-1',
+            '--hapi-starting-mode', 'remote',
+            '--started-by', 'runner',
+            '--model', 'grok-4.5',
+            '--effort', 'low',
+            '--permission-mode', 'plan',
+        ])
     })
 })

@@ -10,7 +10,8 @@ import type { OpencodeSession } from './session';
 import type { PermissionMode } from './types';
 import { createOpencodeBackend } from './utils/opencodeBackend';
 import { OpencodePermissionHandler } from './utils/permissionHandler';
-import { TITLE_INSTRUCTION } from './utils/systemPrompt';
+import { OPENCODE_NATIVE_TOOL_INSTRUCTION } from './utils/systemPrompt';
+import { registerAcpSessionTitleSync } from '@/agent/acpSessionTitle';
 
 class OpencodeRemoteLauncher extends RemoteLauncherBase {
     private readonly session: OpencodeSession;
@@ -47,13 +48,16 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
         const session = this.session;
         const messageBuffer = this.messageBuffer;
 
-        const { server: happyServer, mcpServers } = await buildHapiMcpBridge(session.client);
+        const { server: happyServer, mcpServers } = await buildHapiMcpBridge(session.client, {
+            enableChangeTitle: false
+        });
         this.happyServer = happyServer;
 
         const backend = createOpencodeBackend({
             cwd: session.path
         });
         this.backend = backend;
+        registerAcpSessionTitleSync(backend, session.client);
 
         backend.onStderrError((error) => {
             logger.debug('[opencode-remote] stderr error', error);
@@ -224,7 +228,7 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
             let injectedRecovery = false
             let messageText = batch.message;
             if (!this.instructionsSent) {
-                const parts: string[] = [TITLE_INSTRUCTION]
+                const parts: string[] = [OPENCODE_NATIVE_TOOL_INSTRUCTION]
                 injectedTitle = true
                 if (this.recoveryContext && !this.recoveryContextConsumed) {
                     parts.push(this.recoveryContext)
@@ -245,6 +249,7 @@ class OpencodeRemoteLauncher extends RemoteLauncherBase {
                 await backend.prompt(acpSessionId, promptContent, (message: AgentMessage) => {
                     this.handleAgentMessage(message);
                 });
+                void backend.refreshSessionInfo(acpSessionId, session.path);
                 // Consume flags only after successful prompt
                 if (injectedTitle) this.instructionsSent = true
                 if (injectedRecovery) this.recoveryContextConsumed = true

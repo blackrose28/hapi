@@ -6,7 +6,7 @@ services:
         environment:
             KC_BOOTSTRAP_ADMIN_USERNAME: admin
             KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-            KC_HOSTNAME: https://keycloak.localhost
+            KC_HOSTNAME: https://chuonglvubuntu.local:8443
             KC_HTTP_ENABLED: "true"
             KC_PROXY_HEADERS: xforwarded
         ports:

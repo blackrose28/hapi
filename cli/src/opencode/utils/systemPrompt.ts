@@ -16,6 +16,16 @@ export const TITLE_INSTRUCTION = trimIdent(`
 `);
 
 /**
+ * Tool instructions for native ACP sessions. Title updates are synced
+ * automatically from OpenCode's own native session title (see
+ * `registerAcpSessionTitleSync` / `AcpSdkBackend.refreshSessionInfo`), so the
+ * `change_title` tool is not registered and the model is not told to call it.
+ */
+export const OPENCODE_NATIVE_TOOL_INSTRUCTION = trimIdent(`
+    The HAPI-added MCP server named "hapi_session" provides session tools: report_to_team and mark_team_mention_no_action. Use report_to_team to post structured Team Chat updates when you were asked/tagged in a Team Chat, need to report progress, completion, a blocker, a question, or a handoff. Use mark_team_mention_no_action when a tagged Team mention is seen but does not need a reply. Other provider, user, project, and global tools may also be available.
+`);
+
+/**
  * The system prompt to inject for OpenCode sessions.
  */
 export const opencodeSystemPrompt = TITLE_INSTRUCTION;

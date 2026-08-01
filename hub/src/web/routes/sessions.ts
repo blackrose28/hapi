@@ -1,4 +1,4 @@
-import { getPermissionModesForFlavor, isPermissionModeAllowedForFlavor, supportsModelChange, toSessionSummary } from '@hapi/protocol'
+import { getPermissionModesForFlavor, isPermissionModeAllowedForFlavor, supportsEffort, supportsModelChange, toSessionSummary } from '@hapi/protocol'
 import { CodexCollaborationModeSchema, PermissionModeSchema } from '@hapi/protocol/schemas'
 import { Hono } from 'hono'
 import { isKnownFlavor } from '@hapi/protocol'
@@ -21,7 +21,16 @@ const collaborationModeSchema = z.object({
 })
 
 const modelSchema = z.object({
-    model: z.string().trim().min(1).nullable()
+    // Pi requires { provider, modelId } to uniquely identify a model (two
+    // providers can share a modelId); every other flavor still sends a
+    // plain string.
+    model: z.union([
+        z.string().trim().min(1),
+        z.object({
+            provider: z.string().trim().min(1),
+            modelId: z.string().trim().min(1)
+        })
+    ]).nullable()
 })
 
 const modelReasoningEffortSchema = z.object({
@@ -479,6 +488,9 @@ export function createSessionsRoutes(
         if (flavor === 'codex' && sessionResult.session.agentState?.controlledByUser === true) {
             return c.json({ error: 'Model selection can only be changed for remote Codex sessions' }, 409)
         }
+        if (flavor === 'grok' && sessionResult.session.agentState?.controlledByUser === true) {
+            return c.json({ error: 'Model selection can only be changed for remote Grok sessions' }, 409)
+        }
 
         try {
             await engine.applySessionConfig(sessionResult.sessionId, { model: parsed.data.model })
@@ -547,8 +559,11 @@ export function createSessionsRoutes(
         }
 
         const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
-        if (flavor !== 'claude') {
-            return c.json({ error: 'Effort selection is only supported for Claude sessions' }, 400)
+        if (!supportsEffort(flavor)) {
+            return c.json({ error: 'Effort selection is not supported for this session type' }, 400)
+        }
+        if (flavor === 'grok' && sessionResult.session.agentState?.controlledByUser === true) {
+            return c.json({ error: 'Effort can only be changed for remote Grok sessions' }, 409)
         }
 
         try {
@@ -803,6 +818,129 @@ export function createSessionsRoutes(
             return c.json({
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to list OpenCode models'
+            }, 500)
+        }
+    })
+
+    app.get('/sessions/:id/pi-models', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'view'
+        })
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
+        if (flavor !== 'pi') {
+            return c.json({
+                success: false,
+                error: 'Pi models are only available for Pi sessions'
+            }, 400)
+        }
+
+        if (!sessionResult.session.active) {
+            const cached = sessionResult.session.metadata?.piAvailableModels
+            if (!cached) {
+                return c.json({ success: false, error: 'No cached Pi models available for this session' })
+            }
+            return c.json({
+                success: true,
+                availableModels: cached,
+                currentModelId: sessionResult.session.model ?? null
+            })
+        }
+
+        try {
+            const result = await engine.listPiModelsForSession(sessionResult.sessionId)
+            engine.cachePiModelsForSession(sessionResult.sessionId, result)
+            return c.json(result)
+        } catch (error) {
+            return c.json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list Pi models'
+            }, 500)
+        }
+    })
+
+    app.get('/sessions/:id/grok-models', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'view'
+        })
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
+        if (flavor !== 'grok') {
+            return c.json({
+                success: false,
+                error: 'Grok models are only available for Grok sessions'
+            }, 400)
+        }
+
+        if (!sessionResult.session.active) {
+            const cached = sessionResult.session.metadata?.cachedGrokModels
+            if (!cached) {
+                return c.json({ success: false, error: 'No cached Grok models available for this session' })
+            }
+            return c.json({
+                success: true,
+                availableModels: cached.availableModels,
+                currentModelId: cached.currentModelId ?? null,
+                autoPermissionModeSupported: cached.autoPermissionModeSupported
+            })
+        }
+
+        try {
+            const result = await engine.listGrokModelsForSession(sessionResult.sessionId)
+            engine.cacheGrokModelsForSession(sessionResult.sessionId, result)
+            return c.json(result)
+        } catch (error) {
+            return c.json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list Grok models'
+            }, 500)
+        }
+    })
+
+    app.get('/sessions/:id/grok-reasoning-effort-options', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) {
+            return engine
+        }
+
+        const sessionResult = requireSessionFromParam(c, engine, {
+            capabilityResolver: options.capabilityResolver, requiredCapability: 'view'
+        })
+        if (sessionResult instanceof Response) {
+            return sessionResult
+        }
+
+        const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
+        if (flavor !== 'grok') {
+            return c.json({
+                success: false,
+                error: 'Grok effort options are only available for Grok sessions'
+            }, 400)
+        }
+
+        try {
+            const result = await engine.listGrokReasoningEffortOptionsForSession(sessionResult.sessionId)
+            return c.json(result)
+        } catch (error) {
+            return c.json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to list Grok effort options'
             }, 500)
         }
     })

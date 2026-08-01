@@ -349,6 +349,7 @@ describe('SessionTerminalTabs', () => {
         })
         mocks.controller = makeController([state('t1')])
         renderTabs()
+        focus.mockClear() // mount auto-focuses the terminal; assert the snippet insert below doesn't focus it again
 
         fireEvent.click(screen.getByRole('button', { name: 'Snippets' }))
         expect(screen.getByRole('region', { name: 'Snippet content' })).toHaveAttribute(
@@ -592,6 +593,7 @@ describe('SessionTerminalTabs', () => {
         })
         mocks.controller = makeController([state('t1')])
         renderTabs()
+        focus.mockClear() // mount auto-focuses the terminal; assert the search interactions below don't focus it again
 
         const desktopSearch = screen.getByRole('button', {
             name: 'terminal.search.title',
@@ -1077,6 +1079,7 @@ describe('SessionTerminalTabs', () => {
             const terminal = {
                 write: vi.fn(),
                 clear: vi.fn(),
+                focus: vi.fn(),
                 onData: vi.fn(() => ({ dispose: vi.fn() }))
             }
             mountedTerminals.push(terminal)
@@ -1101,6 +1104,7 @@ describe('SessionTerminalTabs', () => {
         const inputHandlers: Array<(data: string) => void> = []
         mocks.autoMountTerminal = () => ({
             write: vi.fn(),
+            focus: vi.fn(),
             onData: vi.fn((handler: (data: string) => void) => {
                 inputHandlers.push(handler)
                 return { dispose: vi.fn() }

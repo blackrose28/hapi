@@ -10,11 +10,14 @@ command -v mkcert >/dev/null || {
     exit 1
 }
 
+lan_hostname="$(hostname -s 2>/dev/null || hostname)"
+lan_hostname="$(printf '%s' "$lan_hostname" | tr '[:upper:]' '[:lower:]').local"
+
 mkcert -install
 mkcert -cert-file "$temp_dir/hapi.localhost.pem" -key-file "$temp_dir/hapi.localhost-key.pem" \
-    hapi.localhost localhost 127.0.0.1 ::1
+    hapi.localhost "$lan_hostname" localhost 127.0.0.1 ::1
 mkcert -cert-file "$temp_dir/keycloak.localhost.pem" -key-file "$temp_dir/keycloak.localhost-key.pem" \
-    keycloak.localhost localhost 127.0.0.1 ::1
+    keycloak.localhost "$lan_hostname" localhost 127.0.0.1 ::1
 
 sudo install -d -m 0755 /etc/nginx/tls
 sudo install -m 0644 "$temp_dir/hapi.localhost.pem" /etc/nginx/tls/hapi.localhost.pem
@@ -29,3 +32,4 @@ sudo systemctl reload nginx
 echo "Local TLS proxy configured:"
 echo "  HAPI:     https://hapi.localhost"
 echo "  Keycloak: https://keycloak.localhost"
+echo "  LAN:      https://$lan_hostname (web+API), https://$lan_hostname:8443 (Keycloak)"
