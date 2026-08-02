@@ -179,8 +179,27 @@ function getMachineTitle(machine: Machine): string {
 
 
 function SessionsPage() {
-    return <Outlet />
-}
+    const { api } = useAppContext()
+    const navigate = useNavigate()
+    const queryClient = useQueryClient()
+    const pathname = useLocation({ select: location => location.pathname })
+    const matchRoute = useMatchRoute()
+    const { t } = useTranslation()
+    const { addToast } = useToast()
+    const { sessions, isLoading, error, refetch } = useSessions(api)
+    const { machines } = useMachines(api, true)
+    const [isSyncingCodexSession, setIsSyncingCodexSession] = useState(false)
+    const [codexSessions, setCodexSessions] = useState<CodexLocalSessionSummary[]>([])
+    const [codexImportMachineId, setCodexImportMachineId] = useState<string | null>(null)
+    const [isLoadingCodexSessions, setIsLoadingCodexSessions] = useState(false)
+    const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false)
+    const [isRestartingCodexDesktop, setIsRestartingCodexDesktop] = useState(false)
+    const [pendingDuplicateSessionIds, setPendingDuplicateSessionIds] = useState<string[]>([])
+    const [pendingDuplicateHapiSessionIds, setPendingDuplicateHapiSessionIds] = useState<string[]>([])
+    const [duplicateSessionGroups, setDuplicateSessionGroups] = useState<CodexDuplicateSessionGroup[]>([])
+    const [isDuplicateMergeConfirmOpen, setIsDuplicateMergeConfirmOpen] = useState(false)
+    const [isMergingDuplicateSessions, setIsMergingDuplicateSessions] = useState(false)
+    const [codexImportWorkDirectoryOverride, setCodexImportWorkDirectoryOverride] = useState<string | null>(null)
 
     const handleRefresh = useCallback(() => {
         void (async () => {

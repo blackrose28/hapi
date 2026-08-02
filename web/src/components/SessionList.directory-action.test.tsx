@@ -416,6 +416,4 @@ describe('SessionList collapse behavior', () => {
         expect(screen.getByRole('button', { name: /Matching task 3/ })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /Matching task 4/ })).toBeInTheDocument()
     })
-=======
->>>>>>> c305c5ce (fix(web): keep session sidebar stable after selection (#1173))
 })
