@@ -16,7 +16,7 @@ function asString(val: unknown): string | null {
  * sidechain-grouping logic below attach children regardless of flavor.
  */
 function isSubagentToolName(name: string): boolean {
-    return name === 'Task' || name === 'Agent' || name.startsWith('Agent:') || name.startsWith('Task:')
+    return name === 'Task' || name === 'Agent' || name === 'spawn_agent' || name.startsWith('Agent:') || name.startsWith('Task:')
 }
 
 function getTeamMentionMeta(meta: unknown): { requestId: string; teamChatId: string; sourceMessageId: string } | null {

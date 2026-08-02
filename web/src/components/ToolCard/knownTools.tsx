@@ -7,6 +7,11 @@ import { extractTodoChecklist, extractUpdatePlanChecklist } from '@/components/T
 import { basename, resolveDisplayPath } from '@/utils/path'
 import { getInputStringAny, truncate } from '@/lib/toolInputUtils'
 import { extractCodexPatchFiles } from '@/components/ToolCard/codexPatch'
+import {
+    getCodexAgentTargets,
+    getCodexAgentType,
+    summarizeCodexAgentResult
+} from '@/components/ToolCard/codexAgents'
 
 const DEFAULT_ICON_CLASS = 'h-3.5 w-3.5'
 // Tool presentation registry for `hapi/web` (aligned with `hapi-app`).
@@ -531,6 +536,63 @@ export const knownTools: Record<string, {
                 )
             }
             return question.length > 0 ? truncate(question, 120) : null
+        },
+        minimal: true
+    },
+    spawn_agent: {
+        icon: () => <RocketIcon className={DEFAULT_ICON_CLASS} />,
+        title: (opts) => {
+            const agentType = getCodexAgentType(opts.input)
+            return agentType ? `Spawn ${agentType} agent` : 'Spawn agent'
+        },
+        subtitle: (opts) => {
+            const summary = summarizeCodexAgentResult(opts.toolName, opts.result)
+            if (summary) return summary
+            const agentType = getCodexAgentType(opts.input)
+            return agentType ? `${agentType} agent` : 'Background agent'
+        },
+        minimal: true
+    },
+    send_input: {
+        icon: () => <MessageSquareIcon className={DEFAULT_ICON_CLASS} />,
+        title: () => 'Message agent',
+        subtitle: (opts) => {
+            const targets = getCodexAgentTargets(opts.input)
+            return targets.length > 0 ? targets.join(', ') : 'Background message'
+        },
+        minimal: true
+    },
+    resume_agent: {
+        icon: () => <RocketIcon className={DEFAULT_ICON_CLASS} />,
+        title: () => 'Resume agent',
+        subtitle: (opts) => {
+            const targets = getCodexAgentTargets(opts.input)
+            return targets.length > 0 ? targets.join(', ') : null
+        },
+        minimal: true
+    },
+    wait_agent: {
+        icon: () => <RocketIcon className={DEFAULT_ICON_CLASS} />,
+        title: (opts) => {
+            const targets = getCodexAgentTargets(opts.input)
+            return targets.length > 1 ? `Wait for ${targets.length} agents` : 'Wait for agent'
+        },
+        subtitle: (opts) => {
+            const summary = summarizeCodexAgentResult(opts.toolName, opts.result)
+            if (summary) return summary
+            const targets = getCodexAgentTargets(opts.input)
+            return targets.length > 0 ? targets.join(', ') : null
+        },
+        minimal: true
+    },
+    close_agent: {
+        icon: () => <RocketIcon className={DEFAULT_ICON_CLASS} />,
+        title: () => 'Close agent',
+        subtitle: (opts) => {
+            const summary = summarizeCodexAgentResult(opts.toolName, opts.result)
+            if (summary) return summary
+            const targets = getCodexAgentTargets(opts.input)
+            return targets.length > 0 ? targets.join(', ') : null
         },
         minimal: true
     }
