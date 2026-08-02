@@ -112,8 +112,8 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 
 ### Batch 6: Web features (large)
 - [x] `chat-history-scroll-stability` (16 commits) — `patches/` dir new
-- [ ] `session-list-core-stability` (16 commits)
-- [ ] `session-ui-polish-misc` (16 commits) — skip `.github/`
+- [x] `session-list-core-stability` (16 commits)
+- [x] `session-ui-polish-misc` (16 commits) — skip `.github/`
 - [ ] `chat-composer-misc-polish` (13 commits)
 
 ### Batch 7: Web features (medium)
