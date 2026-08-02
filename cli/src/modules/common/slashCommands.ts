@@ -59,9 +59,15 @@ const BUILTIN_COMMANDS: Record<string, SlashCommand[]> = {
         { name: 'session-info', description: 'Show Grok session model, turns, and context usage', source: 'builtin' },
         { name: 'goal', description: 'Set, manage, or inspect an autonomous goal', source: 'builtin' },
         { name: 'always-approve', description: 'Toggle automatic tool approval', source: 'builtin' },
-        { name: 'auto', description: 'Let Grok classify safe tool calls for automatic approval', source: 'builtin' },
+        { name: 'auto', description: 'Let Grok classify safe tool calls for automatic approval', source: 'builtin' }
     ],
-    opencode: [],
+    opencode: [
+        { name: 'help', description: 'Show supported OpenCode slash commands', source: 'builtin' },
+        { name: 'status', description: 'Show OpenCode status', source: 'builtin' },
+        { name: 'plan', description: 'Enable plan mode', source: 'builtin' },
+        { name: 'default', description: 'Return OpenCode mode to default', source: 'builtin' },
+        { name: 'init', description: 'Initialize OpenCode configuration', source: 'builtin' }
+    ]
 };
 
 /**

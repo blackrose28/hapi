@@ -718,8 +718,6 @@ describe('AppServerEventConverter', () => {
         expect(events).toEqual([{ type: 'task_failed', error: 'fatal' }]);
     });
 
-    it('maps thread goal updated notifications', () => {
-
     it('preserves typed non-retryable cyber-policy errors', () => {
         const converter = new AppServerEventConverter();
 
