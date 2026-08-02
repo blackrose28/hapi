@@ -16,7 +16,7 @@ const harness = {
     availableCommandUpdates: [] as Array<Array<{ name: string; description?: string }>>,
     sessionInfoUpdateListener: null as null | ((update: { sessionId: string | null; title: string | null }) => void),
     refreshSessionInfoCalls: [] as Array<{ sessionId: string; cwd: string }>,
-    bridgeOptions: null as { enableChangeTitle?: boolean } | null,
+    bridgeOptions: [] as unknown[],
     thoughtLevelOption: null as { id: string; currentValue?: string; options: Array<{ value: string; name?: string }> } | null
 };
 
@@ -33,7 +33,7 @@ beforeEach(() => {
     harness.availableCommandUpdates = [];
     harness.sessionInfoUpdateListener = null;
     harness.refreshSessionInfoCalls = [];
-    harness.bridgeOptions = null;
+    harness.bridgeOptions = [];
     harness.thoughtLevelOption = null;
 });
 
@@ -94,8 +94,8 @@ vi.mock('./utils/opencodeBackend', () => ({
 }));
 
 vi.mock('@/codex/utils/buildHapiMcpBridge', () => ({
-    buildHapiMcpBridge: async (_client: unknown, options?: { enableChangeTitle?: boolean }) => {
-        harness.bridgeOptions = options ?? null;
+    buildHapiMcpBridge: async (_client: unknown, options?: unknown) => {
+        harness.bridgeOptions.push(options);
         return {
             server: { stop: () => {} },
             mcpServers: {}
@@ -245,7 +245,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         await opencodeRemoteLauncher(session as never);
 
         // Native ACP titles replace the change_title MCP tool for OpenCode.
-        expect(harness.bridgeOptions).toEqual({ enableChangeTitle: false });
+        expect(harness.bridgeOptions).toEqual([{ enableChangeTitle: false }, { enableChangeTitle: false }]);
 
         // refreshSessionInfo is polled once per completed prompt.
         expect(harness.refreshSessionInfoCalls).toEqual([
