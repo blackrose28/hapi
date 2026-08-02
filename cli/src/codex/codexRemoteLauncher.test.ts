@@ -997,23 +997,34 @@ function createSessionStub(
                 rpcHandlers.set(method, handler);
             }
         },
+        updateAgentState(handler: (state: FakeAgentState) => FakeAgentState) {
+            agentState = handler(agentState);
+        },
         sendAgentMessage(message: unknown) {
             codexMessages.push(message);
         },
+        sendUserMessage(_text: string) {},
+        sendClaudeSessionMessage(message: unknown) {
+            summaryMessages.push(message);
+        },
         sendSessionEvent(event: { type: string; [key: string]: unknown }) {
             sessionEvents.push(event);
-        },
-        sendUserMessage(text: string) {
-            summaryMessages.push(text);
         }
     };
 
     const session = {
         sessionId: null as string | null,
         path: '/workspace/project',
+        logPath: '/tmp/hapi-update/test.log',
+        client,
+        queue,
+        codexArgs: undefined as string[] | undefined,
+        codexCliOverrides: undefined,
         thinking: false,
         permissionMode: mode.permissionMode,
         model: mode.model,
+        modelReasoningEffort: mode.modelReasoningEffort,
+        collaborationMode: mode.collaborationMode,
         setPermissionMode(nextMode: EnhancedMode['permissionMode']) {
             currentPermissionMode = nextMode;
         },
@@ -1028,6 +1039,9 @@ function createSessionStub(
         },
         setModelReasoningEffort(nextEffort: EnhancedMode['modelReasoningEffort']) {
             currentModelReasoningEffort = nextEffort;
+        },
+        getModelReasoningEffort() {
+            return currentModelReasoningEffort;
         },
         getCollaborationMode() {
             return currentCollaborationMode;
@@ -1469,8 +1483,6 @@ describe('codexRemoteLauncher', () => {
         });
     });
 
-=======
->>>>>>> 66e41c90 (fix(codex): support app-server plan mode (#622))
     it('switches collaboration mode to default after approving exit_plan_mode', async () => {
         const { session, rpcHandlers, collaborationModes, getCollaborationMode } = createSessionStub(['plan this'], {
             permissionMode: 'default',

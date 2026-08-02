@@ -30,8 +30,7 @@ import type {
     ThreadGoalClearParams,
     ThreadGoalClearResponse,
     ExperimentalFeatureEnablementSetParams,
-    ExperimentalFeatureEnablementSetResponse,
-    CollaborationModeListResponse
+    ExperimentalFeatureEnablementSetResponse
 } from './appServerTypes';
 
 type JsonRpcLiteRequest = {
@@ -243,6 +242,8 @@ export class CodexAppServerClient extends JsonLineParser {
             timeoutMs: 30_000
         });
         return response as ModelListResponse;
+    }
+
     async listCollaborationModes(): Promise<CollaborationModeListResponse> {
         const response = await this.sendRequest('collaborationMode/list', {}, {
             timeoutMs: 30_000

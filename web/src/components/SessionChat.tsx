@@ -21,12 +21,11 @@ import { reconcileChatBlocks } from '@/chat/reconcile'
 import { hasInFlightToolCall } from '@/chat/running'
 import { buildConversationOutline, getConversationMessageAnchorId } from '@/chat/outline'
 import { isQueuedForInvocation, mergeMessages } from '@/lib/messages'
-import { inactiveSessionCanResume } from '@/lib/sessionResume'
 import {
     getCodexModelReasoningEfforts,
     supportsCodexReasoningEffort
 } from '@/lib/codexModelCapabilities'
-import { HappyComposer, type ComposerSendError } from '@/components/AssistantChat/HappyComposer'
+import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
 import type { CompactRuntimeChange } from '@/components/AssistantChat/CompactComposerControls'
 import { codexModelAdvertisesFastTier, getEffectiveCodexServiceTier } from '@/components/AssistantChat/codexFastMode'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'

@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
     applyModelChangeWithReasoningRollback,
     buildGoalStateMessages,
-    isScratchlistHotkeyBlockedTarget,
-    isScratchlistToggleHotkey,
     shouldAutoClearPendingSchedule,
-    shouldRouteToScratchlist,
 } from './SessionChat'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import type { DecryptedMessage } from '@/types/api'
