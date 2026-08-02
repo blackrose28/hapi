@@ -229,6 +229,8 @@ describe('runCodex', () => {
         // Untouched (account-default) sessions must omit the tier entirely so
         // the keepalive never persists serviceTier: null over the default.
         expect(mockCodexSession.setServiceTier).not.toHaveBeenCalled()
+    })
+
     it('does not collapse inherited Codex reasoning effort into explicit default on startup', async () => {
         await runCodexImpl({ workingDirectory: '/tmp/project' })
 
@@ -278,5 +280,4 @@ describe('runCodex', () => {
             applied: expect.objectContaining({ modelReasoningEffort: null })
         })
     })
-})
 })

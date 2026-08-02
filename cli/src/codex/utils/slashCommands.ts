@@ -76,65 +76,6 @@ export function resolveCodexSlashCommand(
     const rest = match[2]?.trim() ?? '';
     if (!command) return { kind: 'passthrough' };
 
-    const custom = state.commands?.find((candidate) =>
-        candidate.source !== 'builtin' && candidate.name.toLowerCase() === command
-    );
-    if (custom?.content) {
-        return {
-            kind: 'replace',
-            text: rest ? `${custom.content}\n\nUser arguments: ${rest}` : custom.content,
-            message: `Expanded /${custom.name}`
-        };
-    }
-
-    if (command === 'plan') {
-        const lowerRest = rest.toLowerCase();
-        if (lowerRest === 'off' || lowerRest === 'default' || lowerRest === 'exit' || lowerRest === 'disable') {
-            return {
-                kind: 'handled',
-                message: 'Codex plan mode disabled',
-                updates: { collaborationMode: 'default' }
-            };
-        }
-        if (rest) {
-            return {
-                kind: 'replace',
-                text: rest,
-                message: 'Codex plan mode enabled',
-                updates: { collaborationMode: 'plan' }
-            };
-        }
-        return {
-            kind: 'handled',
-            message: 'Codex plan mode enabled',
-            updates: { collaborationMode: 'plan' }
-        };
-    }
-
-    if (command === 'agent') {
-        const value = rest.toLowerCase();
-        if (value === 'status') {
-            return {
-                kind: 'handled',
-                message: `Codex proactive multi-agent mode: ${state.proactiveMultiAgent ? 'on' : 'off'}`
-            };
-        }
-        if (value && !['on', 'enable', 'enabled', 'off', 'disable', 'disabled'].includes(value)) {
-            return {
-                kind: 'handled',
-                message: 'Usage: /agent [on|off|status]'
-            };
-        }
-        const enabled = value
-            ? ['on', 'enable', 'enabled'].includes(value)
-            : !state.proactiveMultiAgent;
-        return {
-            kind: 'handled',
-            message: `Codex proactive multi-agent mode ${enabled ? 'enabled' : 'disabled'}`,
-            updates: { proactiveMultiAgent: enabled }
-        };
-    }
-
     if (command === 'goal') {
         const lowerRest = rest.toLowerCase();
         if (!rest) {
@@ -166,6 +107,17 @@ export function resolveCodexSlashCommand(
             kind: 'goal',
             action: 'set',
             objective
+        };
+    }
+
+    const custom = state.commands?.find((candidate) =>
+        candidate.source !== 'builtin' && candidate.name.toLowerCase() === command
+    );
+    if (custom?.content) {
+        return {
+            kind: 'replace',
+            text: rest ? `${custom.content}\n\nUser arguments: ${rest}` : custom.content,
+            message: `Expanded /${custom.name}`
         };
     }
 

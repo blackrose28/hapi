@@ -101,7 +101,7 @@ export async function runCodex(opts: {
     // when resuming a session, mirroring model/effort) so a resumed Fast/Standard
     // thread immediately runs with the right tier; otherwise seed from the
     // persisted session. A persisted/absent `null` stays untouched (omitted).
-    let currentServiceTier: string | null | undefined = opts.serviceTier ?? sessionInfo.serviceTier ?? undefined;
+    let currentServiceTier: string | null | undefined = opts.serviceTier ?? sessionInfo?.serviceTier ?? undefined;
 
     const lifecycle = createRunnerLifecycle({
         session,
