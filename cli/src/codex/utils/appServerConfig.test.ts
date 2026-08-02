@@ -39,6 +39,37 @@ describe('appServerConfig', () => {
         });
     });
 
+    it('passes MCP per-tool approval config through thread config', () => {
+        const params = buildThreadStartParams({
+            cwd: '/workspace/project',
+            mode: { permissionMode: 'default', collaborationMode: 'default' },
+            mcpServers: {
+                hapi: {
+                    command: 'node',
+                    args: ['mcp'],
+                    tools: {
+                        change_title: {
+                            approval_mode: 'approve'
+                        }
+                    }
+                }
+            }
+        });
+
+        expect(params.config).toEqual({
+            'mcp_servers.hapi': {
+                command: 'node',
+                args: ['mcp'],
+                tools: {
+                    change_title: {
+                        approval_mode: 'approve'
+                    }
+                }
+            },
+            developer_instructions: codexSystemPrompt
+        });
+    });
+
     it('uses on-request approvals for default Codex threads', () => {
         const params = buildThreadStartParams({
             cwd: '/workspace/project',

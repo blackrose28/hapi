@@ -14,9 +14,16 @@ import { exportHapiSessionEnv } from '@/agent/hapiSessionEnv';
 /**
  * MCP server entry configuration.
  */
+export type McpToolApprovalMode = 'auto' | 'prompt' | 'approve';
+
+export interface McpServerToolConfig {
+    approval_mode?: McpToolApprovalMode;
+}
+
 export interface McpServerEntry {
     command: string;
     args: string[];
+    tools?: Record<string, McpServerToolConfig>;
 }
 
 /**
@@ -72,7 +79,12 @@ export async function buildHapiMcpBridge(
         mcpServers: {
             hapi_session: {
                 command: bridgeCommand.command,
-                args: bridgeCommand.args
+                args: bridgeCommand.args,
+                tools: {
+                    change_title: {
+                        approval_mode: 'approve'
+                    }
+                }
             }
         }
     };

@@ -9,6 +9,7 @@ import {
 } from './utils/codexMcpConfig';
 import { codexSystemPrompt } from './utils/systemPrompt';
 import type { ReasoningEffort } from './appServerTypes';
+import type { McpServersConfig } from './utils/buildHapiMcpBridge';
 
 const CODEX_OPTIONS_WITH_VALUE = new Set([
     '-a',
@@ -117,7 +118,7 @@ export async function codexLocal(opts: {
     sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
     onSessionFound: (id: string) => void;
     codexArgs?: string[];
-    mcpServers?: Record<string, { command: string; args: string[] }>;
+    mcpServers?: McpServersConfig;
     sessionHook?: {
         port: number;
         token: string;

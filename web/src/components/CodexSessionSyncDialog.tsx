@@ -25,7 +25,7 @@ function getCodexSessionPreview(session: CodexLocalSessionSummary): string {
     return parts.join(' · ')
 }
 
-const ALL_WORKDIR_FILTER = '__ALL__'
+const ALL_WORKDIR_FILTER = '__all__'
 
 function getCodexSessionCwd(session: CodexLocalSessionSummary): string | null {
     const cwd = session.cwd?.trim()
@@ -204,7 +204,7 @@ export function CodexSessionSyncDialog(props: {
     }
 
     const selectAll = () => {
-        setSelectedSessionIds(sessions.map((session) => session.id))
+        setSelectedSessionIds(filteredSessions.map((session) => session.id))
     }
 
     const clearAll = () => {
@@ -228,7 +228,7 @@ export function CodexSessionSyncDialog(props: {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-xl">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-3 pr-10" data-testid="codex-import-dialog-header">
                     <DialogHeader className="flex-1 text-left">
                         <DialogTitle>{t('codexSync.confirm.title')}</DialogTitle>
                         <DialogDescription className="mt-2">
@@ -239,6 +239,7 @@ export function CodexSessionSyncDialog(props: {
                         type="button"
                         variant="secondary"
                         size="sm"
+                        className="shrink-0"
                         onClick={() => void onRestartCodexDesktop()}
                         disabled={isRestartingCodexDesktop}
                         aria-label={t('codexSync.restart.tooltip')}
@@ -282,6 +283,26 @@ export function CodexSessionSyncDialog(props: {
                             ) : null}
                         </div>
                     </div>
+                    {sessions.length > 0 ? (
+                        <label className="block min-w-0 text-xs text-[var(--app-hint)]">
+                            <span className="mb-1 block">{t('codexSync.confirm.cwdFilter')}</span>
+                            <select
+                                className="h-8 w-full rounded-md border border-[var(--app-border)] bg-[var(--app-bg)] px-2 text-xs text-[var(--app-fg)] outline-none focus:ring-2 focus:ring-[var(--app-link)]"
+                                value={workdirFilter}
+                                disabled={isPending || isLoading || workdirOptions.length === 0}
+                                onChange={(event) => setWorkdirFilter(event.target.value)}
+                            >
+                                <option value={ALL_WORKDIR_FILTER}>
+                                    {t('codexSync.confirm.cwdFilterAll')}
+                                </option>
+                                {workdirOptions.map((directory) => (
+                                    <option key={directory} value={directory}>
+                                        {directory}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : null}
                     <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)]">
                         {isLoading ? (
                             <div className="px-4 py-8 text-center text-sm text-[var(--app-hint)]">
@@ -291,9 +312,13 @@ export function CodexSessionSyncDialog(props: {
                             <div className="px-4 py-8 text-center text-sm text-[var(--app-hint)]">
                                 {t('codexSync.confirm.empty')}
                             </div>
+                        ) : filteredSessions.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-sm text-[var(--app-hint)]">
+                                {t('codexSync.confirm.emptyForWorkdir')}
+                            </div>
                         ) : (
                             <div className="divide-y divide-[var(--app-border)]">
-                                {sessions.map((session) => {
+                                {filteredSessions.map((session) => {
                                     const checked = selectedSessionIdSet.has(session.id)
                                     const isImported = Boolean(importedSessions[session.id])
                                     const time = formatCodexSessionTime(session.modifiedAt)
@@ -354,9 +379,15 @@ export function CodexSessionSyncDialog(props: {
                                                         </span>
                                                     ) : null}
                                                 </div>
-                                                {getCodexSessionPreview(session) ? (
+                                                {preview ? (
                                                     <div className="mt-0.5 truncate text-xs text-[var(--app-hint)]">
-                                                        {getCodexSessionPreview(session)}
+                                                        {preview}
+                                                    </div>
+                                                ) : null}
+                                                {cwd ? (
+                                                    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] text-[var(--app-hint)]">
+                                                        <span className="shrink-0">{t('codexSync.confirm.cwd')}</span>
+                                                        <span className="min-w-0 truncate font-mono" title={cwd}>{cwd}</span>
                                                     </div>
                                                 ) : null}
                                                 {time ? (
