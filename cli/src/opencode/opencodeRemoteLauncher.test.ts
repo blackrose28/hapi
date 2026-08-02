@@ -245,7 +245,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         await opencodeRemoteLauncher(session as never);
 
         // Native ACP titles replace the change_title MCP tool for OpenCode.
-        expect(harness.bridgeOptions).toEqual([{ enableChangeTitle: false }, { enableChangeTitle: false }]);
+        expect(harness.bridgeOptions).toEqual([{ enableChangeTitle: false }]);
 
         // refreshSessionInfo is polled once per completed prompt.
         expect(harness.refreshSessionInfoCalls).toEqual([
