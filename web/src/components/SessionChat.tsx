@@ -152,6 +152,7 @@ export function SessionChat(props: {
     isSending: boolean
     pendingCount: number
     messagesVersion: number
+    historyVersion?: number
     onBack: () => void
     onSessionDeleted?: () => void
     onRefresh: () => void
@@ -766,7 +767,7 @@ export function SessionChat(props: {
         session: props.session,
         blocks: reconciled.blocks,
         messagesVersion: props.messagesVersion,
-        historyVersion: props.historyVersion,
+        historyVersion: props.historyVersion ?? 0,
         isSending: props.isSending,
         isRunning: props.session.thinking || hasRunningChildAgent,
         onSendMessage: handleSend,
@@ -878,20 +879,19 @@ export function SessionChat(props: {
                         disabled={sessionInactive || readOnly}
                         onRefresh={props.onRefresh}
                         onRetryMessage={props.onRetryMessage}
-                        onFlushPending={props.onFlushPending}
-                        onAtBottomChange={props.onAtBottomChange}
-                        isLoadingMessages={props.isLoadingMessages}
                         messagesWarning={props.messagesWarning}
                         hasMoreMessages={props.hasMoreMessages}
                         isLoadingMoreMessages={props.isLoadingMoreMessages}
-                        onLoadMore={props.onLoadMore}
-                        pendingCount={props.pendingCount}
+                        onLoadMore={async () => { await props.onLoadMore(); return true }}
                         rawMessagesCount={visibleMessages.length}
                         normalizedMessagesCount={normalizedMessages.length}
                         messagesVersion={props.messagesVersion}
+                        historyVersion={props.historyVersion ?? 0}
+                        onViewModeChange={() => {}}
+                        isSyncingTail={false}
+                        unseenCount={0}
                         forceScrollToken={forceScrollToken}
                         outlineOpen={outlineOpen}
-                        outlineTitle={outlineTitle}
                         outlineItems={outlineItems}
                         onOutlineOpenChange={setOutlineOpen}
                     />

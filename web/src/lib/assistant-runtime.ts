@@ -6,7 +6,7 @@ import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePic
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { safeStringify } from '@hapi/protocol'
 import { renderEventLabel } from '@/chat/presentation'
-import type { ChatBlock, CliOutputBlock, CodexReview, ToolGroupBlock, UsageData } from '@/chat/types'
+import type { ChatBlock, CliOutputBlock, CodexReview, UsageData } from '@/chat/types'
 import type { AgentEvent, TeamMentionBlock, ToolCallBlock } from '@/chat/types'
 import { REASONING_TOOL_NAME, reasoningToolCallId } from '@/lib/reasoningPart'
 import type { AttachmentMetadata, MessageStatus as HappyMessageStatus, Session } from '@/types/api'
@@ -225,34 +225,7 @@ export function toThreadMessageLike(block: ChatBlock, threadMessageId: string): 
             metadata: {
                 custom: {
                     kind: 'cli-output',
-                    source: block.source,
-                    invokedAt: block.invokedAt,
-                    durationMs: block.durationMs,
-                    usage: block.usage,
-                    model: block.model
-                } satisfies HappyChatMessageMetadata
-            }
-        }
-    }
-
-    if (block.kind === 'tool-group') {
-        const groupBlock: ToolGroupBlock = block
-        return {
-            role: 'assistant',
-            id: threadMessageId,
-            createdAt: new Date(groupBlock.createdAt),
-            content: [{
-                type: 'tool-call',
-                toolCallId: groupBlock.id,
-                toolName: 'ToolGroup',
-                argsText: '',
-                artifact: groupBlock
-            }],
-            metadata: {
-                custom: {
-                    kind: 'tool',
-                    toolCallId: groupBlock.id,
-                    invokedAt: groupBlock.invokedAt ?? null
+                    source: block.source
                 } satisfies HappyChatMessageMetadata
             }
         }
@@ -400,8 +373,8 @@ export function useHappyRuntime(props: {
     }, [props.onAbort])
 
     const extras = useMemo<HappyRuntimeExtras>(() => ({
-        messagesVersion: props.messagesVersion,
-        historyVersion: props.historyVersion
+        messagesVersion: props.messagesVersion ?? 0,
+        historyVersion: props.historyVersion ?? 0
     }), [props.messagesVersion, props.historyVersion])
 
     // Memoize the adapter to avoid recreating on every render

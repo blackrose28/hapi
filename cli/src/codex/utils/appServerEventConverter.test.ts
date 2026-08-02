@@ -985,4 +985,3 @@ describe('AppServerEventConverter', () => {
         }]);
     });
 });
-});

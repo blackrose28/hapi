@@ -35,7 +35,7 @@ function userBlockToOutlineItem(block: UserTextBlock): ConversationOutlineItem {
 
 function isLocatableOutlineBlock(block: ChatBlock): block is UserTextBlock {
     return block.kind === 'user-text'
-        && !(block.invokedAt === null && block.status !== 'failed')
+        && block.status !== 'queued'
 }
 
 export function buildConversationOutline(blocks: readonly ChatBlock[]): ConversationOutlineItem[] {

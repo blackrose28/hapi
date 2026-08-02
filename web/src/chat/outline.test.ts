@@ -62,8 +62,8 @@ describe('conversation outline', () => {
 
     it('filters queued user messages that are not yet locatable in the thread', () => {
         const items = buildConversationOutline([
-            userBlock('queued', 'Queued prompt', 1000, { status: 'queued', invokedAt: null }),
-            userBlock('sent', 'Visible prompt', 2000, { status: 'sent', invokedAt: 2500 }),
+            userBlock('queued', 'Queued prompt', 1000, { status: 'queued' }),
+            userBlock('sent', 'Visible prompt', 2000, { status: 'sent' }),
         ])
 
         expect(items.map((item) => item.id)).toEqual([

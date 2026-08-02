@@ -8,27 +8,17 @@ import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionExportDialog } from '@/components/SessionExportDialog'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { CopyIcon, CheckIcon, ScheduleIcon } from '@/components/icons'
+import { CopyIcon, CheckIcon } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
-import { DEFAULT_SESSION_PREVIEW_LIMIT, useSessionPreviewLimit } from '@/hooks/useSessionPreviewLimit'
-import { AgentFlavorIcon } from '@/components/AgentFlavorIcon'
-import { useSessionListStatusMode } from '@/hooks/useSessionListStatusMode'
-import { useShowActiveSessionsOnly } from '@/hooks/useShowActiveSessionsOnly'
 import { classifySessionAttention } from '@/lib/sessionAttention'
-import { getSessionLastSeenAt } from '@/lib/sessionLastSeen'
 import { getAttentionLabel, SessionAttentionIndicator } from '@/components/SessionAttentionIndicator'
 import { HoverTooltip, SESSION_ROW_TOOLTIP_FOCUS_CLASS, useSessionRowTooltipIds } from '@/components/HoverTooltip'
 import { formatRelativeTime } from '@/lib/relativeTime'
 import { formatScheduledTooltipDetail } from '@/lib/scheduledTime'
 import { getCodexImportedAt, subscribeCodexImportedSessions } from '@/lib/codexImportedSessions'
 import { formatReopenError } from '@/lib/reopenError'
-import { getSessionTitle } from '@/lib/sessionTitle'
 import type { Machine } from '@/types/api'
-import { getMachinePlatform, presentMachineHealth } from '@/lib/machineHealth'
-import { MachineFilterBar } from '@/components/MachineFilterBar'
-import { useSessionListMachineFilter } from '@/hooks/useSessionListMachineFilter'
-import { useCursorChatStoreStatus } from '@/hooks/queries/useCursorChatStoreStatus'
 
 type SessionGroup = {
     key: string
@@ -141,7 +131,11 @@ function getGroupDisplayName(directory: string): string {
 }
 
 export const UNKNOWN_MACHINE_ID = '__unknown__'
-export const GROUP_SESSION_PREVIEW_LIMIT = DEFAULT_SESSION_PREVIEW_LIMIT
+export const GROUP_SESSION_PREVIEW_LIMIT = 5
+
+export function getSessionTitle(session: SessionSummary): string {
+    return session.metadata?.name || session.id
+}
 
 export function getSessionDedupKey(session: SessionSummary): string | null {
     const agentId = session.metadata?.agentSessionId?.trim()
@@ -467,8 +461,6 @@ function ChevronIcon(props: { className?: string; collapsed?: boolean }) {
     )
 }
 
-export { getSessionTitle } from '@/lib/sessionTitle'
-
 export function getWorktreeSessionLabel(session: SessionSummary): string | null {
     const worktree = session.metadata?.worktree
     if (!worktree) {
@@ -783,22 +775,7 @@ function SessionItem(props: {
     const [exportOpen, setExportOpen] = useState(false)
     const [archiveOpen, setArchiveOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
-    const {
-        status: cursorChatStoreStatus,
-        isApplicable: cursorChatStoreApplicable,
-        error: cursorChatStoreError,
-    } = useCursorChatStoreStatus({
-        api,
-        session: s,
-        enabled: menuOpen
-    })
-    const cursorReopenDisabledReason = cursorChatStoreApplicable && cursorChatStoreStatus?.onDisk !== true
-        ? cursorChatStoreError
-            ? t('session.action.reopenCursorCheckFailed')
-            : cursorChatStoreStatus?.onDisk === false
-                ? t('session.action.reopenCursorMissing')
-                : t('session.action.reopenCursorChecking')
-        : undefined
+    const cursorReopenDisabledReason = undefined
 
     const { archiveSession, reopenSession, renameSession, deleteSession, isPending } = useSessionActions(
         api,
@@ -842,16 +819,17 @@ function SessionItem(props: {
         () => showDetailedStatus
             ? classifySessionAttention(s, {
                 selected,
-                lastSeenAt: getSessionLastSeenAt(s.id)
+                lastSeenAt: undefined
             })
             : null,
         [s, selected, showDetailedStatus]
     )
     const attentionLabel = attention ? getAttentionLabel(attention, t) : null
-    const scheduledLabel = s.futureScheduledMessageCount > 1
-        ? t('session.item.scheduledMessages', { count: s.futureScheduledMessageCount })
+    const scheduledCount = s.futureScheduledMessageCount ?? 0
+    const scheduledLabel = scheduledCount > 1
+        ? t('session.item.scheduledMessages', { count: scheduledCount })
         : t('session.item.scheduledMessage')
-    const hasScheduleTooltip = showDetailedStatus && s.futureScheduledMessageCount > 0
+    const hasScheduleTooltip = showDetailedStatus && scheduledCount > 0
     const { attentionId, scheduleId, describedBy } = useSessionRowTooltipIds(
         Boolean(attention),
         hasScheduleTooltip
@@ -868,7 +846,6 @@ function SessionItem(props: {
             >
                 <div className={`flex items-center justify-between gap-3 ${!s.active ? 'opacity-50' : ''}`}>
                     <div className="flex items-center gap-2 min-w-0">
-                        <AgentFlavorIcon flavor={s.metadata?.flavor} className="h-4 w-4 shrink-0 -translate-y-px" />
                         <div className={`truncate text-sm font-medium ${s.active ? 'text-[var(--app-fg)]' : 'text-[var(--app-hint)]'}`}>
                             {sessionName}
                         </div>
@@ -885,7 +862,7 @@ function SessionItem(props: {
                         {hasScheduleTooltip ? (
                             <HoverTooltip
                                 id={scheduleId!}
-                                target={<ScheduleIcon className="h-3.5 w-3.5 text-[var(--app-hint)]" />}
+                                target={<span className="h-3.5 w-3.5 text-[var(--app-hint)]" aria-hidden="true">📅</span>}
                                 side="bottom"
                                 align="start"
                                 className="shrink-0"
@@ -932,14 +909,11 @@ function SessionItem(props: {
             <SessionActionMenu
                 isOpen={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                sessionId={s.id}
-                sessionTitle={sessionName}
                 sessionActive={s.active}
                 onRename={() => setRenameOpen(true)}
                 onExport={() => setExportOpen(true)}
                 onArchive={() => setArchiveOpen(true)}
-                onReopen={cursorReopenDisabledReason ? undefined : handleReopen}
-                reopenDisabledReason={cursorReopenDisabledReason}
+                onReopen={handleReopen}
                 onDelete={() => setDeleteOpen(true)}
                 anchorPoint={menuAnchorPoint}
             />
@@ -969,7 +943,7 @@ function SessionItem(props: {
                 <SessionExportDialog
                     isOpen={true}
                     onClose={() => setExportOpen(false)}
-                    sessionId={s.id}
+                    session={s as any}
                     api={api}
                 />
             ) : null}
@@ -1017,11 +991,11 @@ export function SessionList(props: {
 }) {
     const { t } = useTranslation()
     const { renderHeader = true, api, selectedSessionId, machineLabelsById = {}, machinesById = {}, onNewSessionInDirectory } = props
-    const { sessionPreviewLimit } = useSessionPreviewLimit()
-    const { sessionListStatusMode } = useSessionListStatusMode()
-    const { showActiveSessionsOnly } = useShowActiveSessionsOnly()
-    const { machineFilter, setMachineFilter } = useSessionListMachineFilter()
-    const showDetailedStatus = sessionListStatusMode === 'detailed'
+    const sessionPreviewLimit = 5
+    const showDetailedStatus = true
+    const showActiveSessionsOnly = false
+    const machineFilter = null
+    const setMachineFilter = () => {}
     const [searchQuery, setSearchQuery] = useState('')
     const [customStart, setCustomStart] = useState('')
     const [customEnd, setCustomEnd] = useState('')
@@ -1259,25 +1233,6 @@ export function SessionList(props: {
                 </div>
             ) : null}
 
-            {showMachineFilterBar ? (
-                <MachineFilterBar
-                    machines={machineFilters.map((mg) => {
-                        const machine = mg.machineId ? machinesById[mg.machineId] : undefined
-                        return {
-                            id: mg.machineId ?? UNKNOWN_MACHINE_ID,
-                            label: mg.label,
-                            sessionCount: mg.totalSessions,
-                            healthPresentation: presentMachineHealth(
-                                machine?.health,
-                                getMachinePlatform(machine)
-                            )
-                        }
-                    })}
-                    totalCount={allSessions.length}
-                    value={activeMachineFilter}
-                    onChange={setMachineFilter}
-                />
-            ) : null}
             </div>
 
             <div className="app-scroll-y session-list-scrollbar-left min-h-0 flex-1">

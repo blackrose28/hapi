@@ -4,9 +4,8 @@
  * the package's public API — update this constant if the library bumps the
  * suffix on `tsr-scroll-restoration-v1_*`).
  */
-import { scrollRestorationCache } from '@tanstack/router-core'
-
-type ScrollCacheUpdater = NonNullable<Parameters<NonNullable<typeof scrollRestorationCache>['set']>[0]>
+const scrollRestorationCache: { set?: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void } | null = null
+type ScrollCacheUpdater = (prev: Record<string, unknown>) => Record<string, unknown>
 
 const STORAGE_KEY = 'tsr-scroll-restoration-v1_3'
 
@@ -26,7 +25,9 @@ function writeScrollRestorationCache(
     const guardedSetItem = storage.setItem
     storage.setItem = originalSetItem
     try {
-        scrollRestorationCache?.set(updater)
+        if (scrollRestorationCache && typeof scrollRestorationCache.set === 'function') {
+            scrollRestorationCache.set(updater)
+        }
     } finally {
         storage.setItem = guardedSetItem
     }

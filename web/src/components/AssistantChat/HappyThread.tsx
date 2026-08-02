@@ -5,17 +5,15 @@ import type { HappyRuntimeExtras } from '@/lib/assistant-runtime'
 import type { SessionMetadataSummary } from '@/types/api'
 import type { ConversationOutlineItem } from '@/chat/outline'
 import { getConversationMessageAnchorId } from '@/chat/outline'
-import { formatMessageTimestampTitle, formatOutlineTimestamp } from '@/chat/presentation'
+import { formatUnixTimestamp } from '@/chat/presentation'
 import { HappyChatProvider } from '@/components/AssistantChat/context'
 import { HappyAssistantMessage } from '@/components/AssistantChat/messages/AssistantMessage'
 import { HappyUserMessage } from '@/components/AssistantChat/messages/UserMessage'
 import { HappySystemMessage } from '@/components/AssistantChat/messages/SystemMessage'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/Spinner'
-import { useTerminalToolDisplayMode } from '@/hooks/useTerminalToolDisplayMode'
 import { useTranslation } from '@/lib/use-translation'
 import { CloseIcon } from '@/components/icons'
-import { ShareTurnDialog } from '@/components/AssistantChat/ShareTurnDialog'
 
 type ScrollAnchor = {
     id: string
@@ -346,10 +344,10 @@ export function ConversationOutlinePanel(props: {
                                         <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--app-button)]" aria-hidden="true" />
                                         <time
                                             dateTime={createdAt.toISOString()}
-                                            title={formatMessageTimestampTitle(createdAt)}
+                                            title={formatUnixTimestamp(createdAt.getTime())}
                                             className="truncate"
                                         >
-                                            {formatOutlineTimestamp(createdAt, locale)}
+                                            {formatUnixTimestamp(createdAt.getTime())}
                                         </time>
                                     </span>
                                     <span className="mt-0.5 line-clamp-2 pl-4 text-sm leading-snug text-[var(--app-fg)]">
@@ -390,7 +388,6 @@ export function HappyThread(props: {
     onOutlineItemClick?: (item: ConversationOutlineItem) => void
 }) {
     const { t } = useTranslation()
-    const { terminalToolDisplayMode } = useTerminalToolDisplayMode()
     const runtimeExtras = useAssistantState(({ thread }) => thread.extras) as HappyRuntimeExtras | undefined
     const appliedMessagesVersion = runtimeExtras?.messagesVersion ?? props.messagesVersion
     const appliedHistoryVersion = runtimeExtras?.historyVersion ?? props.historyVersion
@@ -398,8 +395,6 @@ export function HappyThread(props: {
     appliedHistoryVersionRef.current = appliedHistoryVersion
     const viewportRef = useRef<HTMLDivElement | null>(null)
     const contentRef = useRef<HTMLDivElement | null>(null)
-    const [shareTurn, setShareTurn] = useState<ShareTurnState>(null)
-    const shareTurnIdRef = useRef(0)
     const topSentinelRef = useRef<HTMLDivElement | null>(null)
     const loadLockRef = useRef(false)
     const pendingScrollRef = useRef<PendingScrollRestore | null>(null)
@@ -824,86 +819,16 @@ export function HappyThread(props: {
     }, [props.isLoadingMoreMessages])
 
     const showSkeleton = props.isSyncingTail && props.rawMessagesCount === 0
-    const handleShareTurn = useCallback((
-        messageTarget: HTMLElement | string | null,
-        clientY?: number,
-        fallbackSnapshot?: ShareTurnSnapshot
-    ) => {
-        const content = contentRef.current
-        if (!content) return
-
-        let target: HTMLElement | null = typeof messageTarget === 'string'
-            ? document.getElementById(messageTarget)
-            : messageTarget
-        if (!(target instanceof HTMLElement) || !content.contains(target)) {
-            target = findNearestMessageElement(content, clientY)
-        }
-        if (!(target instanceof HTMLElement) || !content.contains(target)) {
-            setShareTurn({
-                id: ++shareTurnIdRef.current,
-                snapshots: fallbackSnapshot ? [fallbackSnapshot] : [],
-                title: props.metadata?.summary?.text ?? props.metadata?.name ?? props.metadata?.path ?? props.sessionId.slice(0, 8),
-                subtitle: [props.metadata?.flavor, props.metadata?.host].filter(Boolean).join(' · ') || props.sessionId
-            })
-            return
-        }
-
-        let start: Element | null = target
-        while (start?.previousElementSibling && start.getAttribute('data-hapi-message-role') !== 'user') {
-            start = start.previousElementSibling
-        }
-        if (!start || start.getAttribute('data-hapi-message-role') !== 'user') {
-            start = target
-        }
-
-        const snapshots: ShareTurnSnapshot[] = []
-        let current: Element | null = start
-        while (current instanceof HTMLElement) {
-            if (current !== start && current.getAttribute('data-hapi-message-role') === 'user') {
-                break
-            }
-            const role = current.getAttribute('data-hapi-message-role')
-            if (role === 'user' || role === 'assistant') {
-                snapshots.push({
-                    html: current.outerHTML,
-                    text: (current.innerText || current.textContent || '').trim()
-                })
-            }
-            current = current.nextElementSibling
-        }
-
-        if (snapshots.length === 0 && target instanceof HTMLElement) {
-            snapshots.push({
-                html: target.outerHTML,
-                text: (target.innerText || target.textContent || '').trim()
-            })
-        }
-        if (snapshots.length === 0 && fallbackSnapshot) {
-            snapshots.push(fallbackSnapshot)
-        }
-        const completeSnapshots = prependMissingUserSnapshot(snapshots, fallbackSnapshot)
-
-        setShareTurn({
-            id: ++shareTurnIdRef.current,
-            snapshots: completeSnapshots,
-            title: props.metadata?.summary?.text ?? props.metadata?.name ?? props.metadata?.path ?? props.sessionId.slice(0, 8),
-            subtitle: [props.metadata?.flavor, props.metadata?.host].filter(Boolean).join(' · ') || props.sessionId
-        })
-    }, [props.metadata, props.sessionId])
+    const handleShareTurn = useCallback(() => {}, [])
 
     return (
         <HappyChatProvider value={{
             api: props.api,
             sessionId: props.sessionId,
             metadata: props.metadata,
-            terminalToolDisplayMode,
             disabled: props.disabled,
             onRefresh: props.onRefresh,
-            onRetryMessage: props.onRetryMessage,
-            onShareTurn: handleShareTurn,
-            hasMoreMessages: props.hasMoreMessages,
-            isLoadingMoreMessages: props.isLoadingMoreMessages,
-            loadOlderMessagesPreservingScroll: loadOlderFromUserAction
+            onRetryMessage: props.onRetryMessage
         }}>
             <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col relative">
                 {props.isSyncingTail && props.rawMessagesCount > 0 ? (
@@ -978,14 +903,6 @@ export function HappyThread(props: {
                         />
                     </>
                 ) : null}
-                <ShareTurnDialog
-                    key={shareTurn?.id ?? 'closed'}
-                    isOpen={shareTurn !== null}
-                    title={shareTurn?.title ?? ''}
-                    subtitle={shareTurn?.subtitle ?? ''}
-                    sourceSnapshots={shareTurn?.snapshots ?? []}
-                    onClose={() => setShareTurn(null)}
-                />
             </ThreadPrimitive.Root>
         </HappyChatProvider>
     )

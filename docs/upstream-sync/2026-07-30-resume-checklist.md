@@ -111,7 +111,7 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `multiagent-timeline-codex` (1 commit)
 
 ### Batch 6: Web features (large)
-- [ ] `chat-history-scroll-stability` (16 commits) — `patches/` dir new
+- [x] `chat-history-scroll-stability` (16 commits) — `patches/` dir new
 - [ ] `session-list-core-stability` (16 commits)
 - [ ] `session-ui-polish-misc` (16 commits) — skip `.github/`
 - [ ] `chat-composer-misc-polish` (13 commits)

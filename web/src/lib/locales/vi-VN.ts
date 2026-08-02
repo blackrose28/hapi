@@ -702,7 +702,6 @@ export default {
   'misc.fastModeFast': 'Nhanh (Fast)',
   'misc.variant': 'Biến thể',
   'misc.loading': 'Đang tải…',
-  'misc.loadOlder': 'Tải cũ hơn',
   'misc.newMessage': '{n} tin nhắn mới',
   'misc.loadingMessages': 'Đang tải tin nhắn…',
   'misc.typeMessage': "Gõ 'continue' để tiếp tục...",

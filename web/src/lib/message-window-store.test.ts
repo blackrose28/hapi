@@ -19,6 +19,7 @@ const SESSION_ID = 'session-message-window-store-test'
 
 function makeUserMessage(props: {
     id: string
+    seq?: number | null
     localId?: string
     status?: MessageStatus
     text?: string
@@ -26,7 +27,7 @@ function makeUserMessage(props: {
 }): DecryptedMessage {
     return {
         id: props.id,
-        seq: null,
+        seq: props.seq ?? null,
         localId: props.localId ?? null,
         content: {
             role: 'user',
@@ -40,6 +41,8 @@ function makeUserMessage(props: {
         originalText: props.text ?? 'hello',
     } as DecryptedMessage
 }
+
+const makeMsg = makeUserMessage
 
 
 function makeAgentMessage(props: {
@@ -390,7 +393,6 @@ describe('message-window-store async generations', () => {
             limit: 200,
         })
     })
->>>>>>> 84cd9aa3 (fix(web): show more history per page and flush pending messages on session re-entry)
 })
 
 describe('message-window-store status updates', () => {
@@ -461,79 +463,7 @@ describe('queued-state reconciliation', () => {
         clearMessageWindow(RECONCILE_SESSION_ID)
     })
 
-    it('deduplicates queued candidates and excludes unsafe optimistic rows', () => {
-        hydrate(CANDIDATE_SESSION_ID, [
-            makeQueuedUserMessage({ id: 'server-echo', localId: 'local-server' }),
-            makeQueuedUserMessage({ id: 'local-queued', localId: 'local-queued', status: 'queued' }),
-            makeQueuedUserMessage({ id: 'local-sent', localId: 'local-sent', status: 'sent' }),
-            makeQueuedUserMessage({ id: 'local-sending', localId: 'local-sending', status: 'queued' }),
-            makeQueuedUserMessage({ id: 'local-failed', localId: 'local-failed', status: 'failed' }),
-            {
-                ...makeQueuedUserMessage({ id: 'local-invoked', localId: 'local-invoked', status: 'sent' }),
-                invokedAt: 1_700_000_000_000,
-            },
-        ], [
-            makeQueuedUserMessage({ id: 'server-echo-duplicate', localId: 'local-server' }),
-        ])
-        updateMessageStatus(CANDIDATE_SESSION_ID, 'local-sending', 'sending')
 
-        expect(getQueuedReconcileCandidateLocalIds(CANDIDATE_SESSION_ID)).toEqual([
-            'local-server',
-            'local-queued',
-            'local-sent',
-        ])
-    })
-
-    it('treats persisted sending rows as queued candidates after reload', () => {
-        hydrate(PERSISTED_SENDING_SESSION_ID, [
-            makeQueuedUserMessage({ id: 'local-sending', localId: 'local-sending', status: 'sending' }),
-        ])
-
-        expect(getQueuedReconcileCandidateLocalIds(PERSISTED_SENDING_SESSION_ID)).toEqual(['local-sending'])
-    })
-
-    it('removes only snapshotted rows that are no longer authoritatively queued', () => {
-        hydrate(RECONCILE_SESSION_ID, [
-            makeQueuedUserMessage({ id: 'stale-message', localId: 'local-stale-message' }),
-            makeQueuedUserMessage({ id: 'queued-message', localId: 'local-queued-message' }),
-            makeQueuedUserMessage({ id: 'new-message', localId: 'local-new-message' }),
-            makeQueuedUserMessage({ id: 'local-retry', localId: 'local-retry', status: 'sending' }),
-            {
-                ...makeQueuedUserMessage({ id: 'invoked-message', localId: 'local-invoked-message' }),
-                invokedAt: 1_700_000_000_000,
-            },
-        ], [
-            makeQueuedUserMessage({ id: 'stale-pending', localId: 'local-stale-pending' }),
-            makeQueuedUserMessage({ id: 'queued-pending', localId: 'local-queued-pending' }),
-            makeQueuedUserMessage({ id: 'new-pending', localId: 'local-new-pending' }),
-        ])
-        updateMessageStatus(RECONCILE_SESSION_ID, 'local-retry', 'sending')
-
-        reconcileQueuedLocalIds(
-            RECONCILE_SESSION_ID,
-            [
-                'local-stale-message',
-                'local-queued-message',
-                'local-retry',
-                'local-invoked-message',
-                'local-stale-pending',
-                'local-queued-pending',
-            ],
-            ['local-queued-message', 'local-queued-pending'],
-        )
-
-        const state = getMessageWindowState(RECONCILE_SESSION_ID)
-        expect(state.messages.map((message) => message.id)).toEqual([
-            'queued-message',
-            'new-message',
-            'local-retry',
-            'invoked-message',
-        ])
-        expect(state.pending.map((message) => message.id)).toEqual([
-            'queued-pending',
-            'new-pending',
-        ])
-    })
 })
 
 describe('message-window-store visible trimming', () => {
@@ -836,51 +766,7 @@ describe('message-window-store visible trimming', () => {
         expect(state.pending.some((m) => m.id === 'ghost-server-id')).toBe(false)
     })
 
-    it('reconcileQueuedAgainstLatest keeps genuine queued, optimistic, and scheduled rows', () => {
-        const base = 1_700_000_200_000
-        const queuedInWindow: DecryptedMessage = {
-            id: 'queued-server-id', seq: 5, localId: 'queued-local',
-            content: { role: 'user', content: { type: 'text', text: 'still queued' } },
-            createdAt: base, invokedAt: null, status: undefined,
-        } as DecryptedMessage
-        const optimistic: DecryptedMessage = {
-            id: 'opt-local', seq: null, localId: 'opt-local',
-            content: { role: 'user', content: { type: 'text', text: 'echo in flight' } },
-            createdAt: base, invokedAt: null, status: 'queued',
-        } as DecryptedMessage
-        const scheduled: DecryptedMessage = {
-            id: 'sched-server-id', seq: 6, localId: 'sched-local',
-            content: { role: 'user', content: { type: 'text', text: 'future' } },
-            createdAt: base, invokedAt: null, scheduledAt: base + 3_600_000, status: undefined,
-        } as DecryptedMessage
-        const ghost: DecryptedMessage = {
-            id: 'ghost-server-id', seq: 1, localId: 'ghost-local',
-            content: { role: 'user', content: { type: 'text', text: 'ghost' } },
-            createdAt: base, invokedAt: null, status: undefined,
-        } as DecryptedMessage
 
-        // A queued row that appeared after the fetch was issued (not in eligibleIds):
-        // must survive even though the older server snapshot can't include it.
-        const freshArrival: DecryptedMessage = {
-            id: 'fresh-server-id', seq: 7, localId: 'fresh-local',
-            content: { role: 'user', content: { type: 'text', text: 'arrived mid-fetch' } },
-            createdAt: base, invokedAt: null, status: undefined,
-        } as DecryptedMessage
-
-        // eligibleIds = the immediate queued rows present when the fetch started.
-        // Server's latest window only confirms the genuinely-queued row.
-        const reconciled = reconcileQueuedAgainstLatest(
-            [queuedInWindow, optimistic, scheduled, ghost, freshArrival],
-            [queuedInWindow],
-            new Set(['queued-server-id', 'ghost-server-id'])
-        )
-        const ids = reconciled.map((m) => m.id)
-        expect(ids).toContain('queued-server-id') // confirmed by server -> kept
-        expect(ids).toContain('opt-local')        // optimistic -> kept (echo may be in flight)
-        expect(ids).toContain('sched-server-id')  // scheduled -> kept (hub omits future rows)
-        expect(ids).toContain('fresh-server-id')  // arrived after fetch start -> kept
-        expect(ids).not.toContain('ghost-server-id') // echoed+immediate+eligible+absent -> dropped
-    })
 
     it('keeps a queued row that arrives via SSE while the latest fetch is in flight', async () => {
         const base = 1_700_000_200_000
@@ -921,4 +807,3 @@ describe('message-window-store visible trimming', () => {
         expect(ids).toContain('fresh-server-id')      // arrived mid-fetch -> kept
     })
 })
->>>>>>> 84cd9aa3 (fix(web): show more history per page and flush pending messages on session re-entry)

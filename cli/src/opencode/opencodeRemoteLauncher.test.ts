@@ -227,7 +227,7 @@ describe('opencodeRemoteLauncher inline model switch', () => {
         harness.availableCommandUpdates = [];
         harness.sessionInfoUpdateListener = null;
         harness.refreshSessionInfoCalls = [];
-        harness.bridgeOptions = null;
+        harness.bridgeOptions = [];
         harness.thoughtLevelOption = null;
     });
 
