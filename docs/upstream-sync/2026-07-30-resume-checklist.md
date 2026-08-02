@@ -105,7 +105,7 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] codex-fast-tier-ui (6 commits) — `apiTypes→schemas.ts` fold
 - [x] `codex-mcp-safety-approval` (6 commits)
 - [x] `codex-new-capabilities` (5 commits)
-- [ ] `codex-reasoning-effort-modeswitch` (5 commits)
+- [x] `codex-reasoning-effort-modeswitch` (5 commits)
 - [ ] `codex-review-messages-render` (1 commit)
 - [ ] `codex-title-mcp-autoapprove` (1 commit)
 - [ ] `multiagent-timeline-codex` (1 commit)
