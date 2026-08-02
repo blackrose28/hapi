@@ -98,17 +98,17 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [x] `opencode-features` (3 commits)
 - [x] `pi-agent-integration` (5 commits)
 
-### Batch 5: Codex
+### Batch 5: Codex — ✅ DONE
 - [x] `codex-subagent-goal` (8 commits)
 - [x] `codex-session-import-resume` (8 commits) — `apiTypes→schemas.ts` fold
 - [x] `codex-transcript-sync` (6 commits) — `apiTypes→schemas.ts` fold
-- [x] codex-fast-tier-ui (6 commits) — `apiTypes→schemas.ts` fold
+- [x] `codex-fast-tier-ui` (6 commits) — `apiTypes→schemas.ts` fold
 - [x] `codex-mcp-safety-approval` (6 commits)
 - [x] `codex-new-capabilities` (5 commits)
 - [x] `codex-reasoning-effort-modeswitch` (5 commits)
 - [x] `codex-review-messages-render` (1 commit)
-- [ ] `codex-title-mcp-autoapprove` (1 commit)
-- [ ] `multiagent-timeline-codex` (1 commit)
+- [x] `codex-title-mcp-autoapprove` (1 commit)
+- [x] `multiagent-timeline-codex` (1 commit)
 
 ### Batch 6: Web features (large)
 - [ ] `chat-history-scroll-stability` (16 commits) — `patches/` dir new
@@ -169,7 +169,7 @@ Port order respects dependency chains (see triage artifact for Mermaid DAG).
 - [ ] `windows-schedule-picker` (1 commit) — after batch 2
 - [ ] `filepath-autolink-ergonomics` (1 commit) — after batch 7
 - [ ] `message-actions-metadata-refine` (1 commit) — after batch 7
-- [ ] `codex-import-workdir-filter` (1 commit) — after batch 5
+- [x] `codex-import-workdir-filter` (1 commit) — ✅ done (ported with Batch 5)
 - [ ] `codex-misc` Qwen commit `a2465c78` — after batch 8 (`voice-mode`)
 
 ## Next session: what to do first
